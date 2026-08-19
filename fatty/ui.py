@@ -876,16 +876,24 @@ class App(tk.Tk):
             selectmode="browse",
             height=12,
         )
-        self.cmd_tree.heading("#0", text="Название")
-        self.cmd_tree.heading("command", text="Команда")
+        self.cmd_tree.heading("#0", text="Название", command=self._sort_commands_by_name)
+        self.cmd_tree.heading("command", text="Команда", command=self._sort_commands_by_command)
         self.cmd_tree.column("#0", width=180)
         self.cmd_tree.column("command", width=420)
         self.cmd_tree.pack(fill="both", expand=True)
         self.cmd_tree.bind("<<TreeviewSelect>>", lambda _e: self._remember_selection())
         self.cmd_tree.bind("<Double-1>", lambda _e: self._edit_command())
+        self.cmd_tree.bind("<Control-Up>", lambda _e: self._move_command(-1))
+        self.cmd_tree.bind("<Control-Down>", lambda _e: self._move_command(1))
+
+        corder = ttk.Frame(right)
+        corder.pack(fill="x", pady=(8, 0))
+        ttk.Button(corder, text="Вверх", command=lambda: self._move_command(-1)).pack(side="left")
+        ttk.Button(corder, text="Вниз", command=lambda: self._move_command(1)).pack(side="left", padx=4)
+        ttk.Button(corder, text="По имени", command=self._sort_commands_by_name).pack(side="left", padx=4)
 
         cbtns = ttk.Frame(right)
-        cbtns.pack(fill="x", pady=(8, 0))
+        cbtns.pack(fill="x", pady=(4, 0))
         ttk.Button(cbtns, text="Добавить", command=self._add_command).pack(side="left", padx=(0, 4))
         ttk.Button(cbtns, text="Изменить", command=self._edit_command).pack(side="left", padx=4)
         ttk.Button(cbtns, text="Копия", command=self._duplicate_command).pack(side="left", padx=4)
@@ -1136,6 +1144,40 @@ class App(tk.Tk):
         self.config_data.commands = [c for c in self.config_data.commands if c.server_id != server.id]
         self.persist()
         self._refresh_servers()
+
+    def _move_command(self, delta: int) -> str:
+        cmd = self._selected_command()
+        if not cmd:
+            return "break"
+        if not self.config_data.move_command(cmd.id, delta):
+            return "break"
+        self.persist()
+        self._refresh_commands()
+        if self.cmd_tree.exists(cmd.id):
+            self.cmd_tree.selection_set(cmd.id)
+            self.cmd_tree.see(cmd.id)
+            self.cmd_tree.focus(cmd.id)
+        return "break"
+
+    def _sort_commands_by_name(self) -> None:
+        self._sort_commands("name")
+
+    def _sort_commands_by_command(self) -> None:
+        self._sort_commands("command")
+
+    def _sort_commands(self, by: str) -> None:
+        server = self._selected_server()
+        if not server:
+            return
+        keep = self.cmd_tree.selection()[0] if self.cmd_tree.selection() else None
+        self.config_data.sort_commands_for(server.id, by=by)
+        self.persist()
+        self._refresh_commands()
+        if keep and self.cmd_tree.exists(keep):
+            self.cmd_tree.selection_set(keep)
+            self.cmd_tree.see(keep)
+        label = "имени" if by == "name" else "команде"
+        self.status.configure(text=f"Команды отсортированы по {label}")
 
     def _add_command(self) -> None:
         server = self._selected_server()

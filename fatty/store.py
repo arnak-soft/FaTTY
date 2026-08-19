@@ -114,6 +114,38 @@ class Config:
     def commands_for(self, server_id: str) -> list[Command]:
         return [c for c in self.commands if c.server_id == server_id]
 
+    def set_commands_for(self, server_id: str, ordered: list[Command]) -> None:
+        remaining = list(ordered)
+        rebuilt: list[Command] = []
+        for cmd in self.commands:
+            if cmd.server_id != server_id:
+                rebuilt.append(cmd)
+            elif remaining:
+                rebuilt.append(remaining.pop(0))
+        rebuilt.extend(remaining)
+        self.commands = rebuilt
+
+    def move_command(self, command_id: str, delta: int) -> bool:
+        cmd = self.command_by_id(command_id)
+        if cmd is None or delta == 0:
+            return False
+        group = self.commands_for(cmd.server_id)
+        idx = next(i for i, item in enumerate(group) if item.id == command_id)
+        new_idx = idx + delta
+        if new_idx < 0 or new_idx >= len(group):
+            return False
+        group[idx], group[new_idx] = group[new_idx], group[idx]
+        self.set_commands_for(cmd.server_id, group)
+        return True
+
+    def sort_commands_for(self, server_id: str, *, by: str = "name") -> None:
+        group = self.commands_for(server_id)
+        if by == "command":
+            group.sort(key=lambda c: (c.command.strip().casefold(), c.name.strip().casefold(), c.id))
+        else:
+            group.sort(key=lambda c: (c.name.strip().casefold(), c.command.strip().casefold(), c.id))
+        self.set_commands_for(server_id, group)
+
 
 def _parse_vault(raw: dict) -> VaultMeta | None:
     salt = str(raw.get("salt") or "")

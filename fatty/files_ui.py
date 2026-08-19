@@ -16,6 +16,7 @@ from fatty.sftp import (
     format_size,
 )
 from fatty.store import Server
+from fatty.win_icons import ShellIcons
 
 _PARENT_IID = ".."
 
@@ -79,11 +80,15 @@ class FilesWindow(tk.Toplevel):
 
         tree_frame = ttk.Frame(root)
         tree_frame.pack(fill="both", expand=True, pady=(8, 0))
+        self._icons = ShellIcons(self)
+        style = ttk.Style(self)
+        style.configure("Files.Treeview", rowheight=max(22, self._icons.size + 6))
         self.tree = ttk.Treeview(
             tree_frame,
             columns=("size", "mtime", "kind"),
             show="tree headings",
             selectmode="browse",
+            style="Files.Treeview",
         )
         self.tree.heading("#0", text="Имя")
         self.tree.heading("size", text="Размер")
@@ -185,7 +190,14 @@ class FilesWindow(tk.Toplevel):
         self.path_var.set(self._session.remote_cwd or ".")
         for item in self.tree.get_children():
             self.tree.delete(item)
-        self.tree.insert("", "end", iid=_PARENT_IID, text="..", values=("", "", "папка"))
+        self.tree.insert(
+            "",
+            "end",
+            iid=_PARENT_IID,
+            text="..",
+            image=self._icons.parent(),
+            values=("", "", "папка"),
+        )
         for entry in entries:
             size = "" if entry.is_dir else format_size(entry.size)
             self.tree.insert(
@@ -193,6 +205,7 @@ class FilesWindow(tk.Toplevel):
                 "end",
                 iid=entry.name,
                 text=entry.name,
+                image=self._icons.for_entry(entry),
                 values=(size, format_mtime(entry.mtime), entry.kind_label),
             )
 
