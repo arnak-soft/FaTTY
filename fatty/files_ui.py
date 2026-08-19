@@ -17,6 +17,8 @@ from fatty.sftp import (
 )
 from fatty.store import Server
 
+_PARENT_IID = ".."
+
 
 def _resource_root() -> Path:
     if getattr(sys, "frozen", False):
@@ -183,6 +185,7 @@ class FilesWindow(tk.Toplevel):
         self.path_var.set(self._session.remote_cwd or ".")
         for item in self.tree.get_children():
             self.tree.delete(item)
+        self.tree.insert("", "end", iid=_PARENT_IID, text="..", values=("", "", "папка"))
         for entry in entries:
             size = "" if entry.is_dir else format_size(entry.size)
             self.tree.insert(
@@ -193,11 +196,18 @@ class FilesWindow(tk.Toplevel):
                 values=(size, format_mtime(entry.mtime), entry.kind_label),
             )
 
-    def _selected(self) -> RemoteEntry | None:
+    def _selected_iid(self) -> str | None:
         sel = self.tree.selection()
-        if not sel:
+        return sel[0] if sel else None
+
+    def _is_parent_row(self) -> bool:
+        return self._selected_iid() == _PARENT_IID
+
+    def _selected(self) -> RemoteEntry | None:
+        iid = self._selected_iid()
+        if not iid or iid == _PARENT_IID:
             return None
-        return self._entries.get(sel[0])
+        return self._entries.get(iid)
 
     def _run_list(self, action, ok_status: str) -> None:
         if self._busy:
@@ -243,6 +253,9 @@ class FilesWindow(tk.Toplevel):
         self._run_list(lambda: self._session.enter(path), "Готово")
 
     def _activate(self) -> None:
+        if self._is_parent_row():
+            self._go_up()
+            return
         entry = self._selected()
         if entry is None:
             return
@@ -260,6 +273,8 @@ class FilesWindow(tk.Toplevel):
         self._run_list(lambda: self._session.mkdir(name), f"Создана папка «{name.strip()}»")
 
     def _delete(self) -> None:
+        if self._is_parent_row():
+            return
         entry = self._selected()
         if entry is None or self._busy:
             return
