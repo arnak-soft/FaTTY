@@ -5,7 +5,7 @@ alwaysApply: true
 
 # Version reminders
 
-Версия FaTTY — git-тег `vX.Y.Z`, не `__version__` в коде. Сборка: `git describe --tags` → `dist\FaTTY x.y.z.exe`.
+Версия FaTTY — git-тег `vX.Y.Z`, не `__version__` в коде. Сборка: `git describe --tags` → `dist\FaTTY x.y.z OneFile.exe` и `dist\FaTTY x.y.z Portable\`.
 
 После заметных пользовательских изменений (UI, пресеты, сборка, поведение) в конце ответа коротко напомни пометить релиз, если тега ещё нет или в `CHANGELOG.md` копятся пункты в `[Unreleased]`.
 

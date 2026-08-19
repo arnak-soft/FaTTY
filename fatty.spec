@@ -12,7 +12,15 @@ from PyInstaller.utils.win32.versioninfo import (
     VSVersionInfo,
 )
 
-from fatty import APP_NAME, __version__, exe_filename, exe_stem, version_info
+from fatty import (
+    APP_NAME,
+    __version__,
+    onefile_filename,
+    onefile_stem,
+    portable_dir_name,
+    portable_exe_stem,
+    version_info,
+)
 from fatty.version import write_bundled_version
 
 ICON_FILE = str(Path("assets") / "app.ico")
@@ -66,7 +74,15 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
-splash = Splash(
+splash_onefile = Splash(
+    SPLASH_FILE,
+    binaries=a.binaries,
+    datas=a.datas,
+    text_pos=None,
+    minify_script=True,
+    always_on_top=True,
+)
+splash_portable = Splash(
     SPLASH_FILE,
     binaries=a.binaries,
     datas=a.datas,
@@ -75,47 +91,50 @@ splash = Splash(
     always_on_top=True,
 )
 
-version = VSVersionInfo(
-    ffi=FixedFileInfo(
-        filevers=FILEVERS,
-        prodvers=FILEVERS,
-        mask=0x3F,
-        flags=0x0,
-        OS=0x40004,
-        fileType=0x1,
-        subtype=0x0,
-        date=(0, 0),
-    ),
-    kids=[
-        StringFileInfo(
-            [
-                StringTable(
-                    "040904B0",
-                    [
-                        StringStruct("CompanyName", APP_NAME),
-                        StringStruct("FileDescription", APP_NAME),
-                        StringStruct("FileVersion", __version__),
-                        StringStruct("InternalName", APP_NAME),
-                        StringStruct("OriginalFilename", exe_filename()),
-                        StringStruct("ProductName", APP_NAME),
-                        StringStruct("ProductVersion", __version__),
-                    ],
-                )
-            ]
-        ),
-        VarFileInfo([VarStruct("Translation", [1033, 1200])]),
-    ],
-)
 
-exe = EXE(
+def _version_info(original_filename: str) -> VSVersionInfo:
+    return VSVersionInfo(
+        ffi=FixedFileInfo(
+            filevers=FILEVERS,
+            prodvers=FILEVERS,
+            mask=0x3F,
+            flags=0x0,
+            OS=0x40004,
+            fileType=0x1,
+            subtype=0x0,
+            date=(0, 0),
+        ),
+        kids=[
+            StringFileInfo(
+                [
+                    StringTable(
+                        "040904B0",
+                        [
+                            StringStruct("CompanyName", APP_NAME),
+                            StringStruct("FileDescription", APP_NAME),
+                            StringStruct("FileVersion", __version__),
+                            StringStruct("InternalName", APP_NAME),
+                            StringStruct("OriginalFilename", original_filename),
+                            StringStruct("ProductName", APP_NAME),
+                            StringStruct("ProductVersion", __version__),
+                        ],
+                    )
+                ]
+            ),
+            VarFileInfo([VarStruct("Translation", [1033, 1200])]),
+        ],
+    )
+
+
+exe_onefile = EXE(
     pyz,
     a.scripts,
-    splash,
-    splash.binaries,
+    splash_onefile,
+    splash_onefile.binaries,
     a.binaries,
     a.datas,
     [],
-    name=exe_stem(),
+    name=onefile_stem(),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -123,5 +142,32 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     icon=ICON_FILE,
-    version=version,
+    version=_version_info(onefile_filename()),
+)
+
+exe_portable = EXE(
+    pyz,
+    splash_portable,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name=portable_exe_stem(),
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    console=False,
+    disable_windowed_traceback=False,
+    icon=ICON_FILE,
+    version=_version_info(f"{portable_exe_stem()}.exe"),
+)
+
+coll = COLLECT(
+    exe_portable,
+    a.binaries,
+    a.datas,
+    splash_portable.binaries,
+    strip=False,
+    upx=False,
+    name=portable_dir_name(),
 )

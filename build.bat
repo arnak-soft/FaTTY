@@ -36,6 +36,7 @@ if errorlevel 1 (
 
 if exist dist (
   del /q "dist\FaTTY*.exe" 2>nul
+  for /d %%D in ("dist\FaTTY*Portable") do rd /s /q "%%D"
 )
 
 "%PY%" -m PyInstaller --noconfirm --clean fatty.spec
@@ -44,4 +45,4 @@ if errorlevel 1 (
   exit /b 1
 )
 
-"%PY%" -c "from fatty import exe_filename; print(); print('Ready: dist\\' + exe_filename()); print('Copy that file anywhere — Python is not required on the target PC.')"
+"%PY%" -c "from fatty import onefile_filename, portable_dir_name; print(); print('Ready:'); print('  dist\\' + onefile_filename() + '  (one file, slower start)'); print('  dist\\' + portable_dir_name() + '\\FaTTY.exe  (folder, faster start)'); print('Python is not required on the target PC.')"

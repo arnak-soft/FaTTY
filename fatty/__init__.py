@@ -12,5 +12,21 @@ def exe_stem() -> str:
     return f"{APP_NAME} {__version__}"
 
 
+def onefile_stem() -> str:
+    return f"{exe_stem()} OneFile"
+
+
+def onefile_filename() -> str:
+    return f"{onefile_stem()}.exe"
+
+
+def portable_dir_name() -> str:
+    return f"{exe_stem()} Portable"
+
+
+def portable_exe_stem() -> str:
+    return APP_NAME
+
+
 def exe_filename() -> str:
-    return f"{exe_stem()}.exe"
+    return onefile_filename()
