@@ -16,10 +16,77 @@ from fatty import APP_NAME
 from fatty.store import KNOWN_HOSTS_PATH, Server
 
 OutputCb = Callable[[str], None]
+ClientReadyCb = Callable[[paramiko.SSHClient], None]
 
 
 class SSHError(Exception):
     pass
+
+
+def connect_client(
+    server: Server,
+    *,
+    on_client: ClientReadyCb | None = None,
+) -> paramiko.SSHClient:
+    """Open SSH with the same auth and known_hosts as command runs. Caller closes it."""
+    client = paramiko.SSHClient()
+    KNOWN_HOSTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if KNOWN_HOSTS_PATH.exists():
+        client.load_host_keys(str(KNOWN_HOSTS_PATH))
+    try:
+        client.load_system_host_keys()
+    except Exception:
+        pass
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    connect_kwargs: dict = {
+        "hostname": server.host,
+        "port": server.port,
+        "username": server.username,
+        "timeout": 20,
+        "banner_timeout": 20,
+        "auth_timeout": 20,
+        "allow_agent": True,
+        "look_for_keys": not bool(server.key_path),
+    }
+    if server.password:
+        connect_kwargs["password"] = server.password
+    if server.key_path:
+        key_path = Path(server.key_path).expanduser()
+        if not key_path.exists():
+            try:
+                client.close()
+            except Exception:
+                pass
+            raise SSHError(f"SSH-ключ не найден: {key_path}")
+        connect_kwargs["key_filename"] = str(key_path)
+
+    if on_client is not None:
+        on_client(client)
+
+    try:
+        client.connect(**connect_kwargs)
+    except Exception as exc:
+        try:
+            client.close()
+        except Exception:
+            pass
+        raise SSHError(f"Не удалось подключиться: {exc}") from exc
+
+    try:
+        client.save_host_keys(str(KNOWN_HOSTS_PATH))
+    except Exception:
+        pass
+
+    transport = client.get_transport()
+    if transport is None:
+        try:
+            client.close()
+        except Exception:
+            pass
+        raise SSHError("SSH-транспорт не установлен")
+    transport.set_keepalive(15)
+    return client
 
 
 class SSHSession:
@@ -43,6 +110,9 @@ class SSHSession:
             except Exception:
                 pass
 
+    def _set_client(self, client: paramiko.SSHClient) -> None:
+        self._client = client
+
     def run(
         self,
         server: Server,
@@ -52,46 +122,12 @@ class SSHSession:
         on_output: OutputCb,
     ) -> int:
         self._cancel.clear()
-        client = paramiko.SSHClient()
-        self._client = client
-        KNOWN_HOSTS_PATH.parent.mkdir(parents=True, exist_ok=True)
-        if KNOWN_HOSTS_PATH.exists():
-            client.load_host_keys(str(KNOWN_HOSTS_PATH))
-        try:
-            client.load_system_host_keys()
-        except Exception:
-            pass
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-        connect_kwargs: dict = {
-            "hostname": server.host,
-            "port": server.port,
-            "username": server.username,
-            "timeout": 20,
-            "banner_timeout": 20,
-            "auth_timeout": 20,
-            "allow_agent": True,
-            "look_for_keys": not bool(server.key_path),
-        }
-        if server.password:
-            connect_kwargs["password"] = server.password
-        if server.key_path:
-            key_path = Path(server.key_path).expanduser()
-            if not key_path.exists():
-                raise SSHError(f"SSH-ключ не найден: {key_path}")
-            connect_kwargs["key_filename"] = str(key_path)
-
         on_output(f"→ {server.username}@{server.host}:{server.port}\n")
         try:
-            client.connect(**connect_kwargs)
-        except Exception as exc:
-            raise SSHError(f"Не удалось подключиться: {exc}") from exc
-
-        try:
-            client.save_host_keys(str(KNOWN_HOSTS_PATH))
-        except Exception:
-            pass
-
+            client = connect_client(server, on_client=self._set_client)
+        except SSHError:
+            self._client = None
+            raise
         remote = command.strip()
         if login_shell:
             remote = f"bash -lc {shlex.quote(command.strip())}"
@@ -100,7 +136,6 @@ class SSHSession:
         transport = client.get_transport()
         if transport is None:
             raise SSHError("SSH-транспорт не установлен")
-        transport.set_keepalive(15)
 
         channel = transport.open_session()
         self._channel = channel

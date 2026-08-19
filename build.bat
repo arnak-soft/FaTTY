@@ -28,12 +28,20 @@ if errorlevel 1 (
   exit /b 1
 )
 
+"%PY%" -c "from fatty import __version__; print('Version (git tag): ' + __version__)"
+if errorlevel 1 (
+  echo Failed to read version from git.
+  exit /b 1
+)
+
+if exist dist (
+  del /q "dist\FaTTY*.exe" 2>nul
+)
+
 "%PY%" -m PyInstaller --noconfirm --clean fatty.spec
 if errorlevel 1 (
   echo Build failed.
   exit /b 1
 )
 
-echo.
-echo Ready: dist\FaTTY.exe
-echo Copy that file anywhere — Python is not required on the target PC.
+"%PY%" -c "from fatty import exe_filename; print(); print('Ready: dist\\' + exe_filename()); print('Copy that file anywhere — Python is not required on the target PC.')"

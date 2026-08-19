@@ -7,8 +7,8 @@ import sys
 import time
 from ctypes import wintypes
 
-MUTEX_NAME = "Local\\Tmap.FaTTY.SingleInstance"
-PROP_NAME = "Tmap.FaTTY"
+MUTEX_NAME = "Local\\FaTTY.SingleInstance"
+PROP_NAME = "FaTTY"
 _ERROR_ALREADY_EXISTS = 183
 _SW_RESTORE = 9
 _SW_SHOW = 5
@@ -79,6 +79,8 @@ def _kernel32():
 def try_become_primary() -> bool:
     """True if this process should continue; False if another copy already runs."""
     global _mutex_handle
+    if _mutex_handle is not None:
+        return True
     if sys.platform != "win32":
         return True
     kernel32 = _kernel32()

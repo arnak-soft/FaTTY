@@ -17,8 +17,10 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 MIN_PASSWORD_LEN = 8
 KDF_ITERATIONS = 600_000
 KDF_NAME = "pbkdf2-sha256"
-VERIFIER_PLAIN = "vps-runner-vault-ok"
-_AAD = b"vps-runner-vault"
+VERIFIER_PLAIN = "fatty-vault-ok"
+_AAD = b"fatty-vault"
+_COMPAT_AADS = (b"fatty-vault", b"vps-runner-vault")
+_COMPAT_VERIFIERS = frozenset({"fatty-vault-ok", "vps-runner-vault-ok"})
 
 
 class VaultError(Exception):
@@ -72,7 +74,13 @@ def _decrypt(key: bytes, token: str) -> str:
     if len(raw) < 13:
         raise VaultError("Повреждённый секрет")
     nonce, blob = raw[:12], raw[12:]
-    return AESGCM(key).decrypt(nonce, blob, _AAD).decode("utf-8")
+    last_error: Exception | None = None
+    for aad in _COMPAT_AADS:
+        try:
+            return AESGCM(key).decrypt(nonce, blob, aad).decode("utf-8")
+        except Exception as exc:
+            last_error = exc
+    raise VaultError("Не удалось расшифровать секрет") from last_error
 
 
 class SessionVault:
@@ -103,7 +111,7 @@ class SessionVault:
         try:
             salt = _b64d(meta.salt)
             key = _derive_key(password, salt, int(meta.iterations or KDF_ITERATIONS))
-            if _decrypt(key, meta.verifier) != VERIFIER_PLAIN:
+            if _decrypt(key, meta.verifier) not in _COMPAT_VERIFIERS:
                 return False
         except Exception:
             return False

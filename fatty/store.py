@@ -15,7 +15,7 @@ from fatty.vault import SessionVault, VaultLocked, VaultMeta
 def _resolve_app_dir() -> Path:
     root = Path(os.environ.get("APPDATA", Path.home()))
     current = root / APP_NAME
-    legacy = root / "vps-runner"
+    legacy = root / "vps-runner"  # older local data dir, if present
     if current.exists() or not legacy.exists():
         return current
     try:
@@ -45,6 +45,17 @@ class Server:
     def new() -> Server:
         return Server(id=str(uuid.uuid4()), name="", host="")
 
+    def duplicate(self, name: str) -> Server:
+        return Server(
+            id=str(uuid.uuid4()),
+            name=name,
+            host=self.host,
+            port=self.port,
+            username=self.username,
+            password=self.password,
+            key_path=self.key_path,
+        )
+
 
 @dataclass
 class Command:
@@ -64,6 +75,16 @@ class Command:
             command="",
         )
 
+    def duplicate(self, name: str | None = None, server_id: str | None = None) -> Command:
+        return Command(
+            id=str(uuid.uuid4()),
+            name=self.name if name is None else name,
+            server_id=self.server_id if server_id is None else server_id,
+            command=self.command,
+            timeout_sec=self.timeout_sec,
+            login_shell=self.login_shell,
+        )
+
 
 @dataclass
 class AppSettings:
@@ -73,6 +94,7 @@ class AppSettings:
     sash_pos: int = 0
     last_server_id: str = ""
     last_command_id: str = ""
+    dialog_geometry: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -160,6 +182,12 @@ def load() -> Config:
         sash_pos = int(settings_raw.get("sash_pos", 0) or 0)
     except (TypeError, ValueError):
         sash_pos = 0
+    dialog_geometry: dict[str, str] = {}
+    raw_geoms = settings_raw.get("dialog_geometry") or {}
+    if isinstance(raw_geoms, dict):
+        for key, value in raw_geoms.items():
+            if isinstance(key, str) and isinstance(value, str) and "x" in value:
+                dialog_geometry[key] = value.strip()
     settings = AppSettings(
         confirm_before_run=bool(settings_raw.get("confirm_before_run", True)),
         window_geometry=str(settings_raw.get("window_geometry", "") or ""),
@@ -167,6 +195,7 @@ def load() -> Config:
         sash_pos=max(0, sash_pos),
         last_server_id=str(settings_raw.get("last_server_id", "") or ""),
         last_command_id=str(settings_raw.get("last_command_id", "") or ""),
+        dialog_geometry=dialog_geometry,
     )
     return Config(
         servers=servers,

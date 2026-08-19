@@ -11,12 +11,12 @@ class Preset:
     login_shell: bool = True
 
 
-DEFAULT_APP_DIR = "/var/www/bitrix24-billing-app"
-DEFAULT_BRANCH = "master"
-DEFAULT_PM2 = "billing"
+DEFAULT_APP_DIR = "/var/www/app"
+DEFAULT_BRANCH = "main"
+DEFAULT_PM2 = "app"
 
 
-def billing_presets(
+def deploy_presets(
     app_dir: str = DEFAULT_APP_DIR,
     branch: str = DEFAULT_BRANCH,
     pm2_name: str = DEFAULT_PM2,
@@ -26,7 +26,7 @@ def billing_presets(
     pm2 = pm2_name or DEFAULT_PM2
     return [
         Preset(
-            "Deploy billing",
+            "Deploy",
             f"cd {app} && git pull origin {branch} && pm2 restart {pm2}",
             timeout_sec=300,
         ),
@@ -76,7 +76,7 @@ def all_presets(
     pm2_name: str = DEFAULT_PM2,
     include_server: bool = True,
 ) -> list[Preset]:
-    items = billing_presets(app_dir, branch, pm2_name)
+    items = deploy_presets(app_dir, branch, pm2_name)
     if include_server:
         items = items + server_presets()
     return items

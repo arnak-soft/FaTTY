@@ -61,7 +61,7 @@ def protect(plaintext: str) -> str:
     out_blob = DATA_BLOB()
     ok = crypt32.CryptProtectData(
         ctypes.byref(in_blob),
-        "vps-runner",
+        "FaTTY",
         None,
         None,
         None,

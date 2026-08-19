@@ -17,11 +17,12 @@ from fatty.presets import (
     DEFAULT_PM2,
     Preset,
     all_presets,
-    billing_presets,
 )
 from fatty.single_instance import activate_existing, register_window, try_become_primary
 from fatty.ssh_runner import SSHError, SSHSession, open_system_console
-from fatty.store import APP_DIR, Command, Config, Server, load, save, unlock_secrets
+from fatty.sftp import guess_start_path
+from fatty.files_ui import FilesWindow
+from fatty.store import APP_DIR, AppSettings, Command, Config, Server, load, save, unlock_secrets
 from fatty.vault import MIN_PASSWORD_LEN, SessionVault, VaultError, VaultLocked
 
 
@@ -73,6 +74,18 @@ def _attach_presets(config: Config, server_id: str, presets: list[Preset]) -> in
     return added
 
 
+def _copy_name(base: str, taken: set[str]) -> str:
+    stem = f"{base} (копия)"
+    if stem not in taken:
+        return stem
+    n = 2
+    while True:
+        candidate = f"{base} (копия {n})"
+        if candidate not in taken:
+            return candidate
+        n += 1
+
+
 _GEOM_RE = re.compile(r"^(\d+)x(\d+)(?:([+-]\d+)([+-]\d+))?$")
 _DEFAULT_GEOMETRY = "1100x720"
 
@@ -86,12 +99,12 @@ class _RECT(ctypes.Structure):
     ]
 
 
-def _geometry_on_screen(geom: str) -> bool:
+def _geometry_on_screen(geom: str, min_w: int = 400, min_h: int = 300) -> bool:
     match = _GEOM_RE.match((geom or "").strip())
     if not match:
         return False
     width, height = int(match.group(1)), int(match.group(2))
-    if width < 400 or height < 300:
+    if width < min_w or height < min_h:
         return False
     if match.group(3) is None:
         return True
@@ -142,7 +155,90 @@ def _present_toplevel(window: tk.Toplevel) -> None:
         pass
 
 
-class ServerDialog(tk.Toplevel):
+def _parent_layout(parent: tk.Misc) -> tuple[AppSettings | None, object]:
+    data = getattr(parent, "config_data", None)
+    persist = getattr(parent, "persist", None)
+    settings = getattr(data, "settings", None) if data is not None else None
+    if not isinstance(settings, AppSettings):
+        return None, None
+    return settings, persist if callable(persist) else None
+
+
+def _restore_dialog_geometry(
+    window: tk.Toplevel,
+    settings: AppSettings,
+    key: str,
+    remember_size: bool,
+) -> None:
+    saved = (settings.dialog_geometry.get(key) or "").strip()
+    match = _GEOM_RE.match(saved)
+    if not match:
+        return
+    x_s, y_s = match.group(3), match.group(4)
+    if remember_size and _geometry_on_screen(saved, min_w=200, min_h=150):
+        window.geometry(saved)
+        return
+    if not x_s or not y_s:
+        return
+    width = max(window.winfo_reqwidth(), window.winfo_width(), 80)
+    height = max(window.winfo_reqheight(), window.winfo_height(), 50)
+    if _geometry_on_screen(f"{width}x{height}{x_s}{y_s}", min_w=80, min_h=50):
+        window.geometry(f"{x_s}{y_s}")
+
+
+class PositionedToplevel(tk.Toplevel):
+    """Toplevel, который помнит позицию (и размер, если remember_size)."""
+
+    def _setup_layout(
+        self,
+        settings: AppSettings | None,
+        key: str,
+        *,
+        remember_size: bool = False,
+        persist=None,
+    ) -> None:
+        self._layout_settings = settings
+        self._layout_key = key
+        self._layout_size = remember_size
+        self._layout_persist = persist
+        self._layout_saved = settings is None
+        if settings is None:
+            return
+        self.update_idletasks()
+        _restore_dialog_geometry(self, settings, key, remember_size)
+        self.bind("<Configure>", self._on_layout_configure, add="+")
+
+    def _on_layout_configure(self, event) -> None:
+        if event.widget is not self:
+            return
+        self._capture_layout()
+
+    def _capture_layout(self) -> None:
+        settings = getattr(self, "_layout_settings", None)
+        key = getattr(self, "_layout_key", None)
+        if settings is None or not key:
+            return
+        try:
+            geom = self.geometry()
+        except tk.TclError:
+            return
+        if _GEOM_RE.match(geom):
+            settings.dialog_geometry[key] = geom
+
+    def destroy(self) -> None:
+        if not getattr(self, "_layout_saved", True):
+            self._layout_saved = True
+            self._capture_layout()
+            persist = getattr(self, "_layout_persist", None)
+            if persist is not None:
+                try:
+                    persist()
+                except Exception:
+                    pass
+        super().destroy()
+
+
+class ServerDialog(PositionedToplevel):
     def __init__(self, parent: tk.Tk, server: Server, title: str, is_new: bool = False) -> None:
         super().__init__(parent)
         self.title(title)
@@ -224,7 +320,7 @@ class ServerDialog(tk.Toplevel):
         if is_new:
             ttk.Checkbutton(
                 body,
-                text="Добавить типовые команды Bitrix billing",
+                text="Добавить типовые команды",
                 variable=self.add_presets_var,
                 command=self._toggle_preset_fields,
             ).grid(row=9, column=0, columnspan=3, sticky="w", padx=10, pady=(8, 2))
@@ -248,6 +344,8 @@ class ServerDialog(tk.Toplevel):
         self.bind("<Escape>", lambda _e: self.destroy())
         self.grab_set()
         self.wait_visibility()
+        settings, persist = _parent_layout(parent)
+        self._setup_layout(settings, "server", persist=persist)
         self.after(50, lambda: body.grid_slaves(row=0, column=1)[0].focus_set())
 
     def _toggle_pw(self) -> None:
@@ -328,7 +426,7 @@ class ServerDialog(tk.Toplevel):
         self.destroy()
 
 
-class PresetDialog(tk.Toplevel):
+class PresetDialog(PositionedToplevel):
     def __init__(self, parent: tk.Tk, server: Server) -> None:
         super().__init__(parent)
         self.title(f"Пресеты — {server.name}")
@@ -374,6 +472,8 @@ class PresetDialog(tk.Toplevel):
 
         self.bind("<Escape>", lambda _e: self.destroy())
         self.grab_set()
+        settings, persist = _parent_layout(parent)
+        self._setup_layout(settings, "preset", persist=persist)
 
     def _rebuild(self) -> None:
         for child in self.list_frame.winfo_children():
@@ -402,7 +502,7 @@ class PresetDialog(tk.Toplevel):
         self.destroy()
 
 
-class CommandDialog(tk.Toplevel):
+class CommandDialog(PositionedToplevel):
     def __init__(self, parent: tk.Tk, command: Command, servers: list[Server], title: str) -> None:
         super().__init__(parent)
         self.title(title)
@@ -439,7 +539,7 @@ class CommandDialog(tk.Toplevel):
         ttk.Entry(form, textvariable=self.timeout_var, width=12).grid(row=2, column=1, sticky="w", padx=4, pady=4)
         ttk.Checkbutton(
             form,
-            text="Login-shell (bash -lc) — нужен для pm2, nvm, rbenv",
+            text="Login-shell (bash -lc) — подхватывает PATH из .bashrc",
             variable=self.login_var,
         ).grid(row=3, column=1, sticky="w", padx=4, pady=4)
         ttk.Label(form, text="Пресет").grid(row=4, column=0, sticky="w", padx=4, pady=4)
@@ -459,10 +559,7 @@ class CommandDialog(tk.Toplevel):
         ttk.Label(body, text="Команда").pack(anchor="w", padx=4, pady=(8, 2))
         self.text = tk.Text(body, height=10, wrap="word", font=("Consolas", 10))
         self.text.pack(fill="both", expand=True, padx=4)
-        initial = command.command or billing_presets()[0].command
-        self.text.insert("1.0", initial)
-        if not command.name:
-            self.name_var.set(billing_presets()[0].name)
+        self.text.insert("1.0", command.command)
 
         btns = ttk.Frame(body)
         btns.pack(fill="x", pady=(10, 0))
@@ -471,6 +568,8 @@ class CommandDialog(tk.Toplevel):
 
         self.bind("<Escape>", lambda _e: self.destroy())
         self.grab_set()
+        settings, persist = _parent_layout(parent)
+        self._setup_layout(settings, "command", remember_size=True, persist=persist)
         self.after(50, lambda: self.text.focus_set())
 
     def _apply_preset(self, _event=None) -> None:
@@ -509,7 +608,7 @@ class CommandDialog(tk.Toplevel):
         self.destroy()
 
 
-class MasterPasswordDialog(tk.Toplevel):
+class MasterPasswordDialog(PositionedToplevel):
     def __init__(self, parent: tk.Tk, config: Config, vault: SessionVault) -> None:
         super().__init__(parent)
         self.ok = False
@@ -564,6 +663,7 @@ class MasterPasswordDialog(tk.Toplevel):
         self.bind("<Return>", lambda _e: self._submit())
         self.bind("<Escape>", lambda _e: self._cancel())
         _present_toplevel(self)
+        self._setup_layout(config.settings, "master")
         register_window(self)
         self.after(50, self.pw_entry.focus_set)
 
@@ -604,7 +704,7 @@ class MasterPasswordDialog(tk.Toplevel):
         self.destroy()
 
 
-class ChangeMasterDialog(tk.Toplevel):
+class ChangeMasterDialog(PositionedToplevel):
     def __init__(self, parent: tk.Tk, vault: SessionVault) -> None:
         super().__init__(parent)
         self.ok = False
@@ -648,6 +748,8 @@ class ChangeMasterDialog(tk.Toplevel):
         self.bind("<Return>", lambda _e: self._submit())
         self.bind("<Escape>", lambda _e: self.destroy())
         self.grab_set()
+        settings, persist = _parent_layout(parent)
+        self._setup_layout(settings, "change_master", persist=persist)
 
     def _submit(self) -> None:
         old_pw = self.old_var.get()
@@ -684,6 +786,7 @@ class App(tk.Tk):
         self.config_data: Config = config
         self.vault = vault
         self._session: SSHSession | None = None
+        self._files_windows: dict[str, FilesWindow] = {}
         self._busy = False
         self._restoring_layout = True
         self._last_wm_state = self.config_data.settings.window_state or "normal"
@@ -725,6 +828,10 @@ class App(tk.Tk):
         opt.add_separator()
         opt.add_command(label="Сменить мастер-пароль…", command=self._change_master_password)
         menubar.add_cascade(label="Настройки", menu=opt)
+
+        help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="О программе", command=self._about)
+        menubar.add_cascade(label="Справка", menu=help_menu)
         self.config(menu=menubar)
 
     def _build_ui(self) -> None:
@@ -753,9 +860,14 @@ class App(tk.Tk):
         sbtns.pack(fill="x", pady=(8, 0))
         ttk.Button(sbtns, text="Добавить", command=self._add_server).pack(side="left", padx=(0, 4))
         ttk.Button(sbtns, text="Изменить", command=self._edit_server).pack(side="left", padx=4)
+        ttk.Button(sbtns, text="Копия", command=self._duplicate_server).pack(side="left", padx=4)
         ttk.Button(sbtns, text="Удалить", command=self._delete_server).pack(side="left", padx=4)
-        ttk.Button(sbtns, text="Проверить связь", command=self._test_connection).pack(side="right")
-        ttk.Button(sbtns, text="Открыть консоль", command=self._open_console).pack(side="right", padx=(0, 4))
+
+        sact = ttk.Frame(left)
+        sact.pack(fill="x", pady=(4, 0))
+        ttk.Button(sact, text="Файлы", command=self._open_files).pack(side="left")
+        ttk.Button(sact, text="Открыть консоль", command=self._open_console).pack(side="left", padx=4)
+        ttk.Button(sact, text="Проверить связь", command=self._test_connection).pack(side="left", padx=4)
 
         self.cmd_tree = ttk.Treeview(
             right,
@@ -776,6 +888,7 @@ class App(tk.Tk):
         cbtns.pack(fill="x", pady=(8, 0))
         ttk.Button(cbtns, text="Добавить", command=self._add_command).pack(side="left", padx=(0, 4))
         ttk.Button(cbtns, text="Изменить", command=self._edit_command).pack(side="left", padx=4)
+        ttk.Button(cbtns, text="Копия", command=self._duplicate_command).pack(side="left", padx=4)
         ttk.Button(cbtns, text="Удалить", command=self._delete_command).pack(side="left", padx=4)
         ttk.Button(cbtns, text="Пресеты…", command=self._add_presets).pack(side="left", padx=4)
         self.stop_btn = ttk.Button(cbtns, text="Стоп", command=self._stop, state="disabled")
@@ -998,6 +1111,19 @@ class App(tk.Tk):
             self.persist()
             self._refresh_servers(dlg.result.id)
 
+    def _duplicate_server(self) -> None:
+        server = self._selected_server()
+        if not server:
+            return
+        taken = {s.name for s in self.config_data.servers}
+        clone = server.duplicate(_copy_name(server.name, taken))
+        idx = next(i for i, item in enumerate(self.config_data.servers) if item.id == server.id)
+        self.config_data.servers.insert(idx + 1, clone)
+        for cmd in self.config_data.commands_for(server.id):
+            self.config_data.commands.append(cmd.duplicate(server_id=clone.id))
+        self.persist()
+        self._refresh_servers(clone.id)
+
     def _delete_server(self) -> None:
         server = self._selected_server()
         if not server:
@@ -1040,6 +1166,20 @@ class App(tk.Tk):
             self._refresh_servers(dlg.result.server_id)
             if self.cmd_tree.exists(dlg.result.id):
                 self.cmd_tree.selection_set(dlg.result.id)
+
+    def _duplicate_command(self) -> None:
+        cmd = self._selected_command()
+        if not cmd:
+            return
+        taken = {c.name for c in self.config_data.commands_for(cmd.server_id)}
+        clone = cmd.duplicate(name=_copy_name(cmd.name, taken))
+        idx = next(i for i, item in enumerate(self.config_data.commands) if item.id == cmd.id)
+        self.config_data.commands.insert(idx + 1, clone)
+        self.persist()
+        self._refresh_commands()
+        if self.cmd_tree.exists(clone.id):
+            self.cmd_tree.selection_set(clone.id)
+            self.cmd_tree.see(clone.id)
 
     def _delete_command(self) -> None:
         cmd = self._selected_command()
@@ -1092,6 +1232,13 @@ class App(tk.Tk):
         APP_DIR.mkdir(parents=True, exist_ok=True)
         os.startfile(APP_DIR)  # type: ignore[attr-defined]
 
+    def _about(self) -> None:
+        messagebox.showinfo(
+            f"О {APP_NAME}",
+            f"{APP_NAME} {__version__}",
+            parent=self,
+        )
+
     def _clear_output(self) -> None:
         self.output.configure(state="normal")
         self.output.delete("1.0", "end")
@@ -1133,6 +1280,31 @@ class App(tk.Tk):
         if not server.key_path:
             extra = "  •  пароль, если спросит, введите в окне SSH"
         self.status.configure(text=f"Консоль открыта → {server.name}{extra}")
+
+    def _open_files(self) -> None:
+        server = self._selected_server()
+        if not server:
+            messagebox.showinfo("Файлы", "Сначала выберите VPS.", parent=self)
+            return
+        existing = self._files_windows.get(server.id)
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    existing.deiconify()
+                    existing.lift()
+                    existing.focus_force()
+                    return
+            except tk.TclError:
+                pass
+        start = guess_start_path(self.config_data.commands_for(server.id))
+        win = FilesWindow(self, server, start_path=start)
+        self._files_windows[server.id] = win
+
+        def _clear(event) -> None:
+            if event.widget is win:
+                self._files_windows.pop(server.id, None)
+
+        win.bind("<Destroy>", _clear)
 
     def _run_selected(self) -> None:
         cmd = self._selected_command()
@@ -1227,7 +1399,7 @@ def main() -> None:
     _enable_dpi()
     if sys.platform == "win32":
         try:
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Tmap.FaTTY")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("FaTTY")
         except Exception:
             pass
     if not try_become_primary():
