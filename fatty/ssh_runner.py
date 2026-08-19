@@ -12,8 +12,8 @@ from pathlib import Path
 
 import paramiko
 
-from vps_runner import APP_NAME
-from vps_runner.store import KNOWN_HOSTS_PATH, Server
+from fatty import APP_NAME
+from fatty.store import KNOWN_HOSTS_PATH, Server
 
 OutputCb = Callable[[str], None]
 

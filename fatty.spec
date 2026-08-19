@@ -15,13 +15,14 @@ for pkg in ("paramiko", "cryptography", "bcrypt", "nacl", "invoke"):
     hiddenimports += pkg_hidden
 
 hiddenimports += [
-    "vps_runner",
-    "vps_runner.ui",
-    "vps_runner.store",
-    "vps_runner.crypto",
-    "vps_runner.vault",
-    "vps_runner.ssh_runner",
-    "vps_runner.presets",
+    "fatty",
+    "fatty.ui",
+    "fatty.store",
+    "fatty.crypto",
+    "fatty.vault",
+    "fatty.ssh_runner",
+    "fatty.presets",
+    "fatty.single_instance",
 ]
 
 a = Analysis(

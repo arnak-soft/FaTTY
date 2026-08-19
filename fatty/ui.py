@@ -10,8 +10,8 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from vps_runner import APP_NAME, __version__
-from vps_runner.presets import (
+from fatty import APP_NAME, __version__
+from fatty.presets import (
     DEFAULT_APP_DIR,
     DEFAULT_BRANCH,
     DEFAULT_PM2,
@@ -19,9 +19,10 @@ from vps_runner.presets import (
     all_presets,
     billing_presets,
 )
-from vps_runner.ssh_runner import SSHError, SSHSession, open_system_console
-from vps_runner.store import APP_DIR, Command, Config, Server, load, save, unlock_secrets
-from vps_runner.vault import MIN_PASSWORD_LEN, SessionVault, VaultError, VaultLocked
+from fatty.single_instance import activate_existing, register_window, try_become_primary
+from fatty.ssh_runner import SSHError, SSHSession, open_system_console
+from fatty.store import APP_DIR, Command, Config, Server, load, save, unlock_secrets
+from fatty.vault import MIN_PASSWORD_LEN, SessionVault, VaultError, VaultLocked
 
 
 def _resource_root() -> Path:
@@ -113,6 +114,32 @@ def _enable_dpi() -> None:
             ctypes.windll.user32.SetProcessDPIAware()
         except Exception:
             pass
+
+
+def _parent_is_withdrawn(parent: tk.Misc) -> bool:
+    try:
+        return str(parent.state()) == "withdrawn"
+    except tk.TclError:
+        return False
+
+
+def _present_toplevel(window: tk.Toplevel) -> None:
+    """Make a Toplevel visible and modal even if its parent was withdrawn."""
+    window.deiconify()
+    window.lift()
+    window.update_idletasks()
+    try:
+        window.wait_visibility()
+    except tk.TclError:
+        pass
+    try:
+        window.grab_set()
+    except tk.TclError:
+        pass
+    try:
+        window.focus_force()
+    except tk.TclError:
+        pass
 
 
 class ServerDialog(tk.Toplevel):
@@ -491,7 +518,8 @@ class MasterPasswordDialog(tk.Toplevel):
         self._setup = config.vault is None
         self.title("Мастер-пароль")
         self.resizable(False, False)
-        self.transient(parent)
+        if not _parent_is_withdrawn(parent):
+            self.transient(parent)
         self.protocol("WM_DELETE_WINDOW", self._cancel)
 
         body = ttk.Frame(self, padding=16)
@@ -535,7 +563,8 @@ class MasterPasswordDialog(tk.Toplevel):
 
         self.bind("<Return>", lambda _e: self._submit())
         self.bind("<Escape>", lambda _e: self._cancel())
-        self.grab_set()
+        _present_toplevel(self)
+        register_window(self)
         self.after(50, self.pw_entry.focus_set)
 
     def _cancel(self) -> None:
@@ -649,6 +678,7 @@ class App(tk.Tk):
         super().__init__()
         self.title(f"{APP_NAME} {__version__}")
         _apply_app_icon(self)
+        register_window(self)
         self.minsize(860, 560)
 
         self.config_data: Config = config
@@ -1200,6 +1230,9 @@ def main() -> None:
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Tmap.FaTTY")
         except Exception:
             pass
+    if not try_become_primary():
+        if activate_existing():
+            return
 
     def _excepthook(exc_type, exc, tb) -> None:
         APP_DIR.mkdir(parents=True, exist_ok=True)

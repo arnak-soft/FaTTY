@@ -7,9 +7,9 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from vps_runner import APP_NAME
-from vps_runner.crypto import unprotect
-from vps_runner.vault import SessionVault, VaultLocked, VaultMeta
+from fatty import APP_NAME
+from fatty.crypto import unprotect
+from fatty.vault import SessionVault, VaultLocked, VaultMeta
 
 
 def _resolve_app_dir() -> Path:

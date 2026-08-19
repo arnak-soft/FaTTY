@@ -29,5 +29,5 @@ if "%REBUILD_VENV%"=="1" (
   )
 )
 
-"%PY%" -m vps_runner %*
+"%PY%" -m fatty %*
 if errorlevel 1 pause

@@ -1,4 +1,4 @@
-from vps_runner.ui import main
+from fatty.ui import main
 
 if __name__ == "__main__":
     main()

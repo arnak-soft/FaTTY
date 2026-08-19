@@ -28,7 +28,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-"%PY%" -m PyInstaller --noconfirm --clean vps_runner.spec
+"%PY%" -m PyInstaller --noconfirm --clean fatty.spec
 if errorlevel 1 (
   echo Build failed.
   exit /b 1
