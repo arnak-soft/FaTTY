@@ -1,0 +1,14 @@
+---
+description: Never connect to VPS or read stored credentials
+alwaysApply: true
+---
+
+# No direct VPS access, no secrets
+
+Never connect to any VPS, SSH host, or server from this environment. That includes `ssh`, Paramiko, VPS Runner's `SSHSession`, `git pull` on a remote, `pm2`, and any other remote command.
+
+Never decrypt, print, copy, or use passwords, keys, or `config.json` secrets. Do not call `store.load()` / `unprotect()` to get credentials. Do not read `%APPDATA%\vps-runner\config.json` to recover passwords. Do not use files in `~/.ssh` to log in.
+
+If a remote command fails, explain what to run locally. Do not "help" by logging in as the user.
+
+Fixing VPS Runner itself is local code only: Python, UI, `build.bat`. Do not test against live hosts.
