@@ -92,9 +92,11 @@ class AppSettings:
     window_geometry: str = ""
     window_state: str = "normal"
     sash_pos: int = 0
+    vsash_pos: int = 0
     last_server_id: str = ""
     last_command_id: str = ""
     dialog_geometry: dict[str, str] = field(default_factory=dict)
+    column_widths: dict[str, dict[str, int]] = field(default_factory=dict)
 
 
 @dataclass
@@ -164,6 +166,28 @@ def _parse_vault(raw: dict) -> VaultMeta | None:
     )
 
 
+def _parse_column_widths(raw: object) -> dict[str, dict[str, int]]:
+    result: dict[str, dict[str, int]] = {}
+    if not isinstance(raw, dict):
+        return result
+    for tree_id, cols in raw.items():
+        if not isinstance(tree_id, str) or not isinstance(cols, dict):
+            continue
+        parsed: dict[str, int] = {}
+        for col, value in cols.items():
+            if not isinstance(col, str):
+                continue
+            try:
+                width = int(value)
+            except (TypeError, ValueError):
+                continue
+            if width > 0:
+                parsed[col] = width
+        if parsed:
+            result[tree_id] = parsed
+    return result
+
+
 def load() -> Config:
     if not CONFIG_PATH.exists():
         return Config(needs_migration=True)
@@ -214,6 +238,10 @@ def load() -> Config:
         sash_pos = int(settings_raw.get("sash_pos", 0) or 0)
     except (TypeError, ValueError):
         sash_pos = 0
+    try:
+        vsash_pos = int(settings_raw.get("vsash_pos", 0) or 0)
+    except (TypeError, ValueError):
+        vsash_pos = 0
     dialog_geometry: dict[str, str] = {}
     raw_geoms = settings_raw.get("dialog_geometry") or {}
     if isinstance(raw_geoms, dict):
@@ -225,9 +253,11 @@ def load() -> Config:
         window_geometry=str(settings_raw.get("window_geometry", "") or ""),
         window_state=window_state,
         sash_pos=max(0, sash_pos),
+        vsash_pos=max(0, vsash_pos),
         last_server_id=str(settings_raw.get("last_server_id", "") or ""),
         last_command_id=str(settings_raw.get("last_command_id", "") or ""),
         dialog_geometry=dialog_geometry,
+        column_widths=_parse_column_widths(settings_raw.get("column_widths")),
     )
     return Config(
         servers=servers,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ctypes
 import os
-import re
 import sys
 import threading
 import traceback
@@ -22,7 +21,16 @@ from fatty.single_instance import activate_existing, register_window, try_become
 from fatty.ssh_runner import SSHError, SSHSession, open_system_console
 from fatty.sftp import guess_start_path
 from fatty.files_ui import FilesWindow
-from fatty.store import APP_DIR, AppSettings, Command, Config, Server, load, save, unlock_secrets
+from fatty.layout import (
+    DEFAULT_GEOMETRY as _DEFAULT_GEOMETRY,
+    GEOM_RE as _GEOM_RE,
+    PositionedToplevel,
+    apply_tree_columns,
+    geometry_on_screen as _geometry_on_screen,
+    parent_layout as _parent_layout,
+    store_tree_columns,
+)
+from fatty.store import APP_DIR, Command, Config, Server, load, save, unlock_secrets
 from fatty.vault import MIN_PASSWORD_LEN, SessionVault, VaultError, VaultLocked
 
 
@@ -86,39 +94,6 @@ def _copy_name(base: str, taken: set[str]) -> str:
         n += 1
 
 
-_GEOM_RE = re.compile(r"^(\d+)x(\d+)(?:([+-]\d+)([+-]\d+))?$")
-_DEFAULT_GEOMETRY = "1100x720"
-
-
-class _RECT(ctypes.Structure):
-    _fields_ = [
-        ("left", ctypes.c_long),
-        ("top", ctypes.c_long),
-        ("right", ctypes.c_long),
-        ("bottom", ctypes.c_long),
-    ]
-
-
-def _geometry_on_screen(geom: str, min_w: int = 400, min_h: int = 300) -> bool:
-    match = _GEOM_RE.match((geom or "").strip())
-    if not match:
-        return False
-    width, height = int(match.group(1)), int(match.group(2))
-    if width < min_w or height < min_h:
-        return False
-    if match.group(3) is None:
-        return True
-    x, y = int(match.group(3)), int(match.group(4))
-    if sys.platform == "win32":
-        try:
-            rect = _RECT(x, y, x + width, y + height)
-            handle = ctypes.windll.user32.MonitorFromRect(ctypes.byref(rect), 0)
-            return bool(handle)
-        except Exception:
-            pass
-    return True
-
-
 def _enable_dpi() -> None:
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -155,89 +130,6 @@ def _present_toplevel(window: tk.Toplevel) -> None:
         pass
 
 
-def _parent_layout(parent: tk.Misc) -> tuple[AppSettings | None, object]:
-    data = getattr(parent, "config_data", None)
-    persist = getattr(parent, "persist", None)
-    settings = getattr(data, "settings", None) if data is not None else None
-    if not isinstance(settings, AppSettings):
-        return None, None
-    return settings, persist if callable(persist) else None
-
-
-def _restore_dialog_geometry(
-    window: tk.Toplevel,
-    settings: AppSettings,
-    key: str,
-    remember_size: bool,
-) -> None:
-    saved = (settings.dialog_geometry.get(key) or "").strip()
-    match = _GEOM_RE.match(saved)
-    if not match:
-        return
-    x_s, y_s = match.group(3), match.group(4)
-    if remember_size and _geometry_on_screen(saved, min_w=200, min_h=150):
-        window.geometry(saved)
-        return
-    if not x_s or not y_s:
-        return
-    width = max(window.winfo_reqwidth(), window.winfo_width(), 80)
-    height = max(window.winfo_reqheight(), window.winfo_height(), 50)
-    if _geometry_on_screen(f"{width}x{height}{x_s}{y_s}", min_w=80, min_h=50):
-        window.geometry(f"{x_s}{y_s}")
-
-
-class PositionedToplevel(tk.Toplevel):
-    """Toplevel, который помнит позицию (и размер, если remember_size)."""
-
-    def _setup_layout(
-        self,
-        settings: AppSettings | None,
-        key: str,
-        *,
-        remember_size: bool = False,
-        persist=None,
-    ) -> None:
-        self._layout_settings = settings
-        self._layout_key = key
-        self._layout_size = remember_size
-        self._layout_persist = persist
-        self._layout_saved = settings is None
-        if settings is None:
-            return
-        self.update_idletasks()
-        _restore_dialog_geometry(self, settings, key, remember_size)
-        self.bind("<Configure>", self._on_layout_configure, add="+")
-
-    def _on_layout_configure(self, event) -> None:
-        if event.widget is not self:
-            return
-        self._capture_layout()
-
-    def _capture_layout(self) -> None:
-        settings = getattr(self, "_layout_settings", None)
-        key = getattr(self, "_layout_key", None)
-        if settings is None or not key:
-            return
-        try:
-            geom = self.geometry()
-        except tk.TclError:
-            return
-        if _GEOM_RE.match(geom):
-            settings.dialog_geometry[key] = geom
-
-    def destroy(self) -> None:
-        if not getattr(self, "_layout_saved", True):
-            self._layout_saved = True
-            self._capture_layout()
-            persist = getattr(self, "_layout_persist", None)
-            if persist is not None:
-                try:
-                    persist()
-                except Exception:
-                    pass
-        super().destroy()
-
-
 class ServerDialog(PositionedToplevel):
     def __init__(self, parent: tk.Tk, server: Server, title: str, is_new: bool = False) -> None:
         super().__init__(parent)
@@ -245,7 +137,6 @@ class ServerDialog(PositionedToplevel):
         self.resizable(False, False)
         self.transient(parent)
         self.result: Server | None = None
-        self.preset_opts: dict | None = None
         self._server = server
         self._is_new = is_new
 
@@ -312,31 +203,8 @@ class ServerDialog(PositionedToplevel):
         )
         hint.grid(row=8, column=0, columnspan=3, sticky="w", padx=10, pady=(8, 4))
 
-        self.add_presets_var = tk.BooleanVar(value=is_new)
-        self.app_dir_var = tk.StringVar(value=DEFAULT_APP_DIR)
-        self.branch_var = tk.StringVar(value=DEFAULT_BRANCH)
-        self.pm2_var = tk.StringVar(value=DEFAULT_PM2)
-        next_row = 9
-        if is_new:
-            ttk.Checkbutton(
-                body,
-                text="Добавить типовые команды",
-                variable=self.add_presets_var,
-                command=self._toggle_preset_fields,
-            ).grid(row=9, column=0, columnspan=3, sticky="w", padx=10, pady=(8, 2))
-            self.preset_frame = ttk.Frame(body)
-            self.preset_frame.grid(row=10, column=0, columnspan=3, sticky="ew", padx=10)
-            ttk.Label(self.preset_frame, text="Каталог приложения").grid(row=0, column=0, sticky="w", padx=(0, 8), pady=2)
-            ttk.Entry(self.preset_frame, textvariable=self.app_dir_var, width=42).grid(row=0, column=1, sticky="ew", pady=2)
-            ttk.Label(self.preset_frame, text="Ветка git").grid(row=1, column=0, sticky="w", padx=(0, 8), pady=2)
-            ttk.Entry(self.preset_frame, textvariable=self.branch_var, width=20).grid(row=1, column=1, sticky="w", pady=2)
-            ttk.Label(self.preset_frame, text="Процесс pm2").grid(row=2, column=0, sticky="w", padx=(0, 8), pady=2)
-            ttk.Entry(self.preset_frame, textvariable=self.pm2_var, width=20).grid(row=2, column=1, sticky="w", pady=2)
-            self.preset_frame.columnconfigure(1, weight=1)
-            next_row = 11
-
         btns = ttk.Frame(body)
-        btns.grid(row=next_row, column=0, columnspan=3, sticky="e", pady=(10, 0))
+        btns.grid(row=9, column=0, columnspan=3, sticky="e", pady=(10, 0))
         ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right", padx=4)
         ttk.Button(btns, text="Сохранить", command=self._ok).pack(side="right", padx=4)
 
@@ -367,14 +235,6 @@ class ServerDialog(PositionedToplevel):
         if typed:
             return typed
         return self._stored_password
-
-    def _toggle_preset_fields(self) -> None:
-        if not self._is_new:
-            return
-        if self.add_presets_var.get():
-            self.preset_frame.grid()
-        else:
-            self.preset_frame.grid_remove()
 
     def _browse_key(self) -> None:
         path = filedialog.askopenfilename(
@@ -417,12 +277,6 @@ class ServerDialog(PositionedToplevel):
             password=password,
             key_path=key_path,
         )
-        if self._is_new and self.add_presets_var.get():
-            self.preset_opts = {
-                "app_dir": self.app_dir_var.get().strip() or DEFAULT_APP_DIR,
-                "branch": self.branch_var.get().strip() or DEFAULT_BRANCH,
-                "pm2": self.pm2_var.get().strip() or DEFAULT_PM2,
-            }
         self.destroy()
 
 
@@ -787,6 +641,7 @@ class App(tk.Tk):
         self.vault = vault
         self._session: SSHSession | None = None
         self._files_windows: dict[str, FilesWindow] = {}
+        self._remote_cwd: dict[str, str] = {}
         self._busy = False
         self._restoring_layout = True
         self._last_wm_state = self.config_data.settings.window_state or "normal"
@@ -838,7 +693,12 @@ class App(tk.Tk):
         root = ttk.Frame(self, padding=8)
         root.pack(fill="both", expand=True)
 
-        paned = ttk.Panedwindow(root, orient="horizontal")
+        vpaned = ttk.Panedwindow(root, orient="vertical")
+        vpaned.pack(fill="both", expand=True)
+        self.vpaned = vpaned
+
+        top = ttk.Frame(vpaned)
+        paned = ttk.Panedwindow(top, orient="horizontal")
         paned.pack(fill="both", expand=True)
         self.paned = paned
 
@@ -847,14 +707,17 @@ class App(tk.Tk):
         paned.add(left, weight=1)
         paned.add(right, weight=2)
 
+        saved_cols = self.config_data.settings.column_widths
         self.server_tree = ttk.Treeview(left, columns=("host",), show="tree headings", selectmode="browse", height=12)
         self.server_tree.heading("#0", text="Имя")
         self.server_tree.heading("host", text="Адрес")
-        self.server_tree.column("#0", width=160)
-        self.server_tree.column("host", width=220)
+        self.server_tree.column("#0", width=160, minwidth=80, stretch=False)
+        self.server_tree.column("host", width=220, minwidth=80, stretch=True)
+        apply_tree_columns(self.server_tree, saved_cols.get("servers"))
         self.server_tree.pack(fill="both", expand=True)
         self.server_tree.bind("<<TreeviewSelect>>", lambda _e: self._on_server_select())
         self.server_tree.bind("<Double-1>", lambda _e: self._edit_server())
+        self.server_tree.bind("<ButtonRelease-1>", self._on_layout_drag, add="+")
 
         sbtns = ttk.Frame(left)
         sbtns.pack(fill="x", pady=(8, 0))
@@ -878,13 +741,15 @@ class App(tk.Tk):
         )
         self.cmd_tree.heading("#0", text="Название", command=self._sort_commands_by_name)
         self.cmd_tree.heading("command", text="Команда", command=self._sort_commands_by_command)
-        self.cmd_tree.column("#0", width=180)
-        self.cmd_tree.column("command", width=420)
+        self.cmd_tree.column("#0", width=180, minwidth=80, stretch=False)
+        self.cmd_tree.column("command", width=420, minwidth=80, stretch=True)
+        apply_tree_columns(self.cmd_tree, saved_cols.get("commands"))
         self.cmd_tree.pack(fill="both", expand=True)
         self.cmd_tree.bind("<<TreeviewSelect>>", lambda _e: self._remember_selection())
         self.cmd_tree.bind("<Double-1>", lambda _e: self._edit_command())
         self.cmd_tree.bind("<Control-Up>", lambda _e: self._move_command(-1))
         self.cmd_tree.bind("<Control-Down>", lambda _e: self._move_command(1))
+        self.cmd_tree.bind("<ButtonRelease-1>", self._on_layout_drag, add="+")
 
         corder = ttk.Frame(right)
         corder.pack(fill="x", pady=(8, 0))
@@ -913,10 +778,11 @@ class App(tk.Tk):
         qentry.bind("<Return>", lambda _e: self._run_quick())
         ttk.Button(quick, text="Выполнить", command=self._run_quick).pack(side="left")
 
-        out_frame = ttk.Labelframe(root, text="Вывод", padding=6)
-        out_frame.pack(fill="both", expand=True, pady=(8, 0))
+        out_frame = ttk.Labelframe(vpaned, text="Вывод", padding=6)
         out_btns = ttk.Frame(out_frame)
         out_btns.pack(fill="x")
+        self.cwd_var = tk.StringVar(value="Папка: ~")
+        ttk.Label(out_btns, textvariable=self.cwd_var).pack(side="left")
         ttk.Button(out_btns, text="Очистить", command=self._clear_output).pack(side="right")
         self.output = tk.Text(
             out_frame,
@@ -936,6 +802,11 @@ class App(tk.Tk):
         self.output.tag_configure("ok", foreground="#6a9955")
         self.output.tag_configure("err", foreground="#f14c4c")
 
+        vpaned.add(top, weight=3)
+        vpaned.add(out_frame, weight=2)
+        paned.bind("<ButtonRelease-1>", self._on_layout_drag, add="+")
+        vpaned.bind("<ButtonRelease-1>", self._on_layout_drag, add="+")
+
         self.status = ttk.Label(self, text="Готово", anchor="w", padding=(10, 4))
         self.status.pack(fill="x", side="bottom")
 
@@ -954,6 +825,7 @@ class App(tk.Tk):
     def _on_server_select(self) -> None:
         self._remember_selection()
         self._refresh_commands()
+        self._update_cwd_label()
 
     def _remember_selection(self) -> None:
         server = self._selected_server()
@@ -992,6 +864,15 @@ class App(tk.Tk):
                 settings.sash_pos = max(0, int(self.paned.sashpos(0)))
             except tk.TclError:
                 pass
+        if getattr(self, "vpaned", None) is not None:
+            try:
+                settings.vsash_pos = max(0, int(self.vpaned.sashpos(0)))
+            except tk.TclError:
+                pass
+        if getattr(self, "server_tree", None) is not None:
+            store_tree_columns(settings, "servers", self.server_tree)
+        if getattr(self, "cmd_tree", None) is not None:
+            store_tree_columns(settings, "commands", self.cmd_tree)
         self._remember_selection()
 
     def _restore_window_layout(self) -> None:
@@ -1013,20 +894,56 @@ class App(tk.Tk):
                 self.state("zoomed")
             except tk.TclError:
                 pass
-        self._restore_sash()
+        self.update_idletasks()
+        self._restore_sashes()
+        self.update_idletasks()
+        self._restore_columns()
         self._restoring_layout = False
+        self.after(80, self._retry_layout_restore)
 
-    def _restore_sash(self) -> None:
-        pos = self.config_data.settings.sash_pos
-        if pos <= 0 or getattr(self, "paned", None) is None:
+    def _retry_layout_restore(self) -> None:
+        if not self.winfo_exists():
+            return
+        self._restoring_layout = True
+        try:
+            self._restore_sashes()
+            self.update_idletasks()
+            self._restore_columns()
+        finally:
+            self._restoring_layout = False
+
+    def _restore_sashes(self) -> None:
+        self._restore_sash(self.paned, self.config_data.settings.sash_pos, min_pos=180, min_other=220, vertical=False)
+        self._restore_sash(self.vpaned, self.config_data.settings.vsash_pos, min_pos=160, min_other=120, vertical=True)
+
+    def _restore_sash(
+        self,
+        paned: ttk.Panedwindow | None,
+        pos: int,
+        *,
+        min_pos: int,
+        min_other: int,
+        vertical: bool,
+    ) -> None:
+        if pos <= 0 or paned is None:
             return
         try:
-            total = int(self.paned.winfo_width())
-            if total > 240:
-                pos = min(max(180, pos), total - 220)
-            self.paned.sashpos(0, pos)
+            total = int(paned.winfo_height() if vertical else paned.winfo_width())
+            if total > min_pos + min_other:
+                pos = min(max(min_pos, pos), total - min_other)
+            paned.sashpos(0, pos)
         except tk.TclError:
             pass
+
+    def _restore_columns(self) -> None:
+        widths = self.config_data.settings.column_widths
+        apply_tree_columns(self.server_tree, widths.get("servers"))
+        apply_tree_columns(self.cmd_tree, widths.get("commands"))
+
+    def _on_layout_drag(self, _event=None) -> None:
+        if getattr(self, "_restoring_layout", False):
+            return
+        self._sync_ui_settings()
 
     def _on_window_configure(self, event) -> None:
         if event.widget is not self or getattr(self, "_restoring_layout", False):
@@ -1087,23 +1004,13 @@ class App(tk.Tk):
                 self.cmd_tree.selection_set(last_cmd)
                 self.cmd_tree.see(last_cmd)
         self._remember_selection()
+        self._update_cwd_label()
 
     def _add_server(self) -> None:
         dlg = ServerDialog(self, Server.new(), "Новый VPS", is_new=True)
         self.wait_window(dlg)
         if dlg.result:
             self.config_data.servers.append(dlg.result)
-            if dlg.preset_opts:
-                _attach_presets(
-                    self.config_data,
-                    dlg.result.id,
-                    all_presets(
-                        dlg.preset_opts["app_dir"],
-                        dlg.preset_opts["branch"],
-                        dlg.preset_opts["pm2"],
-                        include_server=True,
-                    ),
-                )
             self.persist()
             self._refresh_servers(dlg.result.id)
 
@@ -1286,6 +1193,22 @@ class App(tk.Tk):
         self.output.delete("1.0", "end")
         self.output.configure(state="disabled")
 
+    def _remember_cwd(self, server_id: str, cwd: str) -> None:
+        path = (cwd or "").strip()
+        if path:
+            self._remote_cwd[server_id] = path
+        self._update_cwd_label()
+
+    def _update_cwd_label(self) -> None:
+        if getattr(self, "cwd_var", None) is None:
+            return
+        server = self._selected_server()
+        if not server:
+            self.cwd_var.set("")
+            return
+        path = self._remote_cwd.get(server.id, "")
+        self.cwd_var.set(f"Папка: {path}" if path else "Папка: ~")
+
     def _append(self, text: str, tag: str | None = None) -> None:
         self.output.configure(state="normal")
         self.output.insert("end", text, (tag,) if tag else ())
@@ -1390,6 +1313,7 @@ class App(tk.Tk):
             messagebox.showinfo("Занято", "Дождитесь окончания текущей команды или нажмите Стоп.", parent=self)
             return
         self._set_busy(True)
+        cwd = self._remote_cwd.get(server.id, "")
         self.status.configure(text=f"Выполняется: {title} → {server.name}")
         self._append(f"\n{'─' * 60}\n", "meta")
         self._append(f"{title}  •  {server.name}\n", "meta")
@@ -1399,13 +1323,17 @@ class App(tk.Tk):
         def worker() -> None:
             code = 1
             try:
-                code = session.run(
+                result = session.run(
                     server,
                     command,
                     timeout,
                     login_shell,
                     lambda chunk: self.after(0, self._append, chunk),
+                    cwd=cwd,
                 )
+                code = result.exit_code
+                if result.cwd:
+                    self.after(0, self._remember_cwd, server.id, result.cwd)
             except SSHError as exc:
                 self.after(0, self._append, f"\n{exc}\n", "err")
             except Exception as exc:
@@ -1417,7 +1345,9 @@ class App(tk.Tk):
             def done() -> None:
                 self._set_busy(False)
                 self._session = None
-                self.status.configure(text=f"Готово  •  код {code}  •  {title}")
+                folder = self._remote_cwd.get(server.id, "")
+                extra = f"  •  {folder}" if folder else ""
+                self.status.configure(text=f"Готово  •  код {code}  •  {title}{extra}")
 
             self.after(0, done)
 

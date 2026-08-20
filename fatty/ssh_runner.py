@@ -7,7 +7,9 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 import paramiko
@@ -21,6 +23,59 @@ ClientReadyCb = Callable[[paramiko.SSHClient], None]
 
 class SSHError(Exception):
     pass
+
+
+@dataclass
+class RunResult:
+    exit_code: int
+    cwd: str = ""
+
+
+def wrap_remote_command(command: str, cwd: str, login_shell: bool) -> tuple[str, str]:
+    """Run user command in one shell: restore cwd, then print pwd for the next run."""
+    mark = f"FATTYCWD_{uuid.uuid4().hex}:"
+    lines = ["set +e"]
+    cwd = (cwd or "").strip()
+    if cwd:
+        quoted = shlex.quote(cwd)
+        warn = shlex.quote(f"■ Нет каталога {cwd} — стартую из домашней")
+        lines.append(f"cd {quoted} || printf '%s\\n' {warn}")
+    lines.append(command.strip())
+    lines.append("_fatty_st=$?")
+    lines.append(f"printf '\\n{mark}%s\\n' \"$(pwd 2>/dev/null || true)\"")
+    lines.append("exit $_fatty_st")
+    script = "\n".join(lines)
+    flag = "-lc" if login_shell else "-c"
+    return f"bash {flag} {shlex.quote(script)}", mark
+
+
+class _CwdOutputFilter:
+    def __init__(self, mark: str, on_output: OutputCb) -> None:
+        self.mark = mark
+        self.on_output = on_output
+        self.cwd = ""
+        self._hold = ""
+
+    def feed(self, text: str) -> None:
+        data = self._hold + text
+        lines = data.split("\n")
+        self._hold = lines.pop()
+        for line in lines:
+            body = line.rstrip("\r")
+            if body.startswith(self.mark):
+                self.cwd = body[len(self.mark) :].strip()
+            else:
+                self.on_output(line + "\n")
+
+    def finish(self) -> None:
+        if not self._hold:
+            return
+        body = self._hold.rstrip("\r")
+        if body.startswith(self.mark):
+            self.cwd = body[len(self.mark) :].strip()
+        else:
+            self.on_output(self._hold)
+        self._hold = ""
 
 
 def connect_client(
@@ -120,17 +175,19 @@ class SSHSession:
         timeout_sec: int,
         login_shell: bool,
         on_output: OutputCb,
-    ) -> int:
+        cwd: str = "",
+    ) -> RunResult:
         self._cancel.clear()
-        on_output(f"→ {server.username}@{server.host}:{server.port}\n")
+        cwd = (cwd or "").strip()
+        where = f"  {cwd}" if cwd else ""
+        on_output(f"→ {server.username}@{server.host}:{server.port}{where}\n")
         try:
             client = connect_client(server, on_client=self._set_client)
         except SSHError:
             self._client = None
             raise
-        remote = command.strip()
-        if login_shell:
-            remote = f"bash -lc {shlex.quote(command.strip())}"
+        remote, mark = wrap_remote_command(command, cwd, login_shell)
+        filt = _CwdOutputFilter(mark, on_output)
 
         on_output(f"$ {command.strip()}\n\n")
         transport = client.get_transport()
@@ -149,21 +206,33 @@ class SSHSession:
         stdout_buf = bytearray()
         stderr_buf = bytearray()
 
-        def flush(buf: bytearray) -> None:
+        def flush(buf: bytearray, *, stdout: bool) -> None:
             if not buf:
                 return
             text = buf.decode("utf-8", errors="replace")
             buf.clear()
-            on_output(text)
+            if stdout:
+                filt.feed(text)
+            else:
+                on_output(text)
+
+        def finish_output() -> None:
+            if stdout_buf:
+                flush(stdout_buf, stdout=True)
+            if stderr_buf:
+                flush(stderr_buf, stdout=False)
+            filt.finish()
 
         try:
             while True:
                 if self._cancel.is_set():
+                    finish_output()
                     on_output("\n■ Выполнение прервано\n")
-                    return 130
+                    return RunResult(130, filt.cwd or cwd)
                 if timeout_sec > 0 and (time.monotonic() - started) > timeout_sec:
+                    finish_output()
                     on_output(f"\n■ Таймаут {timeout_sec} с\n")
-                    return 124
+                    return RunResult(124, filt.cwd or cwd)
 
                 got = False
                 if channel.recv_ready():
@@ -171,25 +240,22 @@ class SSHSession:
                     if chunk:
                         stdout_buf.extend(chunk)
                         if b"\n" in chunk or len(stdout_buf) > 2048:
-                            flush(stdout_buf)
+                            flush(stdout_buf, stdout=True)
                         got = True
                 if channel.recv_stderr_ready():
                     chunk = channel.recv_stderr(4096)
                     if chunk:
                         stderr_buf.extend(chunk)
                         if b"\n" in chunk or len(stderr_buf) > 2048:
-                            flush(stderr_buf)
+                            flush(stderr_buf, stdout=False)
                         got = True
                 if channel.exit_status_ready() and not channel.recv_ready() and not channel.recv_stderr_ready():
                     break
                 if not got:
                     time.sleep(0.04)
 
-            if stdout_buf:
-                flush(stdout_buf)
-            if stderr_buf:
-                flush(stderr_buf)
-            return int(channel.recv_exit_status())
+            finish_output()
+            return RunResult(int(channel.recv_exit_status()), filt.cwd or cwd)
         finally:
             try:
                 channel.close()

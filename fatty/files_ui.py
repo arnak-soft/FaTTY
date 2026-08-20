@@ -7,6 +7,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from fatty import APP_NAME
+from fatty.layout import PositionedToplevel, apply_tree_columns, parent_layout, store_tree_columns
 from fatty.sftp import (
     RemoteEntry,
     SFTPError,
@@ -44,7 +45,7 @@ def _apply_app_icon(window: tk.Toplevel) -> None:
             pass
 
 
-class FilesWindow(tk.Toplevel):
+class FilesWindow(PositionedToplevel):
     def __init__(self, parent: tk.Tk, server: Server, start_path: str = ".") -> None:
         super().__init__(parent)
         self.title(f"Файлы — {server.name or server.host}")
@@ -59,9 +60,20 @@ class FilesWindow(tk.Toplevel):
         self._entries: dict[str, RemoteEntry] = {}
 
         self._build()
+        settings, persist = parent_layout(parent)
+        if settings is not None:
+            apply_tree_columns(self.tree, settings.column_widths.get("files"))
+        self._setup_layout(settings, "files", remember_size=True, persist=persist)
+        self.tree.bind("<ButtonRelease-1>", self._on_columns_drag, add="+")
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<Alt-Up>", lambda _e: self._go_up())
+        self.after(50, self._restore_file_columns)
         self.after(80, self._connect)
+
+    def _restore_file_columns(self) -> None:
+        settings = getattr(self, "_layout_settings", None)
+        if settings is not None:
+            apply_tree_columns(self.tree, settings.column_widths.get("files"))
 
     def _build(self) -> None:
         root = ttk.Frame(self, padding=8)
@@ -94,10 +106,10 @@ class FilesWindow(tk.Toplevel):
         self.tree.heading("size", text="Размер")
         self.tree.heading("mtime", text="Изменён")
         self.tree.heading("kind", text="Тип")
-        self.tree.column("#0", width=280)
-        self.tree.column("size", width=90, anchor="e")
-        self.tree.column("mtime", width=140)
-        self.tree.column("kind", width=110)
+        self.tree.column("#0", width=280, minwidth=120, stretch=True)
+        self.tree.column("size", width=90, minwidth=60, stretch=False, anchor="e")
+        self.tree.column("mtime", width=140, minwidth=80, stretch=False)
+        self.tree.column("kind", width=110, minwidth=70, stretch=False)
         scroll = ttk.Scrollbar(tree_frame, command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.pack(side="left", fill="both", expand=True)
@@ -405,6 +417,13 @@ class FilesWindow(tk.Toplevel):
     def _stop(self) -> None:
         self._session.cancel_transfer()
         self.status.configure(text="Остановка…")
+
+    def _capture_layout(self) -> None:
+        super()._capture_layout()
+        store_tree_columns(getattr(self, "_layout_settings", None), "files", self.tree)
+
+    def _on_columns_drag(self, _event=None) -> None:
+        store_tree_columns(getattr(self, "_layout_settings", None), "files", self.tree)
 
     def _on_close(self) -> None:
         self._session.cancel_transfer()
