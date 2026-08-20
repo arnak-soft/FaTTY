@@ -43,10 +43,10 @@ def _normalize(raw: str) -> str:
     return text
 
 
-def _git_version() -> str | None:
+def _git(args: list[str]) -> str | None:
     try:
         raw = subprocess.check_output(
-            ["git", "-C", str(_repo_root()), "describe", "--tags", "--always", "--dirty"],
+            ["git", "-C", str(_repo_root()), *args],
             stderr=subprocess.DEVNULL,
             text=True,
             timeout=5,
@@ -54,10 +54,51 @@ def _git_version() -> str | None:
         )
     except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
         return None
-    text = raw.strip()
-    if not text:
+    return raw.strip()
+
+
+def _git_ok(args: list[str]) -> bool:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(_repo_root()), *args],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            creationflags=_CREATE_NO_WINDOW,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return completed.returncode == 0
+
+
+def _git_version() -> str | None:
+    """Highest SemVer tag reachable from HEAD, plus -N-gHASH if HEAD is ahead."""
+    if not _git_ok(["rev-parse", "--is-inside-work-tree"]):
         return None
-    return _normalize(text)
+    dirty = bool(_git(["status", "--porcelain"]))
+    tags = _git(["tag", "--list", "v[0-9]*", "--sort=-version:refname"])
+    chosen: str | None = None
+    if tags:
+        for tag in tags.splitlines():
+            tag = tag.strip()
+            if tag and _git_ok(["merge-base", "--is-ancestor", tag, "HEAD"]):
+                chosen = tag
+                break
+    if chosen is None:
+        short = _git(["rev-parse", "--short", "HEAD"])
+        if not short:
+            return None
+        text = f"0.0.0-g{short}"
+    else:
+        count = _git(["rev-list", "--count", f"{chosen}..HEAD"]) or "0"
+        if count == "0":
+            text = _normalize(chosen)
+        else:
+            short = _git(["rev-parse", "--short", "HEAD"]) or "unknown"
+            text = f"{_normalize(chosen)}-{count}-g{short}"
+    if dirty:
+        text += "-dirty"
+    return text
 
 
 def resolve_version() -> str:
