@@ -111,6 +111,36 @@ def _parent_is_withdrawn(parent: tk.Misc) -> bool:
         return False
 
 
+def _copy_widget_selection(widget: tk.Text) -> str:
+    try:
+        text = widget.get("sel.first", "sel.last")
+    except tk.TclError:
+        return ""
+    if not text:
+        return ""
+    widget.clipboard_clear()
+    widget.clipboard_append(text)
+    try:
+        widget.update_idletasks()
+    except tk.TclError:
+        pass
+    return text
+
+
+def _bind_copy_on_select(widget: tk.Text, on_copied=None) -> None:
+    """PuTTY-style: releasing the mouse after a selection copies to clipboard."""
+
+    def copy_sel(_event=None):
+        text = _copy_widget_selection(widget)
+        if text and on_copied is not None:
+            on_copied(text)
+        return "break" if text else None
+
+    widget.bind("<ButtonRelease-1>", copy_sel, add="+")
+    widget.bind("<Control-c>", copy_sel)
+    widget.bind("<Control-C>", copy_sel)
+
+
 def _present_toplevel(window: tk.Toplevel) -> None:
     """Make a Toplevel visible and modal even if its parent was withdrawn."""
     window.deiconify()
@@ -801,6 +831,7 @@ class App(tk.Tk):
         self.output.tag_configure("meta", foreground="#9cdcfe")
         self.output.tag_configure("ok", foreground="#6a9955")
         self.output.tag_configure("err", foreground="#f14c4c")
+        _bind_copy_on_select(self.output, self._on_output_copied)
 
         vpaned.add(top, weight=3)
         vpaned.add(out_frame, weight=2)
@@ -1187,6 +1218,10 @@ class App(tk.Tk):
             f"{APP_NAME} {__version__}",
             parent=self,
         )
+
+    def _on_output_copied(self, text: str) -> None:
+        n = len(text)
+        self.status.configure(text=f"Скопировано в буфер ({n} симв.)")
 
     def _clear_output(self) -> None:
         self.output.configure(state="normal")
