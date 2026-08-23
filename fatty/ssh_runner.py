@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -15,7 +17,8 @@ from pathlib import Path
 import paramiko
 
 from fatty import APP_NAME
-from fatty.store import KNOWN_HOSTS_PATH, Server
+from fatty.ppk import PPKError, write_openssh_as_ppk
+from fatty.store import APP_DIR, KNOWN_HOSTS_PATH, Server
 
 OutputCb = Callable[[str], None]
 ClientReadyCb = Callable[[paramiko.SSHClient], None]
@@ -290,6 +293,144 @@ def find_ssh_executable() -> Path | None:
         if candidate.is_file():
             return candidate
     return None
+
+
+def _putty_install_dirs() -> tuple[Path, ...]:
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    program_files_x86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    local_app = os.environ.get("LocalAppData", "")
+    dirs = (
+        Path(program_files) / "PuTTY",
+        Path(program_files_x86) / "PuTTY",
+    )
+    if local_app:
+        dirs = (*dirs, Path(local_app) / "Programs" / "PuTTY")
+    return dirs
+
+
+def find_putty_executable() -> Path | None:
+    found = shutil.which("putty")
+    if found:
+        return Path(found)
+    for directory in _putty_install_dirs():
+        candidate = directory / "putty.exe"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _putty_key_cache_path(source: Path) -> Path:
+    stat = source.stat()
+    digest = hashlib.sha256(
+        f"{source.resolve()}:{stat.st_mtime_ns}:{stat.st_size}".encode()
+    ).hexdigest()[:16]
+    cache_dir = APP_DIR / "putty-keys"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir / f"{digest}.ppk"
+
+
+def _convert_openssh_key_to_ppk(source: Path) -> Path:
+    dest = _putty_key_cache_path(source)
+    if dest.is_file() and dest.stat().st_mtime >= source.stat().st_mtime:
+        try:
+            head = dest.read_text(encoding="utf-8", errors="replace")[:40]
+        except OSError:
+            head = ""
+        if head.startswith("PuTTY-User-Key-File-"):
+            return dest
+    try:
+        return write_openssh_as_ppk(source, dest)
+    except PPKError as exc:
+        raise SSHError(str(exc)) from exc
+
+
+def _resolve_putty_key_file(key_path: str) -> Path:
+    key = Path(key_path).expanduser()
+    if not key.is_file():
+        raise SSHError(f"SSH-ключ не найден: {key}")
+    if key.suffix.lower() == ".ppk":
+        return key
+    return _convert_openssh_key_to_ppk(key)
+
+
+def _schedule_unlink(path: Path, delay: float = 3.0) -> None:
+    def run() -> None:
+        time.sleep(delay)
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+    threading.Thread(target=run, daemon=True).start()
+
+
+def _putty_password_file(password: str) -> Path:
+    APP_DIR.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix="putty-pw-", suffix=".tmp", dir=str(APP_DIR))
+    path = Path(name)
+    try:
+        os.write(fd, (password + "\n").encode("utf-8"))
+    finally:
+        os.close(fd)
+    return path
+
+
+def open_putty_console(server: Server) -> None:
+    if sys.platform != "win32":
+        raise SSHError("PuTTY доступен только на Windows.")
+    putty = find_putty_executable()
+    if putty is None:
+        raise SSHError(
+            "PuTTY не найден.\n"
+            "Установите его с https://www.chiark.greenend.org.uk/~sgtatham/putty/ "
+            "или добавьте putty.exe в PATH."
+        )
+
+    key_path = (server.key_path or "").strip()
+    password = (server.password or "").strip()
+    pwfile: Path | None = None
+
+    args = [
+        str(putty),
+        "-ssh",
+        server.host,
+        "-P",
+        str(server.port or 22),
+        "-l",
+        server.username,
+        "-noagent",
+    ]
+
+    if key_path:
+        try:
+            ppk = _resolve_putty_key_file(key_path)
+        except SSHError:
+            if not password:
+                raise
+            ppk = None
+        if ppk is not None:
+            args += ["-i", str(ppk)]
+        else:
+            pwfile = _putty_password_file(password)
+            args += ["-pwfile", str(pwfile)]
+    elif password:
+        pwfile = _putty_password_file(password)
+        args += ["-pwfile", str(pwfile)]
+    else:
+        raise SSHError("Для PuTTY укажите пароль или SSH-ключ в карточке VPS.")
+
+    try:
+        subprocess.Popen(args, close_fds=True, cwd=str(Path.home()))
+    except OSError as exc:
+        if pwfile is not None:
+            try:
+                pwfile.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise SSHError(f"Не удалось запустить PuTTY: {exc}") from exc
+
+    if pwfile is not None:
+        _schedule_unlink(pwfile)
 
 
 def open_system_console(server: Server) -> None:

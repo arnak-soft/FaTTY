@@ -18,7 +18,7 @@ from fatty.presets import (
     all_presets,
 )
 from fatty.single_instance import activate_existing, register_window, try_become_primary
-from fatty.ssh_runner import SSHError, SSHSession, open_system_console
+from fatty.ssh_runner import SSHError, SSHSession, open_putty_console, open_system_console
 from fatty.sftp import guess_start_path
 from fatty.files_ui import FilesWindow
 from fatty.layout import (
@@ -760,6 +760,7 @@ class App(tk.Tk):
         sact.pack(fill="x", pady=(4, 0))
         ttk.Button(sact, text="Файлы", command=self._open_files).pack(side="left")
         ttk.Button(sact, text="Открыть консоль", command=self._open_console).pack(side="left", padx=4)
+        ttk.Button(sact, text="PuTTY", command=self._open_putty).pack(side="left", padx=4)
         ttk.Button(sact, text="Проверить связь", command=self._test_connection).pack(side="left", padx=4)
 
         self.cmd_tree = ttk.Treeview(
@@ -1280,6 +1281,19 @@ class App(tk.Tk):
         if not server.key_path:
             extra = "  •  пароль, если спросит, введите в окне SSH"
         self.status.configure(text=f"Консоль открыта → {server.name}{extra}")
+
+    def _open_putty(self) -> None:
+        server = self._selected_server()
+        if not server:
+            messagebox.showinfo("PuTTY", "Сначала выберите VPS.", parent=self)
+            return
+        try:
+            open_putty_console(server)
+        except SSHError as exc:
+            messagebox.showerror("PuTTY", str(exc), parent=self)
+            return
+        via = "ключ" if (server.key_path or "").strip() else "пароль"
+        self.status.configure(text=f"PuTTY открыт → {server.name}  •  {via}")
 
     def _open_files(self) -> None:
         server = self._selected_server()
