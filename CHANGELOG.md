@@ -4,14 +4,14 @@
 
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [SemVer](https://semver.org/lang/ru/).
 
-Номер версии — git-тег (`vX.Y.Z`). `build.bat` читает его через `git describe --tags` и собирает `dist\FaTTY <версия> OneFile.exe` и папку `dist\FaTTY <версия> Portable`.
+Номер версии — git-тег (`vX.Y.Z`). `build.bat` читает его через `git describe --tags` и собирает `dist\FaTTY <версия> Setup.exe`, `dist\FaTTY <версия> OneFile.exe` и папку `dist\FaTTY <версия> Portable`.
 
 ## Как пометить релиз
 
 1. Перенести пункты из `[Unreleased]` в новую секцию `## [x.y.z] — ГГГГ-ММ-ДД`.
 2. Закоммитить изменения.
 3. Поставить тег: `git tag vX.Y.Z` (патч / минор / мажор по SemVer).
-4. Запустить `build.bat` — в `dist\` появятся `FaTTY x.y.z OneFile.exe` и папка `FaTTY x.y.z Portable`.
+4. Запустить `build.bat` — в `dist\` появятся `FaTTY x.y.z Setup.exe`, `FaTTY x.y.z OneFile.exe` и папка `FaTTY x.y.z Portable`.
 
 Сборка не с тега получит суффикс вида `1.4.0-3-gabc1234` (три коммита после тега). Без тегов — `0.0.0-g<хеш>`.
 
@@ -19,6 +19,8 @@
 
 ### Added
 
+- Проверка обновлений: **Справка → Проверить обновления…** (GitHub Releases, иначе теги). Опция **Настройки → Проверять обновления при запуске** (не чаще раза в сутки).
+- Установщик Windows: `FaTTY <версия> Setup.exe` (Inno Setup поверх Portable; `fatty.iss` + `scripts/build_installer.py`).
 - Кнопка **Копия** для VPS (вместе с командами) и для отдельной команды.
 - Положение модальных окон запоминается (у диалога команды — ещё и размер).
 - Экран загрузки при старте, чтобы было видно, что приложение открывается.
@@ -30,7 +32,7 @@
 ### Changed
 
 - Версия берётся из git-тега, а не из `__version__` в коде.
-- Сборка даёт два варианта: `FaTTY <версия> OneFile.exe` (один файл) и папка `FaTTY <версия> Portable` (быстрее стартует).
+- Сборка даёт три варианта: `FaTTY <версия> Setup.exe` (Inno Setup), `FaTTY <версия> OneFile.exe` и папка `FaTTY <версия> Portable`.
 
 
 ## [1.4.0] — 2026-08-19

@@ -89,6 +89,8 @@ class Command:
 @dataclass
 class AppSettings:
     confirm_before_run: bool = True
+    check_updates_on_start: bool = True
+    last_update_check: float = 0.0
     window_geometry: str = ""
     window_state: str = "normal"
     sash_pos: int = 0
@@ -248,8 +250,14 @@ def load() -> Config:
         for key, value in raw_geoms.items():
             if isinstance(key, str) and isinstance(value, str) and "x" in value:
                 dialog_geometry[key] = value.strip()
+    try:
+        last_update_check = float(settings_raw.get("last_update_check", 0) or 0)
+    except (TypeError, ValueError):
+        last_update_check = 0.0
     settings = AppSettings(
         confirm_before_run=bool(settings_raw.get("confirm_before_run", True)),
+        check_updates_on_start=bool(settings_raw.get("check_updates_on_start", True)),
+        last_update_check=max(0.0, last_update_check),
         window_geometry=str(settings_raw.get("window_geometry", "") or ""),
         window_state=window_state,
         sash_pos=max(0, sash_pos),

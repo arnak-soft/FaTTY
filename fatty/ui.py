@@ -4,7 +4,9 @@ import ctypes
 import os
 import sys
 import threading
+import time
 import traceback
+import webbrowser
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -31,6 +33,7 @@ from fatty.layout import (
     store_tree_columns,
 )
 from fatty.store import APP_DIR, Command, Config, Server, load, save, unlock_secrets
+from fatty.updates import UpdateCheckResult, UpdateError, check_for_updates
 from fatty.vault import MIN_PASSWORD_LEN, SessionVault, VaultError, VaultLocked
 
 
@@ -685,6 +688,7 @@ class App(tk.Tk):
         self.bind("<F5>", lambda _e: self._run_selected())
         self.bind("<Configure>", self._on_window_configure)
         self.after(120, self._finish_layout_restore)
+        self.after(2000, self._maybe_auto_check_updates)
 
     def _build_style(self) -> None:
         style = ttk.Style(self)
@@ -710,11 +714,19 @@ class App(tk.Tk):
             variable=self.confirm_var,
             command=self._toggle_confirm,
         )
+        self.updates_var = tk.BooleanVar(value=self.config_data.settings.check_updates_on_start)
+        opt.add_checkbutton(
+            label="Проверять обновления при запуске",
+            variable=self.updates_var,
+            command=self._toggle_updates_on_start,
+        )
         opt.add_separator()
         opt.add_command(label="Сменить мастер-пароль…", command=self._change_master_password)
         menubar.add_cascade(label="Настройки", menu=opt)
 
         help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="Проверить обновления…", command=self._check_updates_manual)
+        help_menu.add_separator()
         help_menu.add_command(label="О программе", command=self._about)
         menubar.add_cascade(label="Справка", menu=help_menu)
         self.config(menu=menubar)
@@ -875,6 +887,8 @@ class App(tk.Tk):
         settings = self.config_data.settings
         if getattr(self, "confirm_var", None) is not None:
             settings.confirm_before_run = bool(self.confirm_var.get())
+        if getattr(self, "updates_var", None) is not None:
+            settings.check_updates_on_start = bool(self.updates_var.get())
         try:
             state = self.state()
         except tk.TclError:
@@ -1197,6 +1211,99 @@ class App(tk.Tk):
         self.config_data.settings.confirm_before_run = self.confirm_var.get()
         self.persist()
 
+    def _toggle_updates_on_start(self) -> None:
+        self.config_data.settings.check_updates_on_start = self.updates_var.get()
+        self.persist()
+
+    def _maybe_auto_check_updates(self) -> None:
+        settings = self.config_data.settings
+        if not settings.check_updates_on_start:
+            return
+        # не чаще раза в сутки
+        if time.time() - float(settings.last_update_check or 0) < 24 * 3600:
+            return
+        self._check_updates(silent=True)
+
+    def _check_updates_manual(self) -> None:
+        self._check_updates(silent=False)
+
+    def _check_updates(self, *, silent: bool) -> None:
+        if getattr(self, "_update_check_busy", False):
+            if not silent:
+                self.status.configure(text="Проверка обновлений уже идёт…")
+            return
+        self._update_check_busy = True
+        if not silent:
+            self.status.configure(text="Проверка обновлений…")
+
+        def worker() -> None:
+            try:
+                result = check_for_updates(__version__)
+                error: str | None = None
+            except UpdateError as exc:
+                result = None
+                error = str(exc)
+            except Exception as exc:  # noqa: BLE001 — показать в UI
+                result = None
+                error = f"Ошибка проверки: {exc}"
+            self.after(0, self._on_update_check_done, result, error, silent)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_update_check_done(
+        self,
+        result: UpdateCheckResult | None,
+        error: str | None,
+        silent: bool,
+    ) -> None:
+        self._update_check_busy = False
+        if error:
+            if not silent:
+                self.status.configure(text="Не удалось проверить обновления")
+                messagebox.showerror("Обновления", error, parent=self)
+            return
+
+        assert result is not None
+        self.config_data.settings.last_update_check = time.time()
+        try:
+            self.persist()
+        except Exception:
+            pass
+
+        if result.status == "update":
+            latest = result.latest or "?"
+            self.status.configure(text=f"Доступна версия {latest}")
+            url = result.download_url or result.page_url
+            msg = (
+                f"Доступна новая версия {latest} (у вас {result.current}).\n\n"
+                "Открыть страницу загрузки?"
+            )
+            if messagebox.askyesno("Обновления", msg, parent=self) and url:
+                webbrowser.open(url)
+            return
+
+        if silent:
+            return
+
+        if result.status == "current":
+            latest = result.latest or result.current
+            self.status.configure(text="Обновлений нет")
+            messagebox.showinfo(
+                "Обновления",
+                f"У вас актуальная версия ({result.current}).\n"
+                f"Последний релиз на GitHub: {latest}.",
+                parent=self,
+            )
+            return
+
+        self.status.configure(text="Релизы на GitHub ещё не опубликованы")
+        msg = (
+            "На GitHub пока нет опубликованных релизов или тегов.\n\n"
+            "Открыть страницу релизов?"
+        )
+        if messagebox.askyesno("Обновления", msg, parent=self) and result.page_url:
+            webbrowser.open(result.page_url)
+
     def _change_master_password(self) -> None:
         dlg = ChangeMasterDialog(self, self.vault)
         self.wait_window(dlg)
@@ -1216,7 +1323,8 @@ class App(tk.Tk):
     def _about(self) -> None:
         messagebox.showinfo(
             f"О {APP_NAME}",
-            f"{APP_NAME} {__version__}",
+            f"{APP_NAME} {__version__}\n\n"
+            "Проверка обновлений: Справка → Проверить обновления…",
             parent=self,
         )
 

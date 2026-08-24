@@ -45,4 +45,15 @@ if errorlevel 1 (
   exit /b 1
 )
 
-"%PY%" -c "from fatty import onefile_filename, portable_dir_name; print(); print('Ready:'); print('  dist\\' + onefile_filename() + '  (one file, slower start)'); print('  dist\\' + portable_dir_name() + '\\FaTTY.exe  (folder, faster start)'); print('Python is not required on the target PC.')"
+echo.
+echo Building installer (Inno Setup)...
+"%PY%" scripts\build_installer.py
+set "INSTALLER_RC=%ERRORLEVEL%"
+if "%INSTALLER_RC%"=="3" (
+  echo WARNING: Setup.exe not built — install Inno Setup 6 or set ISCC.
+) else if not "%INSTALLER_RC%"=="0" (
+  echo Installer failed.
+  exit /b 1
+)
+
+"%PY%" -c "from fatty import __version__, onefile_filename, portable_dir_name; print(); print('Ready:'); print('  dist\\' + onefile_filename() + '  (one file, slower start)'); print('  dist\\' + portable_dir_name() + '\\FaTTY.exe  (folder, faster start)'); print('  dist\\FaTTY ' + __version__ + ' Setup.exe  (installer, needs Inno Setup)'); print('Python is not required on the target PC.')"
