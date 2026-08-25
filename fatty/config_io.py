@@ -37,6 +37,7 @@ def portable_settings(settings: AppSettings) -> dict:
         "default_command_timeout": settings.default_command_timeout,
         "journal_max_entries": settings.journal_max_entries,
         "clear_output_before_run": settings.clear_output_before_run,
+        "allow_short_master_password": settings.allow_short_master_password,
     }
 
 
@@ -51,6 +52,9 @@ def apply_portable_settings(settings: AppSettings, raw: dict) -> None:
     settings.ssh_path = str(raw.get("ssh_path", settings.ssh_path) or "")
     settings.clear_output_before_run = bool(
         raw.get("clear_output_before_run", settings.clear_output_before_run)
+    )
+    settings.allow_short_master_password = bool(
+        raw.get("allow_short_master_password", settings.allow_short_master_password)
     )
     try:
         timeout = int(raw.get("default_command_timeout", settings.default_command_timeout) or 180)

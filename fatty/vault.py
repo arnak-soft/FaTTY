@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 MIN_PASSWORD_LEN = 8
+MIN_PASSWORD_LEN_RELAXED = 4
 KDF_ITERATIONS = 600_000
 KDF_NAME = "pbkdf2-sha256"
 VERIFIER_PLAIN = "fatty-vault-ok"
@@ -92,9 +93,9 @@ class SessionVault:
     def unlocked(self) -> bool:
         return self.key is not None
 
-    def create(self, password: str) -> VaultMeta:
-        if len(password) < MIN_PASSWORD_LEN:
-            raise VaultError(f"Мастер-пароль не короче {MIN_PASSWORD_LEN} символов")
+    def create(self, password: str, *, min_len: int = MIN_PASSWORD_LEN) -> VaultMeta:
+        if len(password) < min_len:
+            raise VaultError(f"Мастер-пароль не короче {min_len} символов")
         salt = os.urandom(16)
         key = _derive_key(password, salt, KDF_ITERATIONS)
         meta = VaultMeta(

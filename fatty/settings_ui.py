@@ -19,7 +19,7 @@ from fatty.config_io import (
 from fatty.layout import PositionedToplevel, parent_layout
 from fatty.ssh_runner import PUTTY_DOWNLOAD_URL, find_putty_executable, find_ssh_executable
 from fatty.store import APP_DIR, CONFIG_PATH, Config
-from fatty.vault import SessionVault, VaultLocked
+from fatty.vault import MIN_PASSWORD_LEN, MIN_PASSWORD_LEN_RELAXED, SessionVault, VaultLocked
 
 
 class SettingsDialog(PositionedToplevel):
@@ -56,6 +56,7 @@ class SettingsDialog(PositionedToplevel):
         self.export_secrets_var = tk.BooleanVar(value=False)
         self.export_settings_var = tk.BooleanVar(value=True)
         self.import_settings_var = tk.BooleanVar(value=True)
+        self.short_pw_var = tk.BooleanVar(value=settings.allow_short_master_password)
 
         body = ttk.Frame(self, padding=12)
         body.pack(fill="both", expand=True)
@@ -265,6 +266,18 @@ class SettingsDialog(PositionedToplevel):
             wraplength=460,
         ).pack(anchor="w", pady=(0, 6))
         ttk.Button(vault, text="Сменить мастер-пароль…", command=self._change_master).pack(anchor="w")
+        ttk.Checkbutton(
+            vault,
+            text=f"Разрешить короткий мастер-пароль (от {MIN_PASSWORD_LEN_RELAXED} символов)",
+            variable=self.short_pw_var,
+            command=self._on_short_pw_toggle,
+        ).pack(anchor="w", pady=(8, 0))
+        ttk.Label(
+            vault,
+            text=f"При первой настройке по-прежнему требуется не меньше {MIN_PASSWORD_LEN} символов.",
+            foreground="#555",
+            wraplength=460,
+        ).pack(anchor="w", pady=(4, 0))
 
         about = self._section(tab, "О программе")
         ttk.Label(about, text=f"{APP_NAME} {__version__}").pack(anchor="w", pady=2)
@@ -310,6 +323,20 @@ class SettingsDialog(PositionedToplevel):
     def _change_master(self) -> None:
         self._on_change_master()
 
+    def _on_short_pw_toggle(self) -> None:
+        if not self.short_pw_var.get():
+            return
+        if self._config.settings.allow_short_master_password:
+            return
+        if not messagebox.askyesno(
+            "Безопасность",
+            f"Короткий мастер-пароль (от {MIN_PASSWORD_LEN_RELAXED} символов) проще подобрать.\n"
+            f"Рекомендуется не короче {MIN_PASSWORD_LEN} символов.\n\n"
+            "Вы уверены, что хотите разрешить короткий пароль?",
+            parent=self,
+        ):
+            self.short_pw_var.set(False)
+
     def _validate(self) -> bool:
         try:
             timeout = int(self.timeout_var.get().strip() or "180")
@@ -353,6 +380,7 @@ class SettingsDialog(PositionedToplevel):
         settings.journal_max_entries = int(self.journal_var.get().strip())
         settings.putty_path = self.putty_var.get().strip()
         settings.ssh_path = self.ssh_var.get().strip()
+        settings.allow_short_master_password = bool(self.short_pw_var.get())
 
     def _save(self) -> None:
         if not self._validate():
@@ -466,3 +494,4 @@ class SettingsDialog(PositionedToplevel):
         self.journal_var.set(str(settings.journal_max_entries))
         self.putty_var.set(settings.putty_path)
         self.ssh_var.set(settings.ssh_path)
+        self.short_pw_var.set(settings.allow_short_master_password)

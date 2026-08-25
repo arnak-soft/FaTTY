@@ -104,6 +104,7 @@ class AppSettings:
     default_command_timeout: int = 180
     journal_max_entries: int = 5000
     clear_output_before_run: bool = False
+    allow_short_master_password: bool = False
 
 
 @dataclass
@@ -288,6 +289,7 @@ def load() -> Config:
             settings_raw.get("journal_max_entries", 5000), 5000, 100, 50_000
         ),
         clear_output_before_run=bool(settings_raw.get("clear_output_before_run", False)),
+        allow_short_master_password=bool(settings_raw.get("allow_short_master_password", False)),
     )
     return Config(
         servers=servers,

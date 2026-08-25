@@ -47,7 +47,7 @@ from fatty.layout import (
 )
 from fatty.store import APP_DIR, Command, Config, Server, load, save, unlock_secrets
 from fatty.updates import UpdateCheckResult, UpdateError, check_for_updates
-from fatty.vault import MIN_PASSWORD_LEN, SessionVault, VaultError, VaultLocked
+from fatty.vault import MIN_PASSWORD_LEN, MIN_PASSWORD_LEN_RELAXED, SessionVault, VaultError, VaultLocked
 
 
 def _resource_root() -> Path:
@@ -605,10 +605,17 @@ class MasterPasswordDialog(PositionedToplevel):
 
 
 class ChangeMasterDialog(PositionedToplevel):
-    def __init__(self, parent: tk.Tk, vault: SessionVault) -> None:
+    def __init__(
+        self,
+        parent: tk.Tk,
+        vault: SessionVault,
+        *,
+        allow_short_master_password: bool = False,
+    ) -> None:
         super().__init__(parent)
         self.ok = False
         self._vault = vault
+        self._allow_short = allow_short_master_password
         self.title("Сменить мастер-пароль")
         self.resizable(False, False)
         self.transient(parent)
@@ -636,6 +643,16 @@ class ChangeMasterDialog(PositionedToplevel):
             ttk.Entry(form, textvariable=var, width=32, show="•").grid(
                 row=i, column=1, sticky="ew", padx=(8, 0), pady=4
             )
+        if allow_short_master_password:
+            hint = (
+                f"Можно от {MIN_PASSWORD_LEN_RELAXED} символов "
+                f"(короче {MIN_PASSWORD_LEN} — с подтверждением)."
+            )
+        else:
+            hint = f"Не короче {MIN_PASSWORD_LEN} символов."
+        ttk.Label(form, text=hint, foreground="#555", wraplength=320).grid(
+            row=len(rows), column=0, columnspan=2, sticky="w", pady=(4, 0)
+        )
         form.columnconfigure(1, weight=1)
 
         self.error = ttk.Label(body, text="", foreground="#b00020")
@@ -658,13 +675,25 @@ class ChangeMasterDialog(PositionedToplevel):
         if new_pw != self.new2_var.get():
             self.error.configure(text="Новые пароли не совпадают.")
             return
+        min_len = MIN_PASSWORD_LEN_RELAXED if self._allow_short else MIN_PASSWORD_LEN
+        if len(new_pw) < min_len:
+            self.error.configure(text=f"Новый пароль не короче {min_len} символов.")
+            return
+        if self._allow_short and len(new_pw) < MIN_PASSWORD_LEN:
+            if not messagebox.askyesno(
+                "Мастер-пароль",
+                f"Пароль короче {MIN_PASSWORD_LEN} символов — его проще подобрать.\n\n"
+                "Вы уверены, что хотите использовать такой пароль?",
+                parent=self,
+            ):
+                return
         meta = self._vault.meta
         if meta is None or not self._vault.unlock(old_pw, meta):
             self.error.configure(text="Неверный текущий мастер-пароль.")
             self.old_var.set("")
             return
         try:
-            self._vault.create(new_pw)
+            self._vault.create(new_pw, min_len=min_len)
         except VaultError as exc:
             self.error.configure(text=str(exc))
             return
@@ -1427,7 +1456,11 @@ class App(tk.Tk):
             webbrowser.open(result.page_url)
 
     def _change_master_password(self) -> None:
-        dlg = ChangeMasterDialog(self, self.vault)
+        dlg = ChangeMasterDialog(
+            self,
+            self.vault,
+            allow_short_master_password=self.config_data.settings.allow_short_master_password,
+        )
         self.wait_window(dlg)
         if not dlg.ok:
             return
