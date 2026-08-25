@@ -21,7 +21,15 @@ from fatty.presets import (
     all_presets,
 )
 from fatty.single_instance import activate_existing, register_window, try_become_primary
-from fatty.ssh_runner import SSHError, SSHSession, open_putty_console, open_system_console
+from fatty.ssh_runner import (
+    PUTTY_DOWNLOAD_URL,
+    PuttyLaunchError,
+    PuttyNotFoundError,
+    SSHError,
+    SSHSession,
+    open_putty_console,
+    open_system_console,
+)
 from fatty.sftp import guess_start_path
 from fatty.files_ui import FilesWindow
 from fatty.journal import Journal, JournalEntry, now_iso, status_from_exit
@@ -1406,16 +1414,63 @@ class App(tk.Tk):
             extra = "  •  пароль, если спросит, введите в окне SSH"
         self.status.configure(text=f"Консоль открыта → {server.name}{extra}")
 
+    def _prompt_putty_setup(self) -> bool:
+        """Предложить скачать PuTTY или указать putty.exe. True — путь сохранён, можно повторить."""
+        msg = (
+            "PuTTY не найден на этом компьютере.\n\n"
+            "Да — открыть страницу загрузки\n"
+            "Нет — указать путь к putty.exe\n"
+            "Отмена — закрыть"
+        )
+        choice = messagebox.askyesnocancel("PuTTY", msg, parent=self)
+        if choice is None:
+            return False
+        if choice:
+            webbrowser.open(PUTTY_DOWNLOAD_URL)
+            return False
+        initialdir = None
+        saved = (self.config_data.settings.putty_path or "").strip()
+        if saved:
+            initialdir = str(Path(saved).expanduser().parent)
+        path = filedialog.askopenfilename(
+            parent=self,
+            title="Укажите putty.exe",
+            initialdir=initialdir,
+            filetypes=[("PuTTY", "putty.exe"), ("Исполняемые", "*.exe"), ("Все файлы", "*.*")],
+        )
+        if not path:
+            return False
+        candidate = Path(path)
+        if not candidate.is_file():
+            messagebox.showerror("PuTTY", f"Файл не найден: {candidate}", parent=self)
+            return False
+        self.config_data.settings.putty_path = str(candidate)
+        try:
+            self.persist()
+        except Exception:
+            pass
+        return True
+
     def _open_putty(self) -> None:
         server = self._selected_server()
         if not server:
             messagebox.showinfo("PuTTY", "Сначала выберите VPS.", parent=self)
             return
-        try:
-            open_putty_console(server)
-        except SSHError as exc:
-            messagebox.showerror("PuTTY", str(exc), parent=self)
-            return
+        while True:
+            putty_path = (self.config_data.settings.putty_path or "").strip() or None
+            try:
+                open_putty_console(server, putty_path=putty_path)
+                break
+            except PuttyNotFoundError:
+                if not self._prompt_putty_setup():
+                    return
+            except PuttyLaunchError as exc:
+                messagebox.showerror("PuTTY", str(exc), parent=self)
+                if not self._prompt_putty_setup():
+                    return
+            except SSHError as exc:
+                messagebox.showerror("PuTTY", str(exc), parent=self)
+                return
         via = "ключ" if (server.key_path or "").strip() else "пароль"
         self.status.configure(text=f"PuTTY открыт → {server.name}  •  {via}")
 

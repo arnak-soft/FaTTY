@@ -28,6 +28,17 @@ class SSHError(Exception):
     pass
 
 
+class PuttyNotFoundError(SSHError):
+    pass
+
+
+class PuttyLaunchError(SSHError):
+    pass
+
+
+PUTTY_DOWNLOAD_URL = "https://www.chiark.greenend.org.uk/~sgtatham/putty/"
+
+
 @dataclass
 class RunResult:
     exit_code: int
@@ -308,7 +319,11 @@ def _putty_install_dirs() -> tuple[Path, ...]:
     return dirs
 
 
-def find_putty_executable() -> Path | None:
+def find_putty_executable(custom_path: str | Path | None = None) -> Path | None:
+    if custom_path:
+        candidate = Path(str(custom_path)).expanduser()
+        if candidate.is_file():
+            return candidate
     found = shutil.which("putty")
     if found:
         return Path(found)
@@ -375,16 +390,12 @@ def _putty_password_file(password: str) -> Path:
     return path
 
 
-def open_putty_console(server: Server) -> None:
+def open_putty_console(server: Server, *, putty_path: str | None = None) -> None:
     if sys.platform != "win32":
         raise SSHError("PuTTY доступен только на Windows.")
-    putty = find_putty_executable()
+    putty = find_putty_executable(putty_path)
     if putty is None:
-        raise SSHError(
-            "PuTTY не найден.\n"
-            "Установите его с https://www.chiark.greenend.org.uk/~sgtatham/putty/ "
-            "или добавьте putty.exe в PATH."
-        )
+        raise PuttyNotFoundError("PuTTY не найден.")
 
     key_path = (server.key_path or "").strip()
     password = (server.password or "").strip()
@@ -427,7 +438,7 @@ def open_putty_console(server: Server) -> None:
                 pwfile.unlink(missing_ok=True)
             except OSError:
                 pass
-        raise SSHError(f"Не удалось запустить PuTTY: {exc}") from exc
+        raise PuttyLaunchError(f"Не удалось запустить PuTTY: {exc}") from exc
 
     if pwfile is not None:
         _schedule_unlink(pwfile)

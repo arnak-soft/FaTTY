@@ -99,6 +99,7 @@ class AppSettings:
     last_command_id: str = ""
     dialog_geometry: dict[str, str] = field(default_factory=dict)
     column_widths: dict[str, dict[str, int]] = field(default_factory=dict)
+    putty_path: str = ""
 
 
 @dataclass
@@ -266,6 +267,7 @@ def load() -> Config:
         last_command_id=str(settings_raw.get("last_command_id", "") or ""),
         dialog_geometry=dialog_geometry,
         column_widths=_parse_column_widths(settings_raw.get("column_widths")),
+        putty_path=str(settings_raw.get("putty_path", "") or ""),
     )
     return Config(
         servers=servers,
