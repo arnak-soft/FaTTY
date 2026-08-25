@@ -8,6 +8,7 @@ from tkinter import filedialog, messagebox, ttk
 
 from fatty.journal import Journal, JournalEntry, KIND_LABELS, STATUS_LABELS
 from fatty.layout import PositionedToplevel, apply_tree_columns, parent_layout, store_tree_columns
+from fatty.theme import apply_result_tags, style_code
 
 
 def _resource_root() -> Path:
@@ -146,12 +147,9 @@ class JournalWindow(PositionedToplevel):
             detail_frame,
             height=10,
             wrap="word",
-            background="#1e1e1e",
-            foreground="#d4d4d4",
-            insertbackground="#fff",
-            font=("Consolas", 10),
             state="disabled",
         )
+        style_code(self.details)
         dscroll = ttk.Scrollbar(detail_frame, command=self.details.yview)
         self.details.configure(yscrollcommand=dscroll.set)
         self.details.pack(side="left", fill="both", expand=True)
@@ -161,19 +159,15 @@ class JournalWindow(PositionedToplevel):
 
         btns = ttk.Frame(root)
         btns.pack(fill="x", pady=(8, 0))
-        ttk.Button(btns, text="Повторить", command=self._rerun).pack(side="left")
+        ttk.Button(btns, text="Повторить", style="Accent.TButton", command=self._rerun).pack(side="left")
         ttk.Button(btns, text="Копировать", command=self._copy_selected).pack(side="left", padx=4)
         ttk.Button(btns, text="Сохранить как…", command=self._export).pack(side="left", padx=4)
         ttk.Button(btns, text="Очистить журнал", command=self._clear).pack(side="left", padx=4)
         self.count_var = tk.StringVar(value="")
-        ttk.Label(btns, textvariable=self.count_var).pack(side="left", padx=(12, 0))
+        ttk.Label(btns, textvariable=self.count_var, style="Muted.TLabel").pack(side="left", padx=(12, 0))
         ttk.Button(btns, text="Закрыть", command=self._on_close).pack(side="right")
 
-        self.tree.tag_configure("ok", foreground="#2e7d32")
-        self.tree.tag_configure("failed", foreground="#c62828")
-        self.tree.tag_configure("timeout", foreground="#ef6c00")
-        self.tree.tag_configure("cancelled", foreground="#6a1b9a")
-        self.tree.tag_configure("error", foreground="#c62828")
+        apply_result_tags(self.tree)
 
     def _on_columns_drag(self, _event=None) -> None:
         settings = getattr(self, "_layout_settings", None)

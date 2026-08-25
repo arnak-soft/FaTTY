@@ -9,6 +9,7 @@ from pathlib import Path
 from tkinter import ttk
 
 from fatty import APP_NAME, __version__
+from fatty.theme import C, FONT_UI, FONT_UI_TITLE, apply_theme
 
 
 def _resource_root() -> Path:
@@ -81,39 +82,35 @@ class _TkSplash:
         x = max((self.root.winfo_screenwidth() - width) // 2, 0)
         y = max((self.root.winfo_screenheight() - height) // 3, 0)
         self.root.geometry(f"{width}x{height}+{x}+{y}")
-        try:
-            ttk.Style(self.root).theme_use("vista")
-        except tk.TclError:
-            pass
-
-        outer = tk.Frame(self.root, background="#3a3a3a")
+        apply_theme(self.root)
+        outer = tk.Frame(self.root, background=C.border)
         outer.pack(fill="both", expand=True)
-        body = tk.Frame(outer, background="#1e1e1e")
+        body = tk.Frame(outer, background=C.bg)
         body.pack(fill="both", expand=True, padx=1, pady=1)
 
         self._photo = self._load_icon()
         if self._photo is not None:
-            tk.Label(body, image=self._photo, background="#1e1e1e").pack(pady=(28, 8))
+            tk.Label(body, image=self._photo, background=C.bg).pack(pady=(28, 8))
         tk.Label(
             body,
             text=APP_NAME,
-            background="#1e1e1e",
-            foreground="#ffffff",
-            font=("Segoe UI", 18, "bold"),
+            background=C.bg,
+            foreground=C.text_bright,
+            font=FONT_UI_TITLE,
         ).pack()
         tk.Label(
             body,
             text=__version__,
-            background="#1e1e1e",
-            foreground="#9cdcfe",
+            background=C.bg,
+            foreground=C.meta,
             font=("Segoe UI", 9),
         ).pack(pady=(2, 10))
         self.status = tk.Label(
             body,
             text="Загрузка…",
-            background="#1e1e1e",
-            foreground="#d4d4d4",
-            font=("Segoe UI", 10),
+            background=C.bg,
+            foreground=C.text,
+            font=FONT_UI,
         )
         self.status.pack()
         bar = ttk.Progressbar(body, mode="indeterminate", length=260)

@@ -74,7 +74,7 @@ class SettingsDialog(PositionedToplevel):
         btns = ttk.Frame(body)
         btns.pack(fill="x", pady=(12, 0))
         ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right", padx=4)
-        ttk.Button(btns, text="Сохранить", command=self._save).pack(side="right", padx=4)
+        ttk.Button(btns, text="Сохранить", style="Accent.TButton", command=self._save).pack(side="right", padx=4)
 
         self.bind("<Escape>", lambda _e: self.destroy())
         self.grab_set()
@@ -159,7 +159,7 @@ class SettingsDialog(PositionedToplevel):
         ttk.Label(
             journal,
             text="Старые записи удаляются автоматически при превышении лимита.",
-            foreground="#555",
+            style="Muted.TLabel",
             wraplength=460,
         ).pack(anchor="w", pady=(6, 0))
         return tab
@@ -188,7 +188,7 @@ class SettingsDialog(PositionedToplevel):
         ttk.Label(
             putty,
             text="Если путь пустой, FaTTY ищет PuTTY в PATH и стандартных папках установки.",
-            foreground="#555",
+            style="Muted.TLabel",
             wraplength=460,
         ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(8, 0))
 
@@ -212,7 +212,7 @@ class SettingsDialog(PositionedToplevel):
             ssh,
             text="Используется кнопкой «Открыть консоль». Пустой путь — поиск в PATH и "
             "C:\\Windows\\System32\\OpenSSH\\.",
-            foreground="#555",
+            style="Muted.TLabel",
             wraplength=460,
         ).grid(row=2, column=0, columnspan=3, sticky="w", pady=(8, 0))
         return tab
@@ -245,7 +245,7 @@ class SettingsDialog(PositionedToplevel):
             text="Импорт VPS и команд из файла FaTTY. Режим «Добавить» пропускает дубликаты "
             "(тот же VPS по имени и хосту, та же команда по названию).",
             wraplength=460,
-            foreground="#555",
+            style="Muted.TLabel",
         ).pack(anchor="w", pady=(0, 6))
         ttk.Checkbutton(
             imp,
@@ -289,7 +289,7 @@ class SettingsDialog(PositionedToplevel):
         ttk.Label(
             self._advanced_frame,
             text=f"При первой настройке по-прежнему требуется не меньше {MIN_PASSWORD_LEN} символов.",
-            foreground="#555",
+            style="Muted.TLabel",
             wraplength=440,
         ).pack(anchor="w", pady=(0, 8))
 
@@ -307,7 +307,7 @@ class SettingsDialog(PositionedToplevel):
             about,
             text="SSH-клиент и менеджер команд для нескольких VPS на Windows.",
             wraplength=460,
-            foreground="#555",
+            style="Muted.TLabel",
         ).pack(anchor="w")
         return tab
 

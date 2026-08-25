@@ -76,7 +76,12 @@ class FilesWindow(PositionedToplevel):
             apply_tree_columns(self.tree, settings.column_widths.get("files"))
 
     def _build(self) -> None:
-        root = ttk.Frame(self, padding=8)
+        status_bar = ttk.Frame(self, style="Status.TFrame")
+        status_bar.pack(fill="x", side="bottom")
+        self.status = ttk.Label(status_bar, text="Подключение…", style="Status.TLabel", anchor="w")
+        self.status.pack(fill="x")
+
+        root = ttk.Frame(self, padding=10)
         root.pack(fill="both", expand=True)
 
         path_row = ttk.Frame(root)
@@ -94,7 +99,7 @@ class FilesWindow(PositionedToplevel):
         tree_frame.pack(fill="both", expand=True, pady=(8, 0))
         self._icons = ShellIcons(self)
         style = ttk.Style(self)
-        style.configure("Files.Treeview", rowheight=max(22, self._icons.size + 6))
+        style.configure("Files.Treeview", rowheight=max(26, self._icons.size + 8))
         self.tree = ttk.Treeview(
             tree_frame,
             columns=("size", "mtime", "kind"),
@@ -120,7 +125,7 @@ class FilesWindow(PositionedToplevel):
 
         actions = ttk.Frame(root)
         actions.pack(fill="x", pady=(8, 0))
-        self.upload_btn = ttk.Button(actions, text="Загрузить…", command=self._upload)
+        self.upload_btn = ttk.Button(actions, text="Загрузить…", style="Accent.TButton", command=self._upload)
         self.upload_btn.pack(side="left")
         self.download_btn = ttk.Button(actions, text="Скачать…", command=self._download)
         self.download_btn.pack(side="left", padx=4)
@@ -135,11 +140,8 @@ class FilesWindow(PositionedToplevel):
         progress_row.pack(fill="x", pady=(8, 0))
         self.progress = ttk.Progressbar(progress_row, mode="determinate")
         self.progress.pack(side="left", fill="x", expand=True)
-        self.progress_label = ttk.Label(progress_row, text="", width=22, anchor="e")
+        self.progress_label = ttk.Label(progress_row, text="", width=22, anchor="e", style="Muted.TLabel")
         self.progress_label.pack(side="right", padx=(8, 0))
-
-        self.status = ttk.Label(self, text="Подключение…", anchor="w", padding=(10, 4))
-        self.status.pack(fill="x", side="bottom")
         self._set_controls(False)
 
     def _set_controls(self, enabled: bool) -> None:

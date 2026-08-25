@@ -11,6 +11,7 @@ from fatty import APP_NAME
 from fatty.layout import PositionedToplevel, apply_tree_columns, parent_layout, store_tree_columns
 from fatty.presets import DEFAULT_APP_DIR, DEFAULT_BRANCH, DEFAULT_PM2
 from fatty.store import APP_DIR, CONFIG_PATH
+from fatty.theme import style_code, style_prose
 
 
 def _resource_root() -> Path:
@@ -381,27 +382,17 @@ class HelpWindow(PositionedToplevel):
         bottom = ttk.Frame(root)
         bottom.pack(fill="x", pady=(8, 0))
         self.status_var = tk.StringVar(value="Выделение в тексте копируется в буфер.")
-        ttk.Label(bottom, textvariable=self.status_var).pack(side="left")
+        ttk.Label(bottom, textvariable=self.status_var, style="Muted.TLabel").pack(side="left")
         ttk.Button(bottom, text="Закрыть", command=self._on_close).pack(side="right")
 
     def _text_tab(self, parent: ttk.Notebook, blocks: list[tuple[str, str]]) -> ttk.Frame:
         tab = ttk.Frame(parent, padding=8)
-        text = tk.Text(
-            tab,
-            wrap="word",
-            font=("Segoe UI", 10),
-            relief="flat",
-            padx=8,
-            pady=8,
-            cursor="arrow",
-        )
+        text = tk.Text(tab, wrap="word", cursor="arrow")
         scroll = ttk.Scrollbar(tab, command=text.yview)
         text.configure(yscrollcommand=scroll.set)
         text.pack(side="left", fill="both", expand=True)
         scroll.pack(side="right", fill="y")
-        text.tag_configure("h", font=("Segoe UI", 11, "bold"), spacing1=12, spacing3=4)
-        text.tag_configure("p", font=("Segoe UI", 10), spacing3=8, lmargin1=0, lmargin2=0)
-        text.tag_configure("pre", font=("Consolas", 10), spacing3=10, lmargin1=8, lmargin2=8)
+        style_prose(text)
         for kind, body in blocks:
             text.insert("end", body.strip() + "\n", (kind,))
         text.configure(state="disabled")
@@ -414,6 +405,7 @@ class HelpWindow(PositionedToplevel):
             tab,
             text="Частые команды для VPS. Двойной клик или «Копировать» — в буфер. "
             "«В разовую» подставляет строку на главном окне.",
+            style="Muted.TLabel",
             wraplength=760,
         )
         hint.pack(anchor="w", pady=(0, 6))
@@ -439,19 +431,14 @@ class HelpWindow(PositionedToplevel):
         self.tree.bind("<Double-1>", lambda _e: self._copy_command())
         self.tree.bind("<Return>", lambda _e: self._copy_command())
 
-        self.details = tk.Text(
-            tab,
-            height=5,
-            wrap="word",
-            font=("Consolas", 10),
-            state="disabled",
-        )
+        self.details = tk.Text(tab, height=5, wrap="word", state="disabled")
+        style_code(self.details)
         self.details.pack(fill="x", pady=(8, 0))
         _bind_copy_on_select(self.details, self._on_copied)
 
         btns = ttk.Frame(tab)
         btns.pack(fill="x", pady=(8, 0))
-        ttk.Button(btns, text="Копировать", command=self._copy_command).pack(side="left")
+        ttk.Button(btns, text="Копировать", style="Accent.TButton", command=self._copy_command).pack(side="left")
         if self._on_insert_quick is not None:
             ttk.Button(btns, text="В разовую", command=self._insert_quick).pack(side="left", padx=4)
 

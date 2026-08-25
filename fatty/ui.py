@@ -50,6 +50,7 @@ from fatty.layout import (
 from fatty.store import APP_DIR, Command, Config, Server, load, save, unlock_secrets
 from fatty.updates import UpdateCheckResult, UpdateError, check_for_updates
 from fatty.vault import MIN_PASSWORD_LEN, MIN_PASSWORD_LEN_RELAXED, SessionVault, VaultError, VaultLocked
+from fatty.theme import apply_result_tags, apply_theme, style_code, style_menu, style_output
 
 
 def _resource_root() -> Path:
@@ -228,7 +229,7 @@ class ServerDialog(PositionedToplevel):
             pw_note = "Пароль сохранён, просмотр недоступен. Оставьте поле пустым, чтобы не менять."
         else:
             pw_note = "Пароль не задан. После сохранения его нельзя будет просмотреть."
-        ttk.Label(body, text=pw_note, foreground="#555", wraplength=420).grid(
+        ttk.Label(body, text=pw_note, style="Muted.TLabel", wraplength=420).grid(
             row=5, column=1, columnspan=2, sticky="w", padx=10, pady=(0, 2)
         )
         if self._stored_password:
@@ -247,14 +248,14 @@ class ServerDialog(PositionedToplevel):
             body,
             text="Пароль хранится в зашифрованном виде (Windows DPAPI).\n"
             "Ключ можно не указывать, если вход только по паролю.",
-            foreground="#555",
+            style="Muted.TLabel",
         )
         hint.grid(row=8, column=0, columnspan=3, sticky="w", padx=10, pady=(8, 4))
 
         btns = ttk.Frame(body)
         btns.grid(row=9, column=0, columnspan=3, sticky="e", pady=(10, 0))
         ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right", padx=4)
-        ttk.Button(btns, text="Сохранить", command=self._ok).pack(side="right", padx=4)
+        ttk.Button(btns, text="Сохранить", style="Accent.TButton", command=self._ok).pack(side="right", padx=4)
 
         self.bind("<Return>", lambda _e: self._ok())
         self.bind("<Escape>", lambda _e: self.destroy())
@@ -363,14 +364,14 @@ class PresetDialog(PositionedToplevel):
         hint = ttk.Label(
             body,
             text="Уже существующие команды с тем же названием не дублируются.",
-            foreground="#555",
+            style="Muted.TLabel",
         )
         hint.pack(anchor="w", pady=(6, 0))
 
         btns = ttk.Frame(body)
         btns.pack(fill="x", pady=(10, 0))
         ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right", padx=4)
-        ttk.Button(btns, text="Добавить выбранные", command=self._ok).pack(side="right", padx=4)
+        ttk.Button(btns, text="Добавить выбранные", style="Accent.TButton", command=self._ok).pack(side="right", padx=4)
 
         self.bind("<Escape>", lambda _e: self.destroy())
         self.grab_set()
@@ -459,14 +460,15 @@ class CommandDialog(PositionedToplevel):
         form.columnconfigure(1, weight=1)
 
         ttk.Label(body, text="Команда").pack(anchor="w", padx=4, pady=(8, 2))
-        self.text = tk.Text(body, height=10, wrap="word", font=("Consolas", 10))
+        self.text = tk.Text(body, height=10, wrap="word")
+        style_code(self.text)
         self.text.pack(fill="both", expand=True, padx=4)
         self.text.insert("1.0", command.command)
 
         btns = ttk.Frame(body)
         btns.pack(fill="x", pady=(10, 0))
         ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right", padx=4)
-        ttk.Button(btns, text="Сохранить", command=self._ok).pack(side="right", padx=4)
+        ttk.Button(btns, text="Сохранить", style="Accent.TButton", command=self._ok).pack(side="right", padx=4)
 
         self.bind("<Escape>", lambda _e: self.destroy())
         self.grab_set()
@@ -550,17 +552,17 @@ class MasterPasswordDialog(PositionedToplevel):
             ttk.Label(
                 form,
                 text=f"Не короче {MIN_PASSWORD_LEN} символов.",
-                foreground="#555",
+                style="Muted.TLabel",
             ).grid(row=2, column=1, sticky="w", padx=(8, 0), pady=(0, 4))
         form.columnconfigure(1, weight=1)
 
-        self.error = ttk.Label(body, text="", foreground="#b00020")
+        self.error = ttk.Label(body, text="", style="Error.TLabel")
         self.error.pack(anchor="w", pady=(8, 0))
 
         btns = ttk.Frame(body)
         btns.pack(fill="x", pady=(12, 0))
         ttk.Button(btns, text="Выход", command=self._cancel).pack(side="right", padx=4)
-        self._continue_btn = ttk.Button(btns, text="Продолжить", command=self._submit)
+        self._continue_btn = ttk.Button(btns, text="Продолжить", style="Accent.TButton", command=self._submit)
         self._continue_btn.pack(side="right", padx=4)
 
         self.bind("<Return>", lambda _e: self._submit())
@@ -677,18 +679,18 @@ class ChangeMasterDialog(PositionedToplevel):
             )
         else:
             hint = f"Не короче {MIN_PASSWORD_LEN} символов."
-        ttk.Label(form, text=hint, foreground="#555", wraplength=320).grid(
+        ttk.Label(form, text=hint, style="Muted.TLabel", wraplength=320).grid(
             row=len(rows), column=0, columnspan=2, sticky="w", pady=(4, 0)
         )
         form.columnconfigure(1, weight=1)
 
-        self.error = ttk.Label(body, text="", foreground="#b00020")
+        self.error = ttk.Label(body, text="", style="Error.TLabel")
         self.error.pack(anchor="w", pady=(8, 0))
 
         btns = ttk.Frame(body)
         btns.pack(fill="x", pady=(12, 0))
         ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right", padx=4)
-        ttk.Button(btns, text="Сменить", command=self._submit).pack(side="right", padx=4)
+        ttk.Button(btns, text="Сменить", style="Accent.TButton", command=self._submit).pack(side="right", padx=4)
         self.bind("<Return>", lambda _e: self._submit())
         self.bind("<Escape>", lambda _e: self.destroy())
         self.grab_set()
@@ -771,17 +773,13 @@ class App(tk.Tk):
         self.after(2000, self._maybe_auto_check_updates)
 
     def _build_style(self) -> None:
-        style = ttk.Style(self)
-        try:
-            style.theme_use("vista")
-        except tk.TclError:
-            pass
-        style.configure("TLabelframe.Label", font=("Segoe UI", 10, "bold"))
-        style.configure("Run.TButton", font=("Segoe UI", 10, "bold"))
+        apply_theme(self)
 
     def _build_menu(self) -> None:
-        menubar = tk.Menu(self)
+        menubar = tk.Menu(self, tearoff=0)
+        style_menu(menubar)
         file_menu = tk.Menu(menubar, tearoff=0)
+        style_menu(file_menu)
         file_menu.add_command(label="Открыть папку конфига", command=self._open_config_dir)
         file_menu.add_command(label="Журнал команд…", command=self._open_journal, accelerator="Ctrl+J")
         file_menu.add_separator()
@@ -792,12 +790,14 @@ class App(tk.Tk):
         menubar.add_cascade(label="Файл", menu=file_menu)
 
         opt = tk.Menu(menubar, tearoff=0)
+        style_menu(opt)
         opt.add_command(label="Настройки…", command=self._open_settings, accelerator="Ctrl+,")
         opt.add_separator()
         opt.add_command(label="Сменить мастер-пароль…", command=self._change_master_password)
         menubar.add_cascade(label="Настройки", menu=opt)
 
         help_menu = tk.Menu(menubar, tearoff=0)
+        style_menu(help_menu)
         help_menu.add_command(label="Содержание", command=self._open_help, accelerator="F1")
         help_menu.add_command(
             label="Частые команды",
@@ -811,7 +811,12 @@ class App(tk.Tk):
         self.config(menu=menubar)
 
     def _build_ui(self) -> None:
-        root = ttk.Frame(self, padding=8)
+        status_bar = ttk.Frame(self, style="Status.TFrame")
+        status_bar.pack(fill="x", side="bottom")
+        self.status = ttk.Label(status_bar, text="Готово", style="Status.TLabel", anchor="w")
+        self.status.pack(fill="x")
+
+        root = ttk.Frame(self, padding=10)
         root.pack(fill="both", expand=True)
 
         vpaned = ttk.Panedwindow(root, orient="vertical")
@@ -869,11 +874,7 @@ class App(tk.Tk):
         self.cmd_tree.column("last", width=140, minwidth=90, stretch=False)
         apply_tree_columns(self.cmd_tree, saved_cols.get("commands"))
         self.cmd_tree.pack(fill="both", expand=True)
-        self.cmd_tree.tag_configure("ok", foreground="#2e7d32")
-        self.cmd_tree.tag_configure("failed", foreground="#c62828")
-        self.cmd_tree.tag_configure("timeout", foreground="#ef6c00")
-        self.cmd_tree.tag_configure("cancelled", foreground="#6a1b9a")
-        self.cmd_tree.tag_configure("error", foreground="#c62828")
+        apply_result_tags(self.cmd_tree)
         self.cmd_tree.bind("<<TreeviewSelect>>", lambda _e: self._remember_selection())
         self.cmd_tree.bind("<Double-1>", self._on_cmd_double)
         self.cmd_tree.bind("<Return>", self._on_cmd_return)
@@ -923,28 +924,19 @@ class App(tk.Tk):
             out_frame,
             height=14,
             wrap="word",
-            background="#1e1e1e",
-            foreground="#d4d4d4",
-            insertbackground="#fff",
-            font=("Consolas", 10),
             state="disabled",
         )
+        style_output(self.output)
         scroll = ttk.Scrollbar(out_frame, command=self.output.yview)
         self.output.configure(yscrollcommand=scroll.set)
         self.output.pack(side="left", fill="both", expand=True, pady=(4, 0))
         scroll.pack(side="right", fill="y", pady=(4, 0))
-        self.output.tag_configure("meta", foreground="#9cdcfe")
-        self.output.tag_configure("ok", foreground="#6a9955")
-        self.output.tag_configure("err", foreground="#f14c4c")
         _bind_copy_on_select(self.output, self._on_output_copied)
 
         vpaned.add(top, weight=3)
         vpaned.add(out_frame, weight=2)
         paned.bind("<ButtonRelease-1>", self._on_layout_drag, add="+")
         vpaned.bind("<ButtonRelease-1>", self._on_layout_drag, add="+")
-
-        self.status = ttk.Label(self, text="Готово", anchor="w", padding=(10, 4))
-        self.status.pack(fill="x", side="bottom")
 
     def _on_cmd_double(self, event) -> str | None:
         region = self.cmd_tree.identify_region(event.x, event.y)
@@ -2062,6 +2054,7 @@ def main() -> None:
     sys.excepthook = _excepthook
     bootstrap = tk.Tk()
     bootstrap.withdraw()
+    apply_theme(bootstrap)
     _apply_app_icon(bootstrap)
     config = load()
     vault = SessionVault()

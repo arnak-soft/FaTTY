@@ -126,6 +126,15 @@ def store_tree_columns(settings: AppSettings | None, key: str, tree: ttk.Treevie
 class PositionedToplevel(tk.Toplevel):
     """Toplevel, который помнит позицию (и размер, если remember_size)."""
 
+    def __init__(self, master=None, **kw):
+        super().__init__(master, **kw)
+        try:
+            from fatty.theme import apply_window
+
+            apply_window(self)
+        except Exception:
+            pass
+
     def _setup_layout(
         self,
         settings: AppSettings | None,
