@@ -38,6 +38,8 @@ def portable_settings(settings: AppSettings) -> dict:
         "journal_max_entries": settings.journal_max_entries,
         "clear_output_before_run": settings.clear_output_before_run,
         "allow_short_master_password": settings.allow_short_master_password,
+        "master_password_max_attempts": settings.master_password_max_attempts,
+        "master_password_lockout_minutes": settings.master_password_lockout_minutes,
     }
 
 
@@ -56,6 +58,26 @@ def apply_portable_settings(settings: AppSettings, raw: dict) -> None:
     settings.allow_short_master_password = bool(
         raw.get("allow_short_master_password", settings.allow_short_master_password)
     )
+    settings.master_password_max_attempts = max(
+        0,
+        min(
+            100,
+            _parse_int_setting(
+                raw.get("master_password_max_attempts"),
+                settings.master_password_max_attempts,
+            ),
+        ),
+    )
+    settings.master_password_lockout_minutes = max(
+        1,
+        min(
+            24 * 60,
+            _parse_int_setting(
+                raw.get("master_password_lockout_minutes"),
+                settings.master_password_lockout_minutes,
+            ),
+        ),
+    )
     try:
         timeout = int(raw.get("default_command_timeout", settings.default_command_timeout) or 180)
         if 1 <= timeout <= 86_400:
@@ -68,6 +90,13 @@ def apply_portable_settings(settings: AppSettings, raw: dict) -> None:
             settings.journal_max_entries = journal
     except (TypeError, ValueError):
         pass
+
+
+def _parse_int_setting(raw: object, default: int) -> int:
+    try:
+        return int(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
 
 
 def _server_key(name: str, host: str) -> tuple[str, str]:

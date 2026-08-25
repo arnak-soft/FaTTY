@@ -105,6 +105,8 @@ class AppSettings:
     journal_max_entries: int = 5000
     clear_output_before_run: bool = False
     allow_short_master_password: bool = False
+    master_password_max_attempts: int = 5
+    master_password_lockout_minutes: int = 20
 
 
 @dataclass
@@ -290,6 +292,12 @@ def load() -> Config:
         ),
         clear_output_before_run=bool(settings_raw.get("clear_output_before_run", False)),
         allow_short_master_password=bool(settings_raw.get("allow_short_master_password", False)),
+        master_password_max_attempts=_parse_int(
+            settings_raw.get("master_password_max_attempts", 5), 5, 0, 100
+        ),
+        master_password_lockout_minutes=_parse_int(
+            settings_raw.get("master_password_lockout_minutes", 20), 20, 1, 24 * 60
+        ),
     )
     return Config(
         servers=servers,

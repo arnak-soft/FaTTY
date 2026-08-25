@@ -13,6 +13,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from fatty.auth_lockout import lockout_message, record_failed_attempt, record_success
 from fatty import APP_NAME, __version__
 from fatty.presets import (
     DEFAULT_APP_DIR,
@@ -558,7 +559,8 @@ class MasterPasswordDialog(PositionedToplevel):
         btns = ttk.Frame(body)
         btns.pack(fill="x", pady=(12, 0))
         ttk.Button(btns, text="Выход", command=self._cancel).pack(side="right", padx=4)
-        ttk.Button(btns, text="Продолжить", command=self._submit).pack(side="right", padx=4)
+        self._continue_btn = ttk.Button(btns, text="Продолжить", command=self._submit)
+        self._continue_btn.pack(side="right", padx=4)
 
         self.bind("<Return>", lambda _e: self._submit())
         self.bind("<Escape>", lambda _e: self._cancel())
@@ -566,6 +568,22 @@ class MasterPasswordDialog(PositionedToplevel):
         self._setup_layout(config.settings, "master")
         register_window(self)
         self.after(50, self.pw_entry.focus_set)
+        if not self._setup:
+            self._refresh_lockout_state()
+
+    def _refresh_lockout_state(self) -> None:
+        if not self.winfo_exists():
+            return
+        msg = lockout_message(self._config.settings)
+        if msg:
+            self.error.configure(text=msg)
+            self.pw_entry.configure(state="disabled")
+            self._continue_btn.configure(state="disabled")
+            self.after(1000, self._refresh_lockout_state)
+            return
+        self.error.configure(text="")
+        self.pw_entry.configure(state="normal")
+        self._continue_btn.configure(state="normal")
 
     def _cancel(self) -> None:
         self.ok = False
@@ -579,6 +597,12 @@ class MasterPasswordDialog(PositionedToplevel):
     def _submit(self) -> None:
         password = self.pw_var.get()
         self.error.configure(text="")
+        if not self._setup:
+            blocked = lockout_message(self._config.settings)
+            if blocked:
+                self.error.configure(text=blocked)
+                self._refresh_lockout_state()
+                return
         try:
             if self._setup:
                 if password != self.pw2_var.get():
@@ -589,9 +613,11 @@ class MasterPasswordDialog(PositionedToplevel):
             else:
                 assert self._config.vault is not None
                 if not self._vault.unlock(password, self._config.vault):
-                    self.error.configure(text="Неверный мастер-пароль.")
+                    self.error.configure(text=record_failed_attempt(self._config.settings))
                     self.pw_var.set("")
+                    self._refresh_lockout_state()
                     return
+                record_success()
                 unlock_secrets(self._config, self._vault)
         except VaultError as exc:
             self.error.configure(text=str(exc))
@@ -805,7 +831,7 @@ class App(tk.Tk):
         sbtns.pack(fill="x", pady=(8, 0))
         ttk.Button(sbtns, text="Добавить", command=self._add_server).pack(side="left", padx=(0, 4))
         ttk.Button(sbtns, text="Изменить", command=self._edit_server).pack(side="left", padx=4)
-        ttk.Button(sbtns, text="Копия", command=self._duplicate_server).pack(side="left", padx=4)
+        ttk.Button(sbtns, text="Дублировать", command=self._duplicate_server).pack(side="left", padx=4)
         ttk.Button(sbtns, text="Удалить", command=self._delete_server).pack(side="left", padx=4)
 
         sact = ttk.Frame(left)
@@ -844,7 +870,7 @@ class App(tk.Tk):
         cbtns.pack(fill="x", pady=(4, 0))
         ttk.Button(cbtns, text="Добавить", command=self._add_command).pack(side="left", padx=(0, 4))
         ttk.Button(cbtns, text="Изменить", command=self._edit_command).pack(side="left", padx=4)
-        ttk.Button(cbtns, text="Копия", command=self._duplicate_command).pack(side="left", padx=4)
+        ttk.Button(cbtns, text="Дублировать", command=self._duplicate_command).pack(side="left", padx=4)
         ttk.Button(cbtns, text="Удалить", command=self._delete_command).pack(side="left", padx=4)
         ttk.Button(cbtns, text="Пресеты…", command=self._add_presets).pack(side="left", padx=4)
         self.stop_btn = ttk.Button(cbtns, text="Стоп", command=self._stop, state="disabled")

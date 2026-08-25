@@ -57,6 +57,9 @@ class SettingsDialog(PositionedToplevel):
         self.export_settings_var = tk.BooleanVar(value=True)
         self.import_settings_var = tk.BooleanVar(value=True)
         self.short_pw_var = tk.BooleanVar(value=settings.allow_short_master_password)
+        self.lockout_attempts_var = tk.StringVar(value=str(settings.master_password_max_attempts))
+        self.lockout_minutes_var = tk.StringVar(value=str(settings.master_password_lockout_minutes))
+        self._advanced_visible = False
 
         body = ttk.Frame(self, padding=12)
         body.pack(fill="both", expand=True)
@@ -266,18 +269,37 @@ class SettingsDialog(PositionedToplevel):
             wraplength=460,
         ).pack(anchor="w", pady=(0, 6))
         ttk.Button(vault, text="Сменить мастер-пароль…", command=self._change_master).pack(anchor="w")
+
+        advanced_toggle = ttk.Frame(vault)
+        advanced_toggle.pack(fill="x", pady=(10, 0))
+        self._advanced_toggle_btn = ttk.Button(
+            advanced_toggle,
+            text="Дополнительные параметры безопасности…",
+            command=self._toggle_advanced_security,
+        )
+        self._advanced_toggle_btn.pack(anchor="w")
+
+        self._advanced_frame = ttk.Frame(vault)
         ttk.Checkbutton(
-            vault,
+            self._advanced_frame,
             text=f"Разрешить короткий мастер-пароль (от {MIN_PASSWORD_LEN_RELAXED} символов)",
             variable=self.short_pw_var,
             command=self._on_short_pw_toggle,
-        ).pack(anchor="w", pady=(8, 0))
+        ).pack(anchor="w", pady=(0, 6))
         ttk.Label(
-            vault,
+            self._advanced_frame,
             text=f"При первой настройке по-прежнему требуется не меньше {MIN_PASSWORD_LEN} символов.",
             foreground="#555",
-            wraplength=460,
-        ).pack(anchor="w", pady=(4, 0))
+            wraplength=440,
+        ).pack(anchor="w", pady=(0, 8))
+
+        lockout_row = ttk.Frame(self._advanced_frame)
+        lockout_row.pack(fill="x", pady=2)
+        ttk.Label(lockout_row, text="Блокировка после попыток").pack(side="left")
+        ttk.Entry(lockout_row, textvariable=self.lockout_attempts_var, width=5).pack(side="left", padx=(8, 4))
+        ttk.Label(lockout_row, text="на").pack(side="left")
+        ttk.Entry(lockout_row, textvariable=self.lockout_minutes_var, width=5).pack(side="left", padx=(8, 4))
+        ttk.Label(lockout_row, text="мин (0 попыток — отключить)").pack(side="left")
 
         about = self._section(tab, "О программе")
         ttk.Label(about, text=f"{APP_NAME} {__version__}").pack(anchor="w", pady=2)
@@ -319,6 +341,15 @@ class SettingsDialog(PositionedToplevel):
     def _open_config_dir(self) -> None:
         APP_DIR.mkdir(parents=True, exist_ok=True)
         os.startfile(APP_DIR)  # type: ignore[attr-defined]
+
+    def _toggle_advanced_security(self) -> None:
+        self._advanced_visible = not self._advanced_visible
+        if self._advanced_visible:
+            self._advanced_frame.pack(fill="x", pady=(8, 0))
+            self._advanced_toggle_btn.configure(text="Скрыть дополнительные параметры")
+        else:
+            self._advanced_frame.pack_forget()
+            self._advanced_toggle_btn.configure(text="Дополнительные параметры безопасности…")
 
     def _change_master(self) -> None:
         self._on_change_master()
@@ -369,6 +400,28 @@ class SettingsDialog(PositionedToplevel):
                     parent=self,
                 )
                 return False
+        try:
+            attempts = int(self.lockout_attempts_var.get().strip() or "5")
+            if not (0 <= attempts <= 100):
+                raise ValueError
+        except ValueError:
+            messagebox.showwarning(
+                "Настройки",
+                "Число попыток блокировки должно быть от 0 до 100 (0 — отключить).",
+                parent=self,
+            )
+            return False
+        try:
+            lockout_min = int(self.lockout_minutes_var.get().strip() or "20")
+            if not (1 <= lockout_min <= 24 * 60):
+                raise ValueError
+        except ValueError:
+            messagebox.showwarning(
+                "Настройки",
+                "Длительность блокировки должна быть от 1 до 1440 минут.",
+                parent=self,
+            )
+            return False
         return True
 
     def _apply_to_config(self) -> None:
@@ -381,6 +434,8 @@ class SettingsDialog(PositionedToplevel):
         settings.putty_path = self.putty_var.get().strip()
         settings.ssh_path = self.ssh_var.get().strip()
         settings.allow_short_master_password = bool(self.short_pw_var.get())
+        settings.master_password_max_attempts = int(self.lockout_attempts_var.get().strip())
+        settings.master_password_lockout_minutes = int(self.lockout_minutes_var.get().strip())
 
     def _save(self) -> None:
         if not self._validate():
@@ -495,3 +550,5 @@ class SettingsDialog(PositionedToplevel):
         self.putty_var.set(settings.putty_path)
         self.ssh_var.set(settings.ssh_path)
         self.short_pw_var.set(settings.allow_short_master_password)
+        self.lockout_attempts_var.set(str(settings.master_password_max_attempts))
+        self.lockout_minutes_var.set(str(settings.master_password_lockout_minutes))
