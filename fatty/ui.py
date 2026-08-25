@@ -35,8 +35,9 @@ from fatty.ssh_runner import (
 from fatty.sftp import guess_start_path
 from fatty.settings_ui import SettingsDialog
 from fatty.files_ui import FilesWindow
-from fatty.journal import Journal, JournalEntry, now_iso, status_from_exit
+from fatty.journal import Journal, JournalEntry, STATUS_LABELS, now_iso, status_from_exit
 from fatty.journal_ui import JournalWindow
+from fatty.help_ui import HelpWindow
 from fatty.layout import (
     DEFAULT_GEOMETRY as _DEFAULT_GEOMETRY,
     GEOM_RE as _GEOM_RE,
@@ -743,7 +744,11 @@ class App(tk.Tk):
         self._session: SSHSession | None = None
         self._files_windows: dict[str, FilesWindow] = {}
         self._journal_window: JournalWindow | None = None
+        self._help_window: HelpWindow | None = None
         self.journal = Journal(max_entries=config.settings.journal_max_entries)
+        self._last_runs: dict[str, JournalEntry] = {}
+        self._reload_last_runs()
+        self.journal.add_listener(self._on_journal_changed_main)
         self._remote_cwd: dict[str, str] = {}
         self._busy = False
         self._restoring_layout = True
@@ -756,6 +761,8 @@ class App(tk.Tk):
         self._refresh_servers(self.config_data.settings.last_server_id)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<F5>", lambda _e: self._run_selected())
+        self.bind("<F2>", self._on_f2)
+        self.bind("<F1>", lambda _e: self._open_help())
         self.bind("<Control-j>", lambda _e: self._open_journal())
         self.bind("<Control-J>", lambda _e: self._open_journal())
         self.bind("<Control-comma>", lambda _e: self._open_settings())
@@ -791,6 +798,12 @@ class App(tk.Tk):
         menubar.add_cascade(label="Настройки", menu=opt)
 
         help_menu = tk.Menu(menubar, tearoff=0)
+        help_menu.add_command(label="Содержание", command=self._open_help, accelerator="F1")
+        help_menu.add_command(
+            label="Частые команды",
+            command=lambda: self._open_help("Команды"),
+        )
+        help_menu.add_separator()
         help_menu.add_command(label="Проверить обновления…", command=self._check_updates_manual)
         help_menu.add_separator()
         help_menu.add_command(label="О программе", command=self._about)
@@ -843,19 +856,28 @@ class App(tk.Tk):
 
         self.cmd_tree = ttk.Treeview(
             right,
-            columns=("command",),
+            columns=("command", "last"),
             show="tree headings",
             selectmode="browse",
             height=12,
         )
         self.cmd_tree.heading("#0", text="Название", command=self._sort_commands_by_name)
         self.cmd_tree.heading("command", text="Команда", command=self._sort_commands_by_command)
+        self.cmd_tree.heading("last", text="Последний раз")
         self.cmd_tree.column("#0", width=180, minwidth=80, stretch=False)
-        self.cmd_tree.column("command", width=420, minwidth=80, stretch=True)
+        self.cmd_tree.column("command", width=320, minwidth=80, stretch=True)
+        self.cmd_tree.column("last", width=140, minwidth=90, stretch=False)
         apply_tree_columns(self.cmd_tree, saved_cols.get("commands"))
         self.cmd_tree.pack(fill="both", expand=True)
+        self.cmd_tree.tag_configure("ok", foreground="#2e7d32")
+        self.cmd_tree.tag_configure("failed", foreground="#c62828")
+        self.cmd_tree.tag_configure("timeout", foreground="#ef6c00")
+        self.cmd_tree.tag_configure("cancelled", foreground="#6a1b9a")
+        self.cmd_tree.tag_configure("error", foreground="#c62828")
         self.cmd_tree.bind("<<TreeviewSelect>>", lambda _e: self._remember_selection())
-        self.cmd_tree.bind("<Double-1>", lambda _e: self._edit_command())
+        self.cmd_tree.bind("<Double-1>", self._on_cmd_double)
+        self.cmd_tree.bind("<Return>", self._on_cmd_return)
+        self.cmd_tree.bind("<KP_Enter>", self._on_cmd_return)
         self.cmd_tree.bind("<Control-Up>", lambda _e: self._move_command(-1))
         self.cmd_tree.bind("<Control-Down>", lambda _e: self._move_command(1))
         self.cmd_tree.bind("<ButtonRelease-1>", self._on_layout_drag, add="+")
@@ -869,7 +891,7 @@ class App(tk.Tk):
         cbtns = ttk.Frame(right)
         cbtns.pack(fill="x", pady=(4, 0))
         ttk.Button(cbtns, text="Добавить", command=self._add_command).pack(side="left", padx=(0, 4))
-        ttk.Button(cbtns, text="Изменить", command=self._edit_command).pack(side="left", padx=4)
+        ttk.Button(cbtns, text="Изменить  (F2)", command=self._edit_command).pack(side="left", padx=4)
         ttk.Button(cbtns, text="Дублировать", command=self._duplicate_command).pack(side="left", padx=4)
         ttk.Button(cbtns, text="Удалить", command=self._delete_command).pack(side="left", padx=4)
         ttk.Button(cbtns, text="Пресеты…", command=self._add_presets).pack(side="left", padx=4)
@@ -883,6 +905,7 @@ class App(tk.Tk):
         ttk.Label(quick, text="Разовая команда:").pack(side="left")
         self.quick_var = tk.StringVar()
         qentry = ttk.Entry(quick, textvariable=self.quick_var)
+        self.quick_entry = qentry
         qentry.pack(side="left", fill="x", expand=True, padx=6)
         qentry.bind("<Return>", lambda _e: self._run_quick())
         ttk.Button(quick, text="Выполнить", command=self._run_quick).pack(side="left")
@@ -892,6 +915,8 @@ class App(tk.Tk):
         out_btns.pack(fill="x")
         self.cwd_var = tk.StringVar(value="Папка: ~")
         ttk.Label(out_btns, textvariable=self.cwd_var).pack(side="left")
+        self.cwd_reset_btn = ttk.Button(out_btns, text="Сбросить в ~", command=self._reset_cwd, state="disabled")
+        self.cwd_reset_btn.pack(side="left", padx=(8, 0))
         ttk.Button(out_btns, text="Очистить", command=self._clear_output).pack(side="right")
         ttk.Button(out_btns, text="Журнал", command=self._open_journal).pack(side="right", padx=(0, 4))
         self.output = tk.Text(
@@ -920,6 +945,44 @@ class App(tk.Tk):
 
         self.status = ttk.Label(self, text="Готово", anchor="w", padding=(10, 4))
         self.status.pack(fill="x", side="bottom")
+
+    def _on_cmd_double(self, event) -> str | None:
+        region = self.cmd_tree.identify_region(event.x, event.y)
+        if region not in {"tree", "cell"}:
+            return None
+        row = self.cmd_tree.identify_row(event.y)
+        if not row:
+            return None
+        self.cmd_tree.selection_set(row)
+        self.cmd_tree.focus(row)
+        self._run_selected()
+        return "break"
+
+    def _on_cmd_return(self, _event=None) -> str:
+        self._run_selected()
+        return "break"
+
+    def _on_f2(self, _event=None) -> str | None:
+        widget = self.focus_get()
+        if isinstance(widget, (tk.Entry, tk.Text, ttk.Entry)):
+            return None
+        self._edit_command()
+        return "break"
+
+    def _reload_last_runs(self) -> None:
+        try:
+            self._last_runs = self.journal.latest_by_command_id()
+        except OSError:
+            self._last_runs = {}
+
+    def _on_journal_changed_main(self) -> None:
+        self._reload_last_runs()
+        try:
+            if not self.winfo_exists() or getattr(self, "cmd_tree", None) is None:
+                return
+        except tk.TclError:
+            return
+        self._refresh_commands()
 
     def _selected_server(self) -> Server | None:
         sel = self.server_tree.selection()
@@ -1103,7 +1166,22 @@ class App(tk.Tk):
             preview = " ".join(cmd.command.split())
             if len(preview) > 90:
                 preview = preview[:87] + "…"
-            self.cmd_tree.insert("", "end", iid=cmd.id, text=cmd.name, values=(preview,))
+            last = self._last_runs.get(cmd.id)
+            if last is None:
+                last_text = "—"
+                tags: tuple[str, ...] = ()
+            else:
+                last_text = last.last_run_label()
+                tag = last.status if last.status in STATUS_LABELS else "error"
+                tags = (tag,)
+            self.cmd_tree.insert(
+                "",
+                "end",
+                iid=cmd.id,
+                text=cmd.name,
+                values=(preview, last_text),
+                tags=tags,
+            )
         if keep and self.cmd_tree.exists(keep):
             self.cmd_tree.selection_set(keep)
             self.cmd_tree.see(keep)
@@ -1497,6 +1575,40 @@ class App(tk.Tk):
             return
         messagebox.showinfo("Мастер-пароль", "Мастер-пароль обновлён.", parent=self)
 
+    def _open_help(self, tab: str | None = None) -> None:
+        existing = self._help_window
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    existing.deiconify()
+                    existing.lift()
+                    existing.focus_force()
+                    if tab:
+                        existing.show_tab(tab)
+                    return
+            except tk.TclError:
+                pass
+        win = HelpWindow(self, on_insert_quick=self._insert_quick_from_help)
+        self._help_window = win
+        if tab:
+            win.after(0, lambda: win.show_tab(tab))
+
+        def _clear(event) -> None:
+            if event.widget is win:
+                self._help_window = None
+
+        win.bind("<Destroy>", _clear)
+
+    def _insert_quick_from_help(self, command: str) -> None:
+        self.quick_var.set(command)
+        entry = getattr(self, "quick_entry", None)
+        if entry is not None:
+            try:
+                entry.icursor("end")
+            except tk.TclError:
+                pass
+        self.status.configure(text="Разовая команда подставлена из справки")
+
     def _open_config_dir(self) -> None:
         APP_DIR.mkdir(parents=True, exist_ok=True)
         os.startfile(APP_DIR)  # type: ignore[attr-defined]
@@ -1505,7 +1617,9 @@ class App(tk.Tk):
         messagebox.showinfo(
             f"О {APP_NAME}",
             f"{APP_NAME} {__version__}\n\n"
-            "Проверка обновлений: Справка → Проверить обновления…",
+            "Запуск команд на VPS по SSH.\n\n"
+            "Справка: F1  •  Частые команды: Справка → Частые команды\n"
+            "Обновления: Справка → Проверить обновления…",
             parent=self,
         )
 
@@ -1524,15 +1638,33 @@ class App(tk.Tk):
             self._remote_cwd[server_id] = path
         self._update_cwd_label()
 
+    def _reset_cwd(self) -> None:
+        server = self._selected_server()
+        if not server:
+            return
+        self._remote_cwd.pop(server.id, None)
+        self._update_cwd_label()
+        self.status.configure(text="Рабочая папка сброшена в домашнюю")
+
     def _update_cwd_label(self) -> None:
         if getattr(self, "cwd_var", None) is None:
             return
+        reset = getattr(self, "cwd_reset_btn", None)
         server = self._selected_server()
         if not server:
             self.cwd_var.set("")
+            if reset is not None:
+                reset.configure(state="disabled")
             return
         path = self._remote_cwd.get(server.id, "")
-        self.cwd_var.set(f"Папка: {path}" if path else "Папка: ~")
+        if path:
+            self.cwd_var.set(f"Папка: {path}")
+            if reset is not None:
+                reset.configure(state="normal")
+        else:
+            self.cwd_var.set("Папка: ~")
+            if reset is not None:
+                reset.configure(state="disabled")
 
     def _append(self, text: str, tag: str | None = None) -> None:
         self.output.configure(state="normal")
@@ -1894,6 +2026,10 @@ class App(tk.Tk):
             if not messagebox.askyesno("Выход", "Команда ещё выполняется. Выйти?", parent=self):
                 return
             self._stop()
+        try:
+            self.journal.remove_listener(self._on_journal_changed_main)
+        except Exception:
+            pass
         try:
             self.persist()
         except Exception:

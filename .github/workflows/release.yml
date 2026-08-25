@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build
+        shell: cmd
+        run: build.bat
+
+      - name: Zip Portable
+        shell: pwsh
+        run: |
+          $dir = Get-ChildItem dist -Directory -Filter "FaTTY * Portable" |
+            Select-Object -First 1
+          if (-not $dir) { throw "Portable folder not found in dist\" }
+          $zip = Join-Path $dir.DirectoryName ($dir.Name + ".zip")
+          Compress-Archive -Path $dir.FullName -DestinationPath $zip -Force
+          Write-Host "Wrote $zip"
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/FaTTY * Setup.exe
+            dist/FaTTY * OneFile.exe
+            dist/FaTTY * Portable.zip

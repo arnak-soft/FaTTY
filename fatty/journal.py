@@ -63,6 +63,37 @@ class JournalEntry:
             return text[: limit - 1] + "…"
         return text
 
+    def compact_when(self) -> str:
+        raw = (self.started_at or "").strip()
+        if not raw:
+            return ""
+        try:
+            dt = datetime.fromisoformat(raw)
+        except ValueError:
+            return ""
+        if dt.tzinfo is not None:
+            now = datetime.now().astimezone()
+            dt = dt.astimezone(now.tzinfo)
+        else:
+            now = datetime.now()
+        if dt.date() == now.date():
+            return dt.strftime("%H:%M")
+        if dt.year == now.year:
+            return dt.strftime("%d.%m %H:%M")
+        return dt.strftime("%d.%m.%y")
+
+    def last_run_label(self) -> str:
+        if self.status == "ok":
+            result = "OK"
+        elif self.exit_code is not None and self.status == "failed":
+            result = str(self.exit_code)
+        else:
+            result = STATUS_LABELS.get(self.status, self.status)
+        when = self.compact_when()
+        if when:
+            return f"{result} · {when}"
+        return result
+
     def as_text(self) -> str:
         lines = [
             f"Время: {self.started_display()}",
@@ -244,6 +275,14 @@ class Journal:
     def load(self, limit: int = MAX_ENTRIES) -> list[JournalEntry]:
         with self._lock:
             return self._read_unlocked(limit)
+
+    def latest_by_command_id(self) -> dict[str, JournalEntry]:
+        latest: dict[str, JournalEntry] = {}
+        for item in self.load():
+            cid = (item.command_id or "").strip()
+            if cid and cid not in latest:
+                latest[cid] = item
+        return latest
 
     def clear(self) -> None:
         with self._lock:
