@@ -100,6 +100,10 @@ class AppSettings:
     dialog_geometry: dict[str, str] = field(default_factory=dict)
     column_widths: dict[str, dict[str, int]] = field(default_factory=dict)
     putty_path: str = ""
+    ssh_path: str = ""
+    default_command_timeout: int = 180
+    journal_max_entries: int = 5000
+    clear_output_before_run: bool = False
 
 
 @dataclass
@@ -167,6 +171,14 @@ def _parse_vault(raw: dict) -> VaultMeta | None:
         iterations=max(100_000, iterations),
         kdf=str(raw.get("kdf") or "pbkdf2-sha256"),
     )
+
+
+def _parse_int(raw: object, default: int, min_val: int, max_val: int) -> int:
+    try:
+        value = int(raw)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    return max(min_val, min(max_val, value))
 
 
 def _parse_column_widths(raw: object) -> dict[str, dict[str, int]]:
@@ -268,6 +280,14 @@ def load() -> Config:
         dialog_geometry=dialog_geometry,
         column_widths=_parse_column_widths(settings_raw.get("column_widths")),
         putty_path=str(settings_raw.get("putty_path", "") or ""),
+        ssh_path=str(settings_raw.get("ssh_path", "") or ""),
+        default_command_timeout=_parse_int(
+            settings_raw.get("default_command_timeout", 180), 180, 1, 86_400
+        ),
+        journal_max_entries=_parse_int(
+            settings_raw.get("journal_max_entries", 5000), 5000, 100, 50_000
+        ),
+        clear_output_before_run=bool(settings_raw.get("clear_output_before_run", False)),
     )
     return Config(
         servers=servers,

@@ -291,7 +291,11 @@ def _win_cmd_quote(arg: str) -> str:
     return '"' + arg.replace('"', '""') + '"'
 
 
-def find_ssh_executable() -> Path | None:
+def find_ssh_executable(custom_path: str | Path | None = None) -> Path | None:
+    if custom_path:
+        candidate = Path(str(custom_path)).expanduser()
+        if candidate.is_file():
+            return candidate
     found = shutil.which("ssh")
     if found:
         return Path(found)
@@ -444,10 +448,10 @@ def open_putty_console(server: Server, *, putty_path: str | None = None) -> None
         _schedule_unlink(pwfile)
 
 
-def open_system_console(server: Server) -> None:
+def open_system_console(server: Server, *, ssh_path: str | None = None) -> None:
     if sys.platform != "win32":
         raise SSHError("Интерактивная консоль доступна только на Windows.")
-    ssh = find_ssh_executable()
+    ssh = find_ssh_executable(ssh_path)
     if ssh is None:
         raise SSHError(
             "Не найден ssh.exe.\n"

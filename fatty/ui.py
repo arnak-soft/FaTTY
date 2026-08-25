@@ -8,6 +8,7 @@ import time
 import traceback
 import uuid
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -31,6 +32,7 @@ from fatty.ssh_runner import (
     open_system_console,
 )
 from fatty.sftp import guess_start_path
+from fatty.settings_ui import SettingsDialog
 from fatty.files_ui import FilesWindow
 from fatty.journal import Journal, JournalEntry, now_iso, status_from_exit
 from fatty.journal_ui import JournalWindow
@@ -686,7 +688,7 @@ class App(tk.Tk):
         self._session: SSHSession | None = None
         self._files_windows: dict[str, FilesWindow] = {}
         self._journal_window: JournalWindow | None = None
-        self.journal = Journal()
+        self.journal = Journal(max_entries=config.settings.journal_max_entries)
         self._remote_cwd: dict[str, str] = {}
         self._busy = False
         self._restoring_layout = True
@@ -701,6 +703,7 @@ class App(tk.Tk):
         self.bind("<F5>", lambda _e: self._run_selected())
         self.bind("<Control-j>", lambda _e: self._open_journal())
         self.bind("<Control-J>", lambda _e: self._open_journal())
+        self.bind("<Control-comma>", lambda _e: self._open_settings())
         self.bind("<Configure>", self._on_window_configure)
         self.after(120, self._finish_layout_restore)
         self.after(2000, self._maybe_auto_check_updates)
@@ -720,22 +723,14 @@ class App(tk.Tk):
         file_menu.add_command(label="Открыть папку конфига", command=self._open_config_dir)
         file_menu.add_command(label="Журнал команд…", command=self._open_journal, accelerator="Ctrl+J")
         file_menu.add_separator()
+        file_menu.add_command(label="Экспорт…", command=self._export_config)
+        file_menu.add_command(label="Импорт…", command=self._import_config)
+        file_menu.add_separator()
         file_menu.add_command(label="Выход", command=self._on_close)
         menubar.add_cascade(label="Файл", menu=file_menu)
 
         opt = tk.Menu(menubar, tearoff=0)
-        self.confirm_var = tk.BooleanVar(value=self.config_data.settings.confirm_before_run)
-        opt.add_checkbutton(
-            label="Спрашивать перед запуском",
-            variable=self.confirm_var,
-            command=self._toggle_confirm,
-        )
-        self.updates_var = tk.BooleanVar(value=self.config_data.settings.check_updates_on_start)
-        opt.add_checkbutton(
-            label="Проверять обновления при запуске",
-            variable=self.updates_var,
-            command=self._toggle_updates_on_start,
-        )
+        opt.add_command(label="Настройки…", command=self._open_settings, accelerator="Ctrl+,")
         opt.add_separator()
         opt.add_command(label="Сменить мастер-пароль…", command=self._change_master_password)
         menubar.add_cascade(label="Настройки", menu=opt)
@@ -902,10 +897,6 @@ class App(tk.Tk):
 
     def _sync_ui_settings(self) -> None:
         settings = self.config_data.settings
-        if getattr(self, "confirm_var", None) is not None:
-            settings.confirm_before_run = bool(self.confirm_var.get())
-        if getattr(self, "updates_var", None) is not None:
-            settings.check_updates_on_start = bool(self.updates_var.get())
         try:
             state = self.state()
         except tk.TclError:
@@ -1156,7 +1147,9 @@ class App(tk.Tk):
             return
         if not self.config_data.servers:
             return
-        dlg = CommandDialog(self, Command.new(server.id), self.config_data.servers, "Новая команда")
+        cmd = Command.new(server.id)
+        cmd.timeout_sec = self.config_data.settings.default_command_timeout
+        dlg = CommandDialog(self, cmd, self.config_data.servers, "Новая команда")
         self.wait_window(dlg)
         if dlg.result:
             self.config_data.commands.append(dlg.result)
@@ -1224,13 +1217,125 @@ class App(tk.Tk):
                 parent=self,
             )
 
-    def _toggle_confirm(self) -> None:
-        self.config_data.settings.confirm_before_run = self.confirm_var.get()
+    def _apply_runtime_settings(self) -> None:
+        self.journal.max_entries = self.config_data.settings.journal_max_entries
+
+    def _after_config_import(self) -> None:
+        self._apply_runtime_settings()
+        keep_id = self.config_data.settings.last_server_id
+        self._refresh_servers(keep_id)
+
+    def _open_settings(self) -> None:
+        dlg = SettingsDialog(
+            self,
+            self.config_data,
+            self.vault,
+            on_apply=self._save_settings,
+            on_change_master=self._change_master_password,
+            on_check_updates=self._check_updates_manual,
+            on_import_done=self._after_config_import,
+        )
+        self.wait_window(dlg)
+        self._apply_runtime_settings()
+
+    def _save_settings(self) -> None:
         self.persist()
 
-    def _toggle_updates_on_start(self) -> None:
-        self.config_data.settings.check_updates_on_start = self.updates_var.get()
-        self.persist()
+    def _export_config(self) -> None:
+        from fatty.config_io import write_export
+
+        include_secrets = messagebox.askyesno(
+            "Экспорт",
+            "Включить пароли VPS в файл?\n\n"
+            "Нет — только хосты, команды и (опционально) настройки.",
+            parent=self,
+        )
+        if include_secrets and not messagebox.askyesno(
+            "Экспорт",
+            "Файл будет содержать пароли в открытом виде.\nПродолжить?",
+            parent=self,
+        ):
+            return
+        include_settings = messagebox.askyesno(
+            "Экспорт",
+            "Включить настройки приложения?",
+            parent=self,
+        )
+        stamp = datetime.now().strftime("%Y-%m-%d")
+        path = filedialog.asksaveasfilename(
+            parent=self,
+            title="Экспорт FaTTY",
+            defaultextension=".json",
+            initialfile=f"fatty-backup-{stamp}.json",
+            filetypes=[("FaTTY backup", "*.json"), ("JSON", "*.json"), ("Все файлы", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            write_export(
+                Path(path),
+                self.config_data,
+                include_secrets=include_secrets,
+                include_settings=include_settings,
+            )
+        except OSError as exc:
+            messagebox.showerror("Экспорт", f"Не удалось сохранить файл:\n{exc}", parent=self)
+            return
+        messagebox.showinfo("Экспорт", f"Сохранено:\n{path}", parent=self)
+
+    def _import_config(self) -> None:
+        from fatty.config_io import ConfigIOError, format_import_summary, import_into_config, read_export
+
+        choice = messagebox.askyesnocancel(
+            "Импорт",
+            "Да — добавить к текущим VPS и командам\n"
+            "Нет — заменить все VPS и команды\n"
+            "Отмена",
+            parent=self,
+        )
+        if choice is None:
+            return
+        mode = "merge" if choice else "replace"
+        path = filedialog.askopenfilename(
+            parent=self,
+            title="Импорт FaTTY",
+            filetypes=[("FaTTY backup", "*.json"), ("JSON", "*.json"), ("Все файлы", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            data = read_export(Path(path))
+        except ConfigIOError as exc:
+            messagebox.showerror("Импорт", str(exc), parent=self)
+            return
+        import_settings = messagebox.askyesno(
+            "Импорт",
+            "Импортировать настройки приложения из файла?",
+            parent=self,
+        )
+        if mode == "replace" and not messagebox.askyesno(
+            "Импорт",
+            "Текущие VPS и команды будут удалены.\nПродолжить?",
+            parent=self,
+        ):
+            return
+        try:
+            result = import_into_config(
+                self.config_data,
+                data,
+                mode=mode,
+                import_settings=import_settings,
+            )
+            self.persist()
+        except (ConfigIOError, VaultLocked) as exc:
+            messagebox.showerror("Импорт", str(exc), parent=self)
+            return
+        self._after_config_import()
+        messagebox.showinfo(
+            "Импорт",
+            format_import_summary(result, mode=mode),
+            parent=self,
+        )
 
     def _maybe_auto_check_updates(self) -> None:
         settings = self.config_data.settings
@@ -1405,7 +1510,8 @@ class App(tk.Tk):
             messagebox.showinfo("Консоль", "Сначала выберите VPS.", parent=self)
             return
         try:
-            open_system_console(server)
+            ssh_path = (self.config_data.settings.ssh_path or "").strip() or None
+            open_system_console(server, ssh_path=ssh_path)
         except SSHError as exc:
             messagebox.showerror("Консоль", str(exc), parent=self)
             return
@@ -1510,7 +1616,7 @@ class App(tk.Tk):
         if not server:
             messagebox.showerror("Запуск", "VPS для этой команды не найден.", parent=self)
             return
-        if self.confirm_var.get():
+        if self.config_data.settings.confirm_before_run:
             if not messagebox.askyesno(
                 "Запуск",
                 f"Выполнить «{cmd.name}» на {server.name}\n({server.username}@{server.host})?",
@@ -1535,14 +1641,15 @@ class App(tk.Tk):
             return
         if not command:
             return
-        if self.confirm_var.get():
+        if self.config_data.settings.confirm_before_run:
             if not messagebox.askyesno(
                 "Запуск",
                 f"Выполнить разовую команду на {server.name}?",
                 parent=self,
             ):
                 return
-        self._run(server, command, 180, True, title="разовая команда", kind="quick")
+        timeout = self.config_data.settings.default_command_timeout
+        self._run(server, command, timeout, True, title="разовая команда", kind="quick")
 
     def _open_journal(self) -> None:
         existing = self._journal_window
@@ -1651,6 +1758,8 @@ class App(tk.Tk):
         if self._busy:
             messagebox.showinfo("Занято", "Дождитесь окончания текущей команды или нажмите Стоп.", parent=self)
             return
+        if self.config_data.settings.clear_output_before_run:
+            self._clear_output()
         self._set_busy(True)
         cwd = self._remote_cwd.get(server.id, "")
         self.status.configure(text=f"Выполняется: {title} → {server.name}")

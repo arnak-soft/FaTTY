@@ -206,8 +206,9 @@ def _write_lines(path: Path, lines: list[str]) -> None:
 
 
 class Journal:
-    def __init__(self, path: Path | None = None) -> None:
+    def __init__(self, path: Path | None = None, *, max_entries: int = MAX_ENTRIES) -> None:
         self.path = path or JOURNAL_PATH
+        self.max_entries = max(100, min(50_000, int(max_entries or MAX_ENTRIES)))
         self._lock = threading.Lock()
         self._listeners: list[Listener] = []
 
@@ -288,6 +289,6 @@ class Journal:
             raw_lines = [line for line in self.path.read_text(encoding="utf-8").splitlines() if line.strip()]
         except OSError:
             return
-        if len(raw_lines) <= MAX_ENTRIES + _TRIM_SLACK:
+        if len(raw_lines) <= self.max_entries + _TRIM_SLACK:
             return
-        _write_lines(self.path, raw_lines[-MAX_ENTRIES:])
+        _write_lines(self.path, raw_lines[-self.max_entries :])
