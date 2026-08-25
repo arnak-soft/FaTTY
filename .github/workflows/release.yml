@@ -28,14 +28,9 @@ jobs:
         run: build.bat
 
       - name: Zip Portable
-        shell: pwsh
+        shell: cmd
         run: |
-          $dir = Get-ChildItem dist -Directory -Filter "FaTTY * Portable" |
-            Select-Object -First 1
-          if (-not $dir) { throw "Portable folder not found in dist\" }
-          $zip = Join-Path $dir.DirectoryName ($dir.Name + ".zip")
-          Compress-Archive -Path $dir.FullName -DestinationPath $zip -Force
-          Write-Host "Wrote $zip"
+          .venv\Scripts\python.exe -c "import shutil; from pathlib import Path; from fatty import portable_dir_name; root = Path('dist'); portable = root / portable_dir_name(); exe = portable / 'FaTTY.exe'; assert exe.is_file(), f'missing {exe}; dist={list(root.iterdir()) if root.is_dir() else []}'; zip_base = root / portable.name; shutil.make_archive(str(zip_base), 'zip', portable); print('Wrote', zip_base.with_suffix('.zip'))"
 
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
