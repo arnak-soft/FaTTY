@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 import traceback
+import uuid
 import webbrowser
 from pathlib import Path
 import tkinter as tk
@@ -23,6 +24,8 @@ from fatty.single_instance import activate_existing, register_window, try_become
 from fatty.ssh_runner import SSHError, SSHSession, open_putty_console, open_system_console
 from fatty.sftp import guess_start_path
 from fatty.files_ui import FilesWindow
+from fatty.journal import Journal, JournalEntry, now_iso, status_from_exit
+from fatty.journal_ui import JournalWindow
 from fatty.layout import (
     DEFAULT_GEOMETRY as _DEFAULT_GEOMETRY,
     GEOM_RE as _GEOM_RE,
@@ -674,6 +677,8 @@ class App(tk.Tk):
         self.vault = vault
         self._session: SSHSession | None = None
         self._files_windows: dict[str, FilesWindow] = {}
+        self._journal_window: JournalWindow | None = None
+        self.journal = Journal()
         self._remote_cwd: dict[str, str] = {}
         self._busy = False
         self._restoring_layout = True
@@ -686,6 +691,8 @@ class App(tk.Tk):
         self._refresh_servers(self.config_data.settings.last_server_id)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.bind("<F5>", lambda _e: self._run_selected())
+        self.bind("<Control-j>", lambda _e: self._open_journal())
+        self.bind("<Control-J>", lambda _e: self._open_journal())
         self.bind("<Configure>", self._on_window_configure)
         self.after(120, self._finish_layout_restore)
         self.after(2000, self._maybe_auto_check_updates)
@@ -703,6 +710,7 @@ class App(tk.Tk):
         menubar = tk.Menu(self)
         file_menu = tk.Menu(menubar, tearoff=0)
         file_menu.add_command(label="Открыть папку конфига", command=self._open_config_dir)
+        file_menu.add_command(label="Журнал команд…", command=self._open_journal, accelerator="Ctrl+J")
         file_menu.add_separator()
         file_menu.add_command(label="Выход", command=self._on_close)
         menubar.add_cascade(label="Файл", menu=file_menu)
@@ -827,6 +835,7 @@ class App(tk.Tk):
         self.cwd_var = tk.StringVar(value="Папка: ~")
         ttk.Label(out_btns, textvariable=self.cwd_var).pack(side="left")
         ttk.Button(out_btns, text="Очистить", command=self._clear_output).pack(side="right")
+        ttk.Button(out_btns, text="Журнал", command=self._open_journal).pack(side="right", padx=(0, 4))
         self.output = tk.Text(
             out_frame,
             height=14,
@@ -1373,7 +1382,14 @@ class App(tk.Tk):
         server = self._selected_server()
         if not server:
             return
-        self._run(server, "echo OK && hostname && whoami && pwd", 30, True, title=f"Проверка {server.name}")
+        self._run(
+            server,
+            "echo OK && hostname && whoami && pwd",
+            30,
+            True,
+            title=f"Проверка {server.name}",
+            kind="test",
+        )
 
     def _open_console(self) -> None:
         server = self._selected_server()
@@ -1446,7 +1462,15 @@ class App(tk.Tk):
                 parent=self,
             ):
                 return
-        self._run(server, cmd.command, cmd.timeout_sec, cmd.login_shell, title=cmd.name)
+        self._run(
+            server,
+            cmd.command,
+            cmd.timeout_sec,
+            cmd.login_shell,
+            title=cmd.name,
+            command_id=cmd.id,
+            kind="command",
+        )
 
     def _run_quick(self) -> None:
         server = self._selected_server()
@@ -1463,9 +1487,112 @@ class App(tk.Tk):
                 parent=self,
             ):
                 return
-        self._run(server, command, 180, True, title="разовая команда")
+        self._run(server, command, 180, True, title="разовая команда", kind="quick")
 
-    def _run(self, server: Server, command: str, timeout: int, login_shell: bool, title: str) -> None:
+    def _open_journal(self) -> None:
+        existing = self._journal_window
+        if existing is not None:
+            try:
+                if existing.winfo_exists():
+                    existing.deiconify()
+                    existing.lift()
+                    existing.focus_force()
+                    return
+            except tk.TclError:
+                pass
+        win = JournalWindow(self, self.journal, on_rerun=self._rerun_journal_entry)
+        self._journal_window = win
+
+        def _clear(event) -> None:
+            if event.widget is win:
+                self._journal_window = None
+
+        win.bind("<Destroy>", _clear)
+
+    def _rerun_journal_entry(self, entry: JournalEntry) -> None:
+        server = self.config_data.server_by_id(entry.server_id)
+        if server is None:
+            for item in self.config_data.servers:
+                if (
+                    item.host == entry.host
+                    and int(item.port or 22) == int(entry.port or 22)
+                    and item.username == entry.username
+                ):
+                    server = item
+                    break
+        if server is None:
+            messagebox.showerror(
+                "Журнал",
+                "VPS из этой записи больше нет в списке.",
+                parent=self,
+            )
+            return
+        timeout = entry.timeout_sec or 180
+        self._run(
+            server,
+            entry.command,
+            timeout,
+            entry.login_shell,
+            title=entry.title or "журнал",
+            command_id=entry.command_id,
+            kind=entry.kind or "command",
+        )
+
+    def _log_run(
+        self,
+        *,
+        server: Server,
+        command: str,
+        title: str,
+        cwd: str,
+        timeout: int,
+        login_shell: bool,
+        command_id: str,
+        kind: str,
+        started_at: str,
+        duration_sec: float,
+        exit_code: int | None,
+        status: str,
+        error: str,
+    ) -> None:
+        try:
+            self.journal.append(
+                JournalEntry(
+                    id=str(uuid.uuid4()),
+                    started_at=started_at,
+                    finished_at=now_iso(),
+                    duration_sec=duration_sec,
+                    server_id=server.id,
+                    server_name=server.name,
+                    host=server.host,
+                    port=server.port or 22,
+                    username=server.username,
+                    command_id=command_id,
+                    title=title,
+                    command=command,
+                    cwd=cwd,
+                    login_shell=login_shell,
+                    timeout_sec=timeout,
+                    exit_code=exit_code,
+                    status=status,
+                    kind=kind,
+                    error=error,
+                )
+            )
+        except OSError:
+            pass
+
+    def _run(
+        self,
+        server: Server,
+        command: str,
+        timeout: int,
+        login_shell: bool,
+        title: str,
+        *,
+        command_id: str = "",
+        kind: str = "command",
+    ) -> None:
         if self._busy:
             messagebox.showinfo("Занято", "Дождитесь окончания текущей команды или нажмите Стоп.", parent=self)
             return
@@ -1476,9 +1603,13 @@ class App(tk.Tk):
         self._append(f"{title}  •  {server.name}\n", "meta")
         session = SSHSession()
         self._session = session
+        started_at = now_iso()
+        t0 = time.monotonic()
 
         def worker() -> None:
-            code = 1
+            code: int | None = 1
+            status = "error"
+            error_text = ""
             try:
                 result = session.run(
                     server,
@@ -1489,22 +1620,47 @@ class App(tk.Tk):
                     cwd=cwd,
                 )
                 code = result.exit_code
+                status = status_from_exit(code)
                 if result.cwd:
                     self.after(0, self._remember_cwd, server.id, result.cwd)
             except SSHError as exc:
+                code = None
+                status = "error"
+                error_text = str(exc)
                 self.after(0, self._append, f"\n{exc}\n", "err")
             except Exception as exc:
+                code = None
+                status = "error"
+                error_text = str(exc)
                 self.after(0, self._append, f"\nОшибка: {exc}\n", "err")
             else:
                 tag = "ok" if code == 0 else "err"
                 self.after(0, self._append, f"\n← код выхода {code}\n", tag)
+
+            duration = time.monotonic() - t0
 
             def done() -> None:
                 self._set_busy(False)
                 self._session = None
                 folder = self._remote_cwd.get(server.id, "")
                 extra = f"  •  {folder}" if folder else ""
-                self.status.configure(text=f"Готово  •  код {code}  •  {title}{extra}")
+                shown = "—" if code is None else str(code)
+                self.status.configure(text=f"Готово  •  код {shown}  •  {title}{extra}")
+                self._log_run(
+                    server=server,
+                    command=command,
+                    title=title,
+                    cwd=folder or cwd,
+                    timeout=timeout,
+                    login_shell=login_shell,
+                    command_id=command_id,
+                    kind=kind,
+                    started_at=started_at,
+                    duration_sec=duration,
+                    exit_code=code,
+                    status=status,
+                    error=error_text,
+                )
 
             self.after(0, done)
 

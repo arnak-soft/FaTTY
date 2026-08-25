@@ -24,6 +24,7 @@ build/
 # Secrets and local app data (never commit)
 config.json
 known_hosts
+journal.jsonl
 .env
 .env.*
 *.pem

@@ -55,6 +55,8 @@ hiddenimports += [
     "fatty.ssh_runner",
     "fatty.sftp",
     "fatty.files_ui",
+    "fatty.journal",
+    "fatty.journal_ui",
     "fatty.layout",
     "fatty.win_icons",
     "fatty.presets",
