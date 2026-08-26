@@ -53,8 +53,21 @@ def restore_dialog_geometry(
     if not match:
         return
     x_s, y_s = match.group(3), match.group(4)
-    if remember_size and geometry_on_screen(saved, min_w=200, min_h=150):
-        window.geometry(saved)
+    if remember_size and geometry_on_screen(saved, min_w=80, min_h=50):
+        width, height = int(match.group(1)), int(match.group(2))
+        try:
+            min_w = int(window.wm_minsize()[0] or 0)
+            min_h = int(window.wm_minsize()[1] or 0)
+        except (tk.TclError, TypeError, ValueError):
+            min_w, min_h = 0, 0
+        if min_w > 0:
+            width = max(width, min_w)
+        if min_h > 0:
+            height = max(height, min_h)
+        if x_s and y_s:
+            window.geometry(f"{width}x{height}{x_s}{y_s}")
+        else:
+            window.geometry(f"{width}x{height}")
         return
     if not x_s or not y_s:
         return

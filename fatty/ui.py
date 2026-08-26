@@ -409,8 +409,8 @@ class CommandDialog(PositionedToplevel):
     def __init__(self, parent: tk.Tk, command: Command, servers: list[Server], title: str) -> None:
         super().__init__(parent)
         self.title(title)
-        self.geometry("640x420")
-        self.minsize(520, 360)
+        self.geometry("640x520")
+        self.minsize(520, 460)
         self.transient(parent)
         self.result: Command | None = None
         self._command = command
@@ -425,6 +425,12 @@ class CommandDialog(PositionedToplevel):
         server_names = {s.id: s.name for s in servers}
         self.server_var = tk.StringVar(value=server_names.get(command.server_id, ""))
         self._id_by_name = {s.name: s.id for s in servers}
+
+        # Buttons first (side=bottom) so they stay visible when the window is short.
+        btns = ttk.Frame(body)
+        btns.pack(fill="x", pady=(10, 0), side="bottom")
+        ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right", padx=4)
+        ttk.Button(btns, text="Сохранить", style="Accent.TButton", command=self._ok).pack(side="right", padx=4)
 
         form = ttk.Frame(body)
         form.pack(fill="x")
@@ -464,11 +470,6 @@ class CommandDialog(PositionedToplevel):
         style_code(self.text)
         self.text.pack(fill="both", expand=True, padx=4)
         self.text.insert("1.0", command.command)
-
-        btns = ttk.Frame(body)
-        btns.pack(fill="x", pady=(10, 0))
-        ttk.Button(btns, text="Отмена", command=self.destroy).pack(side="right", padx=4)
-        ttk.Button(btns, text="Сохранить", style="Accent.TButton", command=self._ok).pack(side="right", padx=4)
 
         self.bind("<Escape>", lambda _e: self.destroy())
         self.grab_set()

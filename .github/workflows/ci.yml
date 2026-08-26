@@ -7,20 +7,36 @@ on:
     branches: [main]
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
+  windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          fetch-depth: 0
+          fetch-tags: true
 
-      - name: Compile
-        run: python -m compileall -q fatty scripts launch.py
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            third_party/vcpkg
+            build/vcpkg_installed
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
 
-      - name: Import package
-        run: python -c "import fatty; print(fatty.__version__)"
+      - name: Configure
+        shell: cmd
+        run: |
+          if not exist third_party\vcpkg\vcpkg.exe (
+            git clone --depth 1 https://github.com/microsoft/vcpkg.git third_party\vcpkg
+            call third_party\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+          )
+          cmake --preset msvc-static
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -C Release

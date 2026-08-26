@@ -4,42 +4,38 @@
 
 Типичный сценарий: `git pull` и перезапуск процесса на сервере без ручного набора `ssh` каждый раз.
 
-## Запуск без Python
+Нативное приложение на C++ (wxWidgets + libssh2). Конфиг `%APPDATA%\FaTTY\config.json` совместим с прежней Python-версией.
 
-`build.bat` кладёт в `dist\` три варианта. Python на целевом компьютере не нужен.
+## Сборка
+
+Нужны CMake 3.24+, Ninja, Git и компилятор: Visual Studio 2022 (MSVC) или MinGW-w64. Зависимости подтягивает [vcpkg](https://github.com/microsoft/vcpkg) (клон в `third_party\vcpkg`, не в git).
+
+`build.bat` кладёт в `dist\` три варианта:
 
 - **`FaTTY <версия> Setup.exe`** — установщик (Inno Setup): `Program Files`, ярлык в меню Пуск, удаление через «Приложения». Нужен [Inno Setup 6](https://jrsoftware.org/isinfo.php) на машине сборки (`ISCC.exe`).
-- **`FaTTY <версия> OneFile.exe`** — один файл, можно скопировать куда угодно. Старт медленнее: при каждом запуске распаковывается во временную папку.
-- **`FaTTY <версия> Portable\`** — папка. Запускайте `FaTTY.exe` внутри. Старт заметно быстрее; копировать нужно всю папку целиком.
-
-Пересобрать:
+- **`FaTTY <версия> OneFile.exe`** — один статически собранный файл.
+- **`FaTTY <версия> Portable\`** — папка. Запускайте `FaTTY.exe` внутри.
 
 ```bat
 build.bat
 ```
 
-Версия берётся из git-тега (`git describe --tags`). Перед релизом допишите `CHANGELOG.md`, закоммитьте и поставьте тег:
+Или вручную (MSVC):
+
+```bat
+cmake --preset msvc-static
+cmake --build build --config Release
+ctest --test-dir build -C Release --output-on-failure
+```
+
+Версия берётся из git-тега. Перед релизом допишите `CHANGELOG.md`, закоммитьте и поставьте тег:
 
 ```bat
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-Push тега `v*` запускает GitHub Actions: Windows-сборка (`build.bat` + Inno Setup) и публикация на [Releases](https://github.com/arnak-soft/FaTTY/releases) — Setup, OneFile и zip Portable. Локально по-прежнему можно собрать `build.bat`.
-
-Только установщик (после уже собранного Portable):
-
-```bat
-.venv\Scripts\python.exe scripts\build_installer.py
-```
-
-## Запуск из исходников
-
-Нужен Python 3.10+ (в PATH). Первый раз:
-
-```bat
-run.bat
-```
+Push тега `v*` запускает GitHub Actions: Windows-сборка (`build.bat` + Inno Setup) и публикация на [Releases](https://github.com/arnak-soft/FaTTY/releases).
 
 ## Как пользоваться
 

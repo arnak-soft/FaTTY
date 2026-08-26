@@ -1,36 +1,67 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 cd /d "%~dp0"
 
-set "PY=.venv\Scripts\python.exe"
-set "REBUILD_VENV=0"
-if not exist "%PY%" (
-  set "REBUILD_VENV=1"
-) else (
-  "%PY%" -c "import pathlib, sys; raise SystemExit(0 if pathlib.Path(sys.prefix).resolve() == pathlib.Path(r'%~dp0.venv').resolve() else 1)"
-  if errorlevel 1 set "REBUILD_VENV=1"
+set "VCPKG_ROOT=%~dp0third_party\vcpkg"
+if not exist "%VCPKG_ROOT%\vcpkg.exe" (
+  echo Cloning vcpkg...
+  if not exist "third_party" mkdir third_party
+  git clone --depth 1 https://github.com/microsoft/vcpkg.git "%VCPKG_ROOT%"
+  call "%VCPKG_ROOT%\bootstrap-vcpkg.bat" -disableMetrics
+  if errorlevel 1 exit /b 1
 )
 
-if "%REBUILD_VENV%"=="1" (
-  echo Recreating virtual environment...
-  if exist ".venv" rmdir /s /q ".venv"
-  python -m venv .venv
+set "GENERATOR=Ninja"
+set "TRIPLET="
+set "PRESET="
+
+where cl >nul 2>nul
+if not errorlevel 1 (
+  set "TRIPLET=x64-windows-static"
+  set "PRESET=msvc-static"
+) else (
+  where g++ >nul 2>nul
   if errorlevel 1 (
-    echo Python is not in PATH. Install Python 3 and retry.
+    echo Neither MSVC (cl) nor MinGW (g++) is in PATH.
     exit /b 1
   )
-  "%PY%" -m pip install --upgrade pip
+  set "TRIPLET=x64-mingw-static"
+  set "PRESET=mingw-static"
 )
 
-"%PY%" -m pip install -r requirements.txt pyinstaller
+echo Configuring ^(triplet %TRIPLET%^)...
+cmake --preset %PRESET%
 if errorlevel 1 (
-  echo Failed to install build dependencies.
-  exit /b 1
+  echo Fallback configure without preset...
+  cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ^
+    -DCMAKE_TOOLCHAIN_FILE="%VCPKG_ROOT%\scripts\buildsystems\vcpkg.cmake" ^
+    -DVCPKG_TARGET_TRIPLET=%TRIPLET%
+  if errorlevel 1 exit /b 1
 )
 
-"%PY%" -c "from fatty import __version__; print('Version (git tag): ' + __version__)"
-if errorlevel 1 (
-  echo Failed to read version from git.
+echo Building...
+cmake --build build --config Release
+if errorlevel 1 exit /b 1
+
+echo Tests...
+ctest --test-dir build --output-on-failure -C Release
+if errorlevel 1 exit /b 1
+
+for /f "usebackq delims=" %%V in (`cmake -S . -B build -N -L 2^>nul ^| findstr FATTY_VERSION:`) do (
+  rem unused: version read from generated file
+)
+set "VER="
+if exist "build\generated\_version.txt" (
+  set /p VER=<build\generated\_version.txt
+)
+if "%VER%"=="" set "VER=0.0.0-dev"
+for /f "tokens=* delims= " %%A in ("%VER%") do set "VER=%%A"
+
+set "EXE="
+if exist "build\FaTTY.exe" set "EXE=build\FaTTY.exe"
+if exist "build\Release\FaTTY.exe" set "EXE=build\Release\FaTTY.exe"
+if "%EXE%"=="" (
+  echo FaTTY.exe not found
   exit /b 1
 )
 
@@ -38,22 +69,40 @@ if exist dist (
   del /q "dist\FaTTY*.exe" 2>nul
   for /d %%D in ("dist\FaTTY*Portable") do rd /s /q "%%D"
 )
-
-"%PY%" -m PyInstaller --noconfirm --clean fatty.spec
-if errorlevel 1 (
-  echo Build failed.
-  exit /b 1
-)
+mkdir dist 2>nul
+set "PORTABLE=dist\FaTTY %VER% Portable"
+mkdir "%PORTABLE%" 2>nul
+copy /y "%EXE%" "%PORTABLE%\FaTTY.exe" >nul
+copy /y "build\generated\_version.txt" "%PORTABLE%\_version.txt" >nul
+if exist "assets\app.ico" copy /y "assets\app.ico" "%PORTABLE%\app.ico" >nul
+copy /y "%EXE%" "dist\FaTTY %VER% OneFile.exe" >nul
 
 echo.
-echo Building installer (Inno Setup)...
-"%PY%" scripts\build_installer.py
-set "INSTALLER_RC=%ERRORLEVEL%"
-if "%INSTALLER_RC%"=="3" (
+echo Ready:
+echo   dist\FaTTY %VER% OneFile.exe
+echo   %PORTABLE%\FaTTY.exe
+
+set "ISCC="
+if defined ISCC goto :has_iscc
+if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+if exist "%ProgramFiles%\Inno Setup 6\ISCC.exe" set "ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe"
+:has_iscc
+if "%ISCC%"=="" (
   echo WARNING: Setup.exe not built — install Inno Setup 6 or set ISCC.
-) else if not "%INSTALLER_RC%"=="0" (
-  echo Installer failed.
-  exit /b 1
+  exit /b 0
 )
 
-"%PY%" -c "from fatty import __version__, onefile_filename, portable_dir_name; print(); print('Ready:'); print('  dist\\' + onefile_filename() + '  (one file, slower start)'); print('  dist\\' + portable_dir_name() + '\\FaTTY.exe  (folder, faster start)'); print('  dist\\FaTTY ' + __version__ + ' Setup.exe  (installer, needs Inno Setup)'); print('Python is not required on the target PC.')"
+for /f "tokens=1-4 delims=.,-" %%a in ("%VER%") do (
+  set "V1=%%a"
+  set "V2=%%b"
+  set "V3=%%c"
+  set "V4=%%d"
+)
+if "%V2%"=="" set "V2=0"
+if "%V3%"=="" set "V3=0"
+if "%V4%"=="" set "V4=0"
+echo Building installer...
+"%ISCC%" "/DMyAppVersion=%VER%" "/DMyVersionInfo=%V1%.%V2%.%V3%.%V4%" "/DPortableDirName=FaTTY %VER% Portable" fatty.iss
+if errorlevel 1 exit /b 1
+echo   dist\FaTTY %VER% Setup.exe
+exit /b 0
