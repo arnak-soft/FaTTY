@@ -6,6 +6,7 @@
 
 #include <wx/button.h>
 #include <wx/checkbox.h>
+#include <wx/choice.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 #include <functional>
@@ -29,6 +30,7 @@ class SettingsDialog : public PositionedDialog {
   wxCheckBox* confirm_{};
   wxCheckBox* updates_{};
   wxCheckBox* clear_output_{};
+  wxChoice* theme_{};
   wxTextCtrl* timeout_{};
   wxTextCtrl* journal_{};
   wxTextCtrl* putty_{};

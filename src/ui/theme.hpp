@@ -3,6 +3,9 @@
 #include <wx/colour.h>
 #include <wx/font.h>
 #include <wx/window.h>
+#include <string>
+
+class wxTextCtrl;
 
 namespace fatty {
 
@@ -28,6 +31,10 @@ struct Theme {
   static wxFont mono();
 };
 
+void set_theme(const std::string& name);
+bool theme_is_dark();
+std::string theme_name();
+void apply_theme(wxWindow* window);
 void apply_dark(wxWindow* window);
 void apply_dark_titlebar(wxWindow* window);
 void style_text(wxTextCtrl* ctrl, bool terminal = false);

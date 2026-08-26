@@ -50,6 +50,7 @@ void set_icon(wxWindow* window) {
 
 wxButton* accent_button(wxWindow* parent, const wxString& label, wxWindowID id) {
   auto* btn = new wxButton(parent, id, label);
+  btn->SetName("accent");
   btn->SetBackgroundColour(Theme::accent());
   btn->SetForegroundColour(*wxWHITE);
   return btn;

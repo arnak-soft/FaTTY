@@ -11,6 +11,7 @@
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
+#include <algorithm>
 #include <fstream>
 
 namespace fatty {
@@ -25,6 +26,7 @@ JournalWindow::JournalWindow(wxWindow* parent, Journal& journal, std::function<v
   auto* rerun = new wxButton(panel, wxID_ANY, "Повтор");
   auto* copy = new wxButton(panel, wxID_ANY, "Копировать");
   auto* save = new wxButton(panel, wxID_ANY, "Сохранить…");
+  auto* del = new wxButton(panel, wxID_ANY, "Удалить");
   auto* clear = new wxButton(panel, wxID_ANY, "Очистить");
   list_ = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
   list_->AppendColumn("Время", wxLIST_FORMAT_LEFT, 150);
@@ -41,6 +43,7 @@ JournalWindow::JournalWindow(wxWindow* parent, Journal& journal, std::function<v
   top->Add(rerun, 0, wxRIGHT, 4);
   top->Add(copy, 0, wxRIGHT, 4);
   top->Add(save, 0, wxRIGHT, 4);
+  top->Add(del, 0, wxRIGHT, 4);
   top->Add(clear);
   auto* split = new wxBoxSizer(wxVERTICAL);
   split->Add(list_, 1, wxEXPAND);
@@ -80,11 +83,43 @@ JournalWindow::JournalWindow(wxWindow* parent, Journal& journal, std::function<v
     std::ofstream out(std::filesystem::path(dlg.GetPath().utf8_string()), std::ios::binary);
     out << journal_.export_text(&entries_);
   });
+  del->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { delete_selected(); });
   clear->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     if (wxMessageBox("Очистить журнал?", "Журнал", wxYES_NO, this) != wxYES) return;
     journal_.clear();
+    detail_->Clear();
     reload();
   });
+  Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
+    if (e.GetKeyCode() == WXK_DELETE && wxWindow::FindFocus() != filter_) {
+      long i = list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+      if (i >= 0) {
+        delete_selected();
+        return;
+      }
+    }
+    e.Skip();
+  });
+}
+
+void JournalWindow::delete_selected() {
+  long i = list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (i < 0 || i >= static_cast<long>(entries_.size())) return;
+  const auto& e = entries_[static_cast<std::size_t>(i)];
+  auto preview = e.command_preview(48);
+  auto msg = preview.empty() ? wxString("Удалить эту запись из журнала?")
+                             : wxString::FromUTF8("Удалить запись «" + preview + "»?");
+  if (wxMessageBox(msg, "Журнал", wxYES_NO | wxNO_DEFAULT, this) != wxYES) return;
+  journal_.remove(e.id);
+  detail_->Clear();
+  reload();
+  if (list_->GetItemCount() == 0) return;
+  long next = std::min(i, list_->GetItemCount() - 1);
+  list_->SetItemState(next, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
+                      wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+  if (next >= 0 && next < static_cast<long>(entries_.size())) {
+    detail_->SetValue(wxString::FromUTF8(entries_[static_cast<std::size_t>(next)].as_text()));
+  }
 }
 
 void JournalWindow::reload() {

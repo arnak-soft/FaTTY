@@ -30,6 +30,15 @@ void fatty::test::test_store() {
   cfg.sort_commands_for(s.id, "name");
   expect(cfg.commands_for(s.id)[0].name == "a", "sort by name");
 
+  auto folder = Folder::make_new(s.id, "proj-a");
+  cfg.folders.push_back(folder);
+  cfg.commands[0].folder_id = folder.id;
+  expect(cfg.commands_for(s.id, folder.id).size() == 1, "folder commands");
+  expect(cfg.commands_for(s.id, "").size() == 1, "general folder");
+  cfg.remove_folder(folder.id);
+  expect(cfg.folders.empty(), "folder removed");
+  expect(cfg.commands_for(s.id, "").size() == 2, "commands moved to general");
+
   auto clone = s.duplicate(copy_name(s.name, {"alpha"}));
   expect(clone.name == "alpha (копия)", "copy name");
   expect(clone.id != s.id, "new id");

@@ -31,6 +31,14 @@ Command Command::make_new(const std::string& server_id) {
   return c;
 }
 
+Folder Folder::make_new(const std::string& server_id, const std::string& name) {
+  Folder f;
+  f.id = new_uuid();
+  f.server_id = server_id;
+  f.name = name;
+  return f;
+}
+
 Command Command::duplicate(const std::string& new_name, const std::string& new_server_id) const {
   Command c = *this;
   c.id = new_uuid();
@@ -89,6 +97,44 @@ std::vector<Command> Config::commands_for(const std::string& server_id) const {
   return out;
 }
 
+std::vector<Command> Config::commands_for(const std::string& server_id, const std::string& folder_id) const {
+  std::vector<Command> out;
+  for (const auto& c : commands) {
+    if (c.server_id == server_id && c.folder_id == folder_id) {
+      out.push_back(c);
+    }
+  }
+  return out;
+}
+
+std::vector<Folder> Config::folders_for(const std::string& server_id) const {
+  std::vector<Folder> out;
+  for (const auto& f : folders) {
+    if (f.server_id == server_id) {
+      out.push_back(f);
+    }
+  }
+  return out;
+}
+
+Folder* Config::folder_by_id(const std::string& id) {
+  for (auto& f : folders) {
+    if (f.id == id) {
+      return &f;
+    }
+  }
+  return nullptr;
+}
+
+const Folder* Config::folder_by_id(const std::string& id) const {
+  for (const auto& f : folders) {
+    if (f.id == id) {
+      return &f;
+    }
+  }
+  return nullptr;
+}
+
 void Config::set_commands_for(const std::string& server_id, const std::vector<Command>& ordered) {
   std::vector<Command> remaining = ordered;
   std::vector<Command> rebuilt;
@@ -104,12 +150,28 @@ void Config::set_commands_for(const std::string& server_id, const std::vector<Co
   commands = std::move(rebuilt);
 }
 
+void Config::set_commands_for(const std::string& server_id, const std::string& folder_id,
+                             const std::vector<Command>& ordered) {
+  std::vector<Command> remaining = ordered;
+  std::vector<Command> rebuilt;
+  for (const auto& cmd : commands) {
+    if (cmd.server_id != server_id || cmd.folder_id != folder_id) {
+      rebuilt.push_back(cmd);
+    } else if (!remaining.empty()) {
+      rebuilt.push_back(remaining.front());
+      remaining.erase(remaining.begin());
+    }
+  }
+  rebuilt.insert(rebuilt.end(), remaining.begin(), remaining.end());
+  commands = std::move(rebuilt);
+}
+
 bool Config::move_command(const std::string& command_id, int delta) {
   auto* cmd = command_by_id(command_id);
   if (!cmd || delta == 0) {
     return false;
   }
-  auto group = commands_for(cmd->server_id);
+  auto group = commands_for(cmd->server_id, cmd->folder_id);
   int idx = -1;
   for (int i = 0; i < static_cast<int>(group.size()); ++i) {
     if (group[static_cast<std::size_t>(i)].id == command_id) {
@@ -122,12 +184,16 @@ bool Config::move_command(const std::string& command_id, int delta) {
     return false;
   }
   std::swap(group[static_cast<std::size_t>(idx)], group[static_cast<std::size_t>(new_idx)]);
-  set_commands_for(cmd->server_id, group);
+  set_commands_for(cmd->server_id, cmd->folder_id, group);
   return true;
 }
 
 void Config::sort_commands_for(const std::string& server_id, const std::string& by) {
-  auto group = commands_for(server_id);
+  sort_commands_for(server_id, "", by);
+}
+
+void Config::sort_commands_for(const std::string& server_id, const std::string& folder_id, const std::string& by) {
+  auto group = commands_for(server_id, folder_id);
   if (by == "command") {
     std::sort(group.begin(), group.end(), [](const Command& a, const Command& b) {
       auto ca = to_lower(trim(a.command));
@@ -157,7 +223,19 @@ void Config::sort_commands_for(const std::string& server_id, const std::string& 
       return a.id < b.id;
     });
   }
-  set_commands_for(server_id, group);
+  set_commands_for(server_id, folder_id, group);
+}
+
+void Config::remove_folder(const std::string& folder_id) {
+  if (folder_id.empty()) return;
+  for (auto& c : commands) {
+    if (c.folder_id == folder_id) {
+      c.folder_id.clear();
+    }
+  }
+  folders.erase(std::remove_if(folders.begin(), folders.end(),
+                               [&](const Folder& f) { return f.id == folder_id; }),
+                folders.end());
 }
 
 namespace {
@@ -263,9 +341,18 @@ Config load_config() {
     c.name = raw.value("name", "");
     c.server_id = raw.value("server_id", "");
     c.command = raw.value("command", "");
+    c.folder_id = raw.value("folder_id", "");
     c.timeout_sec = raw.value("timeout_sec", 180);
     c.login_shell = raw.value("login_shell", true);
     cfg.commands.push_back(std::move(c));
+  }
+  for (const auto& raw : data.value("folders", json::array())) {
+    Folder f;
+    f.id = raw.value("id", new_uuid());
+    f.server_id = raw.value("server_id", "");
+    f.name = trim(raw.value("name", ""));
+    if (f.name.empty() || f.server_id.empty()) continue;
+    cfg.folders.push_back(std::move(f));
   }
   json settings_raw = data.value("settings", json::object());
   auto& st = cfg.settings;
@@ -304,6 +391,18 @@ Config load_config() {
   st.allow_short_master_password = settings_raw.value("allow_short_master_password", false);
   st.master_password_max_attempts = json_int(settings_raw, "master_password_max_attempts", 5, 0, 100);
   st.master_password_lockout_minutes = json_int(settings_raw, "master_password_lockout_minutes", 20, 1, 24 * 60);
+  st.theme = settings_raw.value("theme", std::string("dark"));
+  if (st.theme != "light" && st.theme != "dark") {
+    st.theme = "dark";
+  }
+  if (settings_raw.contains("last_folder_by_server") && settings_raw["last_folder_by_server"].is_object()) {
+    for (auto it = settings_raw["last_folder_by_server"].begin();
+         it != settings_raw["last_folder_by_server"].end(); ++it) {
+      if (it.value().is_string()) {
+        st.last_folder_by_server[it.key()] = it.value().get<std::string>();
+      }
+    }
+  }
   return cfg;
 }
 
@@ -350,8 +449,17 @@ void save_config(Config& config, SessionVault& vault) {
         {"name", c.name},
         {"server_id", c.server_id},
         {"command", c.command},
+        {"folder_id", c.folder_id},
         {"timeout_sec", c.timeout_sec},
         {"login_shell", c.login_shell},
+    });
+  }
+  payload["folders"] = json::array();
+  for (const auto& f : config.folders) {
+    payload["folders"].push_back({
+        {"id", f.id},
+        {"server_id", f.server_id},
+        {"name", f.name},
     });
   }
   json settings = {
@@ -374,6 +482,8 @@ void save_config(Config& config, SessionVault& vault) {
       {"allow_short_master_password", config.settings.allow_short_master_password},
       {"master_password_max_attempts", config.settings.master_password_max_attempts},
       {"master_password_lockout_minutes", config.settings.master_password_lockout_minutes},
+      {"theme", config.settings.theme},
+      {"last_folder_by_server", config.settings.last_folder_by_server},
   };
   payload["settings"] = settings;
   atomic_write_text(config_path(), payload.dump(2));

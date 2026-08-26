@@ -22,9 +22,12 @@
 #include <wx/filedlg.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
+#include <wx/notebook.h>
+#include <wx/bookctrl.h>
 #include <wx/sizer.h>
 #include <wx/statbox.h>
 #include <wx/stattext.h>
+#include <wx/textdlg.h>
 #include <algorithm>
 #include <chrono>
 #include <thread>
@@ -66,6 +69,12 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     e.Skip();
   });
   Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
+    if (auto* focus = wxWindow::FindFocus()) {
+      if (auto* tlw = wxGetTopLevelParent(focus); tlw && tlw != this) {
+        e.Skip();
+        return;
+      }
+    }
     if (e.GetKeyCode() == WXK_F5) {
       wxCommandEvent ev;
       if (auto* c = selected_command()) {
@@ -81,12 +90,13 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     }
     if (e.GetKeyCode() == WXK_F2) {
       if (auto* c = selected_command()) {
-        CommandDialog dlg(this, *c, config_.servers, wxString::FromUTF8("Команда: " + c->name));
+        CommandDialog dlg(this, *c, config_.servers, config_.folders, wxString::FromUTF8("Команда: " + c->name));
         dlg.setup_layout(&config_.settings, "command", true, [this] { persist(); });
         if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
           *config_.command_by_id(c->id) = dlg.result;
+          config_.settings.last_folder_by_server[dlg.result.server_id] = dlg.result.folder_id;
           persist();
-          refresh_commands();
+          refresh_servers(dlg.result.server_id);
         }
       }
       return;
@@ -124,7 +134,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       return;
     }
     if (e.ControlDown() && e.GetKeyCode() == ',') {
-      SettingsDialog dlg(this, config_, vault_, [this] { persist(); },
+      SettingsDialog dlg(this, config_, vault_, [this] { persist(); apply_ui_theme(); },
                          [this] {
                            ChangeMasterDialog d(this, vault_, config_.settings.allow_short_master_password);
                            if (d.ShowModal() == wxID_OK && d.ok) persist();
@@ -233,7 +243,7 @@ void AppFrame::build_menu() {
   }, 1004);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { Close(); }, wxID_EXIT);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    SettingsDialog dlg(this, config_, vault_, [this] { persist(); },
+    SettingsDialog dlg(this, config_, vault_, [this] { persist(); apply_ui_theme(); },
                        [this] {
                          ChangeMasterDialog d(this, vault_, config_.settings.allow_short_master_password);
                          if (d.ShowModal() == wxID_OK && d.ok) persist();
@@ -320,17 +330,30 @@ void AppFrame::build_ui() {
   ls->Add(sact, 0, wxTOP, 4);
   left->SetSizer(ls);
 
-  commands_ = new wxListCtrl(right, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
+  folders_nb_ = new wxNotebook(right, wxID_ANY);
+  auto* first_page = new wxPanel(folders_nb_);
+  auto* page_sz = new wxBoxSizer(wxVERTICAL);
+  commands_ = new wxListCtrl(first_page, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
   commands_->AppendColumn("Название", wxLIST_FORMAT_LEFT, 180);
   commands_->AppendColumn("Команда", wxLIST_FORMAT_LEFT, 320);
   commands_->AppendColumn("Последний раз", wxLIST_FORMAT_LEFT, 140);
+  page_sz->Add(commands_, 1, wxEXPAND);
+  first_page->SetSizer(page_sz);
+  folders_nb_->AddPage(first_page, "Общее");
+  folder_tab_ids_.push_back("");
   auto* corder = new wxBoxSizer(wxHORIZONTAL);
   auto* up = new wxButton(right, wxID_ANY, "Вверх");
   auto* down = new wxButton(right, wxID_ANY, "Вниз");
   auto* byname = new wxButton(right, wxID_ANY, "По имени");
+  auto* fadd = new wxButton(right, wxID_ANY, "Папка+");
+  auto* frename = new wxButton(right, wxID_ANY, "Переименовать");
+  auto* fdel = new wxButton(right, wxID_ANY, "Удалить папку");
   corder->Add(up, 0, wxRIGHT, 4);
   corder->Add(down, 0, wxRIGHT, 4);
-  corder->Add(byname);
+  corder->Add(byname, 0, wxRIGHT, 12);
+  corder->Add(fadd, 0, wxRIGHT, 4);
+  corder->Add(frename, 0, wxRIGHT, 4);
+  corder->Add(fdel);
   auto* cbtns = new wxBoxSizer(wxHORIZONTAL);
   auto* cadd = new wxButton(right, wxID_ANY, "Добавить");
   auto* cedit = new wxButton(right, wxID_ANY, "Изменить  (F2)");
@@ -356,7 +379,7 @@ void AppFrame::build_ui() {
   qrow->Add(qrun);
   auto* rs = new wxBoxSizer(wxVERTICAL);
   rs->Add(new wxStaticText(right, wxID_ANY, "Команды выбранного VPS"), 0, wxBOTTOM, 4);
-  rs->Add(commands_, 1, wxEXPAND);
+  rs->Add(folders_nb_, 1, wxEXPAND);
   rs->Add(corder, 0, wxTOP, 8);
   rs->Add(cbtns, 0, wxTOP, 4);
   rs->Add(qrow, 0, wxEXPAND | wxTOP, 8);
@@ -399,7 +422,10 @@ void AppFrame::build_ui() {
   outer->Add(panel, 1, wxEXPAND);
   SetSizer(outer);
 
-  servers_->Bind(wxEVT_LIST_ITEM_SELECTED, [this](wxListEvent&) { refresh_commands(); });
+  servers_->Bind(wxEVT_LIST_ITEM_SELECTED, [this](wxListEvent&) {
+    rebuild_folder_tabs();
+    refresh_commands();
+  });
   servers_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { sedit->GetEventHandler()->ProcessEvent(wxCommandEvent(wxEVT_BUTTON)); });
   commands_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) {
     auto* c = selected_command();
@@ -409,7 +435,7 @@ void AppFrame::build_ui() {
   commands_->Bind(wxEVT_LIST_COL_CLICK, [this](wxListEvent& e) {
     auto* s = selected_server();
     if (!s) return;
-    config_.sort_commands_for(s->id, e.GetColumn() == 1 ? "command" : "name");
+    config_.sort_commands_for(s->id, current_folder_id(), e.GetColumn() == 1 ? "command" : "name");
     persist();
     refresh_commands();
   });
@@ -440,8 +466,22 @@ void AppFrame::build_ui() {
     for (auto& x : config_.servers) names.push_back(x.name);
     auto clone = s->duplicate(copy_name(s->name, names));
     auto cmds = config_.commands_for(s->id);
+    std::map<std::string, std::string> folder_map;
+    for (const auto& f : config_.folders_for(s->id)) {
+      auto nf = Folder::make_new(clone.id, f.name);
+      folder_map[f.id] = nf.id;
+      config_.folders.push_back(nf);
+    }
     config_.servers.push_back(clone);
-    for (auto& c : cmds) config_.commands.push_back(c.duplicate("", clone.id));
+    for (auto& c : cmds) {
+      auto d = c.duplicate("", clone.id);
+      if (!c.folder_id.empty() && folder_map.count(c.folder_id)) {
+        d.folder_id = folder_map[c.folder_id];
+      } else {
+        d.folder_id.clear();
+      }
+      config_.commands.push_back(d);
+    }
     persist();
     refresh_servers(clone.id);
   });
@@ -456,6 +496,9 @@ void AppFrame::build_ui() {
     config_.commands.erase(std::remove_if(config_.commands.begin(), config_.commands.end(),
                                           [&](const Command& x) { return x.server_id == id; }),
                            config_.commands.end());
+    config_.folders.erase(std::remove_if(config_.folders.begin(), config_.folders.end(),
+                                         [&](const Folder& x) { return x.server_id == id; }),
+                          config_.folders.end());
     persist();
     refresh_servers();
   });
@@ -532,8 +575,72 @@ void AppFrame::build_ui() {
   byname->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) return;
-    config_.sort_commands_for(s->id, "name");
+    config_.sort_commands_for(s->id, current_folder_id(), "name");
     persist();
+    refresh_commands();
+  });
+  folders_nb_->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
+    if (updating_folders_) return;
+    attach_commands_page(e.GetSelection());
+    if (auto* s = selected_server()) {
+      config_.settings.last_folder_by_server[s->id] = current_folder_id();
+    }
+    refresh_commands();
+  });
+  fadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    auto* s = selected_server();
+    if (!s) {
+      wxMessageBox("Сначала выберите VPS.", "Папка");
+      return;
+    }
+    auto name = wxGetTextFromUser("Имя папки (проект)", "Новая папка", "", this);
+    auto trimmed = trim(std::string(name.utf8_string()));
+    if (trimmed.empty()) return;
+    for (const auto& f : config_.folders_for(s->id)) {
+      if (to_lower(f.name) == to_lower(trimmed)) {
+        wxMessageBox("Такая папка уже есть.", "Папка", wxOK | wxICON_WARNING, this);
+        return;
+      }
+    }
+    auto folder = Folder::make_new(s->id, trimmed);
+    config_.settings.last_folder_by_server[s->id] = folder.id;
+    config_.folders.push_back(folder);
+    persist();
+    rebuild_folder_tabs();
+    refresh_commands();
+  });
+  frename->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    auto id = current_folder_id();
+    auto* f = config_.folder_by_id(id);
+    if (!f) {
+      wxMessageBox("Вкладку «Общее» переименовать нельзя — создайте папку.", "Папка");
+      return;
+    }
+    auto name = wxGetTextFromUser("Новое имя", "Папка", wxString::FromUTF8(f->name), this);
+    auto trimmed = trim(std::string(name.utf8_string()));
+    if (trimmed.empty()) return;
+    f->name = trimmed;
+    persist();
+    rebuild_folder_tabs();
+    refresh_commands();
+  });
+  fdel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    auto id = current_folder_id();
+    if (id.empty()) {
+      wxMessageBox("Вкладку «Общее» удалить нельзя.", "Папка");
+      return;
+    }
+    auto* f = config_.folder_by_id(id);
+    if (!f) return;
+    if (wxMessageBox("Удалить папку «" + wxString::FromUTF8(f->name) +
+                         "»? Команды останутся во вкладке «Общее».",
+                     "Папка", wxYES_NO, this) != wxYES)
+      return;
+    auto* s = selected_server();
+    if (s) config_.settings.last_folder_by_server[s->id].clear();
+    config_.remove_folder(id);
+    persist();
+    rebuild_folder_tabs();
     refresh_commands();
   });
   cadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
@@ -544,10 +651,12 @@ void AppFrame::build_ui() {
     }
     auto cmd = Command::make_new(s->id);
     cmd.timeout_sec = config_.settings.default_command_timeout;
-    CommandDialog dlg(this, cmd, config_.servers, "Новая команда");
+    cmd.folder_id = current_folder_id();
+    CommandDialog dlg(this, cmd, config_.servers, config_.folders, "Новая команда");
     dlg.setup_layout(&config_.settings, "command", true, [this] { persist(); });
     if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
       config_.commands.push_back(dlg.result);
+      config_.settings.last_folder_by_server[dlg.result.server_id] = dlg.result.folder_id;
       persist();
       refresh_servers(dlg.result.server_id);
     }
@@ -555,12 +664,13 @@ void AppFrame::build_ui() {
   cedit->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* c = selected_command();
     if (!c) return;
-    CommandDialog dlg(this, *c, config_.servers, wxString::FromUTF8("Команда: " + c->name));
+    CommandDialog dlg(this, *c, config_.servers, config_.folders, wxString::FromUTF8("Команда: " + c->name));
     dlg.setup_layout(&config_.settings, "command", true, [this] { persist(); });
     if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
       *c = dlg.result;
+      config_.settings.last_folder_by_server[dlg.result.server_id] = dlg.result.folder_id;
       persist();
-      refresh_commands();
+      refresh_servers(dlg.result.server_id);
     }
   });
   cdup->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
@@ -602,6 +712,7 @@ void AppFrame::build_ui() {
       cmd.command = p.command;
       cmd.timeout_sec = p.timeout_sec;
       cmd.login_shell = p.login_shell;
+      cmd.folder_id = current_folder_id();
       config_.commands.push_back(cmd);
       names.push_back(p.name);
       ++added;
@@ -660,7 +771,10 @@ void AppFrame::persist() {
   if (vsplit_) config_.settings.vsash_pos = vsplit_->GetSashPosition();
   store_list_columns(servers_, config_.settings, "servers", {"name", "host"});
   store_list_columns(commands_, config_.settings, "commands", {"name", "command", "last"});
-  if (auto* s = selected_server()) config_.settings.last_server_id = s->id;
+  if (auto* s = selected_server()) {
+    config_.settings.last_server_id = s->id;
+    config_.settings.last_folder_by_server[s->id] = current_folder_id();
+  }
   if (auto* c = selected_command()) config_.settings.last_command_id = c->id;
   try {
     save_config(config_, vault_);
@@ -685,7 +799,74 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
   }
   if (sel < 0 && !config_.servers.empty()) sel = 0;
   if (sel >= 0) servers_->SetItemState(sel, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+  rebuild_folder_tabs();
   refresh_commands();
+}
+
+void AppFrame::apply_ui_theme() {
+  set_theme(config_.settings.theme);
+  apply_theme(this);
+  if (journal_window_) apply_theme(journal_window_);
+  if (help_window_) apply_theme(help_window_);
+  for (auto& [id, win] : files_windows_) {
+    if (win) apply_theme(win);
+  }
+  refresh_commands();
+}
+
+std::string AppFrame::current_folder_id() const {
+  if (!folders_nb_) return {};
+  int sel = folders_nb_->GetSelection();
+  if (sel < 0 || sel >= static_cast<int>(folder_tab_ids_.size())) return {};
+  return folder_tab_ids_[static_cast<std::size_t>(sel)];
+}
+
+void AppFrame::attach_commands_page(int index) {
+  if (!folders_nb_ || !commands_ || index < 0 || index >= static_cast<int>(folders_nb_->GetPageCount())) return;
+  auto* page = folders_nb_->GetPage(static_cast<std::size_t>(index));
+  if (!page) return;
+  commands_->Reparent(page);
+  if (!page->GetSizer()) {
+    page->SetSizer(new wxBoxSizer(wxVERTICAL));
+  }
+  page->GetSizer()->Clear(false);
+  page->GetSizer()->Add(commands_, 1, wxEXPAND);
+  page->Layout();
+  folders_nb_->Layout();
+}
+
+void AppFrame::rebuild_folder_tabs() {
+  if (!folders_nb_ || !commands_) return;
+  updating_folders_ = true;
+  std::string keep;
+  if (auto* s = selected_server()) {
+    auto it = config_.settings.last_folder_by_server.find(s->id);
+    if (it != config_.settings.last_folder_by_server.end()) keep = it->second;
+  }
+  commands_->Reparent(folders_nb_);
+  while (folders_nb_->GetPageCount() > 0) {
+    folders_nb_->DeletePage(0);
+  }
+  folder_tab_ids_.clear();
+  auto add_page = [&](const wxString& title, const std::string& id) {
+    auto* page = new wxPanel(folders_nb_);
+    page->SetSizer(new wxBoxSizer(wxVERTICAL));
+    folders_nb_->AddPage(page, title);
+    folder_tab_ids_.push_back(id);
+  };
+  add_page("Общее", "");
+  if (auto* s = selected_server()) {
+    for (const auto& f : config_.folders_for(s->id)) {
+      add_page(wxString::FromUTF8(f.name), f.id);
+    }
+  }
+  int sel = 0;
+  for (std::size_t i = 0; i < folder_tab_ids_.size(); ++i) {
+    if (folder_tab_ids_[i] == keep) sel = static_cast<int>(i);
+  }
+  attach_commands_page(sel);
+  folders_nb_->SetSelection(sel);
+  updating_folders_ = false;
 }
 
 void AppFrame::refresh_commands() {
@@ -695,7 +876,7 @@ void AppFrame::refresh_commands() {
     update_cwd_label();
     return;
   }
-  auto cmds = config_.commands_for(s->id);
+  auto cmds = config_.commands_for(s->id, current_folder_id());
   long sel = -1;
   for (std::size_t i = 0; i < cmds.size(); ++i) {
     const auto& c = cmds[i];
@@ -731,7 +912,7 @@ Command* AppFrame::selected_command() {
   auto* s = selected_server();
   if (!s) return nullptr;
   long i = commands_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
-  auto cmds = config_.commands_for(s->id);
+  auto cmds = config_.commands_for(s->id, current_folder_id());
   if (i < 0 || i >= static_cast<long>(cmds.size())) return nullptr;
   return config_.command_by_id(cmds[static_cast<std::size_t>(i)].id);
 }

@@ -26,6 +26,7 @@ json portable_settings(const AppSettings& settings) {
       {"allow_short_master_password", settings.allow_short_master_password},
       {"master_password_max_attempts", settings.master_password_max_attempts},
       {"master_password_lockout_minutes", settings.master_password_lockout_minutes},
+      {"theme", settings.theme},
   };
 }
 
@@ -46,6 +47,8 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   if (timeout >= 1 && timeout <= 86400) settings.default_command_timeout = timeout;
   int journal = raw.value("journal_max_entries", settings.journal_max_entries);
   if (journal >= 100 && journal <= 50000) settings.journal_max_entries = journal;
+  auto theme = raw.value("theme", settings.theme);
+  if (theme == "light" || theme == "dark") settings.theme = theme;
 }
 
 std::pair<std::string, std::string> server_key(const std::string& name, const std::string& host) {
@@ -73,6 +76,10 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
   for (const auto& cmd : config.commands) {
     auto* server = config.server_by_id(cmd.server_id);
     if (!server) continue;
+    std::string folder_name;
+    if (!cmd.folder_id.empty()) {
+      if (auto* f = config.folder_by_id(cmd.folder_id)) folder_name = f->name;
+    }
     commands.push_back({
         {"server_name", server->name},
         {"server_host", server->host},
@@ -80,6 +87,17 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
         {"command", cmd.command},
         {"timeout_sec", cmd.timeout_sec},
         {"login_shell", cmd.login_shell},
+        {"folder", folder_name},
+    });
+  }
+  json folders = json::array();
+  for (const auto& folder : config.folders) {
+    auto* server = config.server_by_id(folder.server_id);
+    if (!server) continue;
+    folders.push_back({
+        {"server_name", server->name},
+        {"server_host", server->host},
+        {"name", folder.name},
     });
   }
   json payload = {
@@ -90,6 +108,7 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
       {"include_secrets", include_secrets},
       {"servers", servers},
       {"commands", commands},
+      {"folders", folders},
   };
   if (include_settings) {
     payload["settings"] = portable_settings(config.settings);
@@ -149,6 +168,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
   struct ImpCmd {
     std::string server_name;
     std::string server_host;
+    std::string folder_name;
     Command cmd;
   };
   std::vector<ImpCmd> imported_commands;
@@ -158,6 +178,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       ImpCmd item;
       item.server_name = trim(raw.value("server_name", ""));
       item.server_host = trim(raw.value("server_host", ""));
+      item.folder_name = trim(raw.value("folder", raw.value("folder_name", "")));
       item.cmd = Command::make_new("");
       item.cmd.name = trim(raw.value("name", ""));
       item.cmd.command = trim(raw.value("command", ""));
@@ -171,14 +192,49 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       imported_commands.push_back(std::move(item));
     }
   }
+  struct ImpFolder {
+    std::string server_name;
+    std::string server_host;
+    std::string name;
+  };
+  std::vector<ImpFolder> imported_folders;
+  json raw_folders = data.value("folders", json::array());
+  if (raw_folders.is_array()) {
+    for (const auto& raw : raw_folders) {
+      if (!raw.is_object()) continue;
+      ImpFolder item;
+      item.server_name = trim(raw.value("server_name", ""));
+      item.server_host = trim(raw.value("server_host", ""));
+      item.name = trim(raw.value("name", ""));
+      if (item.server_name.empty() || item.server_host.empty() || item.name.empty()) continue;
+      imported_folders.push_back(std::move(item));
+    }
+  }
+
+  auto ensure_folder = [&](const std::string& server_id, const std::string& name) -> std::string {
+    auto want = to_lower(trim(name));
+    if (want.empty() || server_id.empty()) return "";
+    for (const auto& f : config.folders) {
+      if (f.server_id == server_id && to_lower(trim(f.name)) == want) return f.id;
+    }
+    auto f = Folder::make_new(server_id, trim(name));
+    auto id = f.id;
+    config.folders.push_back(std::move(f));
+    return id;
+  };
 
   if (mode == "replace") {
     result.servers_replaced = static_cast<int>(config.servers.size());
     config.servers = imported_servers;
     config.commands.clear();
+    config.folders.clear();
     std::map<std::pair<std::string, std::string>, std::string> id_by_key;
     for (const auto& s : imported_servers) {
       id_by_key[server_key(s.name, s.host)] = s.id;
+    }
+    for (const auto& folder : imported_folders) {
+      auto it = id_by_key.find(server_key(folder.server_name, folder.server_host));
+      if (it != id_by_key.end()) ensure_folder(it->second, folder.name);
     }
     for (auto& item : imported_commands) {
       auto it = id_by_key.find(server_key(item.server_name, item.server_host));
@@ -187,6 +243,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
         continue;
       }
       item.cmd.server_id = it->second;
+      item.cmd.folder_id = ensure_folder(it->second, item.folder_name);
       config.commands.push_back(item.cmd);
       result.commands_added++;
     }
@@ -205,6 +262,10 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       id_by_key[key] = server.id;
       result.servers_added++;
     }
+    for (const auto& folder : imported_folders) {
+      auto it = id_by_key.find(server_key(folder.server_name, folder.server_host));
+      if (it != id_by_key.end()) ensure_folder(it->second, folder.name);
+    }
     std::set<std::pair<std::string, std::string>> existing_cmds;
     for (const auto& cmd : config.commands) {
       existing_cmds.insert({cmd.server_id, to_lower(trim(cmd.name))});
@@ -221,6 +282,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
         continue;
       }
       item.cmd.server_id = it->second;
+      item.cmd.folder_id = ensure_folder(it->second, item.folder_name);
       config.commands.push_back(item.cmd);
       existing_cmds.insert(cmd_key);
       result.commands_added++;

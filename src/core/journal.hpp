@@ -56,6 +56,7 @@ class Journal {
   void append(JournalEntry entry);
   std::vector<JournalEntry> load(int limit = 5000) const;
   std::map<std::string, JournalEntry> latest_by_command_id() const;
+  bool remove(const std::string& id);
   void clear();
   std::string export_text(const std::vector<JournalEntry>* entries = nullptr) const;
 

@@ -53,17 +53,22 @@ class PresetDialog : public PositionedDialog {
 
 class CommandDialog : public PositionedDialog {
  public:
-  CommandDialog(wxWindow* parent, const Command& command, const std::vector<Server>& servers, const wxString& title);
+  CommandDialog(wxWindow* parent, const Command& command, const std::vector<Server>& servers,
+                const std::vector<Folder>& folders, const wxString& title);
   Command result;
   bool accepted = false;
 
  private:
   void on_ok(wxCommandEvent&);
+  void fill_folders();
   Command command_;
   std::vector<Server> servers_;
+  std::vector<Folder> folders_;
   std::vector<Preset> presets_;
+  std::vector<std::string> folder_ids_;
   wxTextCtrl* name_{};
   wxComboBox* server_{};
+  wxComboBox* folder_{};
   wxTextCtrl* timeout_{};
   wxCheckBox* login_{};
   wxComboBox* preset_{};

@@ -351,6 +351,54 @@ std::map<std::string, JournalEntry> Journal::latest_by_command_id() const {
   return latest;
 }
 
+bool Journal::remove(const std::string& id) {
+  auto target = trim(id);
+  if (target.empty()) return false;
+  bool removed = false;
+  {
+    std::lock_guard lock(mutex_);
+    if (!std::filesystem::exists(path_)) return false;
+    std::vector<std::string> kept;
+    try {
+      auto text = read_text_file(path_);
+      std::istringstream ss(text);
+      std::string line;
+      while (std::getline(ss, line)) {
+        auto row = trim(line);
+        if (row.empty()) continue;
+        bool drop = false;
+        try {
+          auto parsed = json::parse(row);
+          if (parsed.is_object() && parsed.value("id", "") == target) {
+            drop = true;
+          }
+        } catch (...) {
+        }
+        if (drop) {
+          removed = true;
+          continue;
+        }
+        kept.push_back(std::move(row));
+      }
+    } catch (...) {
+      return false;
+    }
+    if (!removed) return false;
+    std::ostringstream out;
+    for (const auto& row : kept) {
+      out << row << "\n";
+    }
+    atomic_write_text(path_, out.str());
+  }
+  for (auto& cb : listeners_) {
+    try {
+      cb();
+    } catch (...) {
+    }
+  }
+  return true;
+}
+
 void Journal::clear() {
   {
     std::lock_guard lock(mutex_);

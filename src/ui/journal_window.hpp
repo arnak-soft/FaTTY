@@ -15,6 +15,7 @@ class JournalWindow : public wxFrame {
 
  private:
   void reload();
+  void delete_selected();
   Journal& journal_;
   std::function<void(const JournalEntry&)> on_rerun_;
   std::vector<JournalEntry> entries_;

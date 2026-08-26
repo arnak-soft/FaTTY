@@ -22,7 +22,7 @@ if not errorlevel 1 (
 ) else (
   where g++ >nul 2>nul
   if errorlevel 1 (
-    echo Neither MSVC (cl) nor MinGW (g++) is in PATH.
+    echo Neither MSVC cl nor MinGW g++ is in PATH.
     exit /b 1
   )
   set "TRIPLET=x64-mingw-static"

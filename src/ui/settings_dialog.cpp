@@ -9,6 +9,7 @@
 
 #include <wx/button.h>
 #include <wx/checkbox.h>
+#include <wx/choice.h>
 #include <wx/filedlg.h>
 #include <wx/msgdlg.h>
 #include <wx/notebook.h>
@@ -40,6 +41,14 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   clear_output_->SetValue(st.clear_output_before_run);
   updates_ = new wxCheckBox(general, wxID_ANY, "Проверять обновления при запуске (не чаще раза в сутки)");
   updates_->SetValue(st.check_updates_on_start);
+  auto* theme_row = new wxBoxSizer(wxHORIZONTAL);
+  theme_row->Add(new wxStaticText(general, wxID_ANY, "Тема"), 0, wxALIGN_CENTER_VERTICAL);
+  wxArrayString themes;
+  themes.Add("Тёмная");
+  themes.Add("Светлая");
+  theme_ = new wxChoice(general, wxID_ANY, wxDefaultPosition, wxDefaultSize, themes);
+  theme_->SetSelection(st.theme == "light" ? 1 : 0);
+  theme_row->Add(theme_, 0, wxLEFT, 8);
   auto* trow = new wxBoxSizer(wxHORIZONTAL);
   trow->Add(new wxStaticText(general, wxID_ANY, "Таймаут новых команд, с"), 0, wxALIGN_CENTER_VERTICAL);
   timeout_ = new wxTextCtrl(general, wxID_ANY, std::to_string(st.default_command_timeout));
@@ -51,6 +60,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* check_now = new wxButton(general, wxID_ANY, "Проверить сейчас…");
   gsz->Add(confirm_, 0, wxALL, 8);
   gsz->Add(clear_output_, 0, wxALL, 8);
+  gsz->Add(theme_row, 0, wxALL, 8);
   gsz->Add(trow, 0, wxALL, 8);
   gsz->Add(updates_, 0, wxALL, 8);
   gsz->Add(check_now, 0, wxALL, 8);
@@ -185,6 +195,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.confirm_before_run = confirm_->GetValue();
   config_.settings.check_updates_on_start = updates_->GetValue();
   config_.settings.clear_output_before_run = clear_output_->GetValue();
+  config_.settings.theme = theme_->GetSelection() == 1 ? "light" : "dark";
   config_.settings.default_command_timeout = clamp_int(timeout, 1, 86400);
   config_.settings.journal_max_entries = clamp_int(journal, 100, 50000);
   config_.settings.putty_path = std::string(putty_->GetValue().utf8_string());
