@@ -6,6 +6,7 @@
 #include <wx/button.h>
 #include <wx/clipbrd.h>
 #include <wx/icon.h>
+#include <wx/toplevel.h>
 
 namespace fatty {
 
@@ -43,8 +44,11 @@ void set_icon(wxWindow* window) {
   if (!std::filesystem::exists(ico)) ico = resource_root() / "app.ico";
   if (std::filesystem::exists(ico)) {
     wxIcon icon;
-    icon.LoadFile(wxString::FromUTF8(ico.u8string()), wxBITMAP_TYPE_ICO);
-    if (icon.IsOk()) window->SetIcon(icon);
+    const auto u8 = ico.u8string();
+    icon.LoadFile(wxString::FromUTF8(reinterpret_cast<const char*>(u8.c_str()), u8.size()), wxBITMAP_TYPE_ICO);
+    if (icon.IsOk()) {
+      if (auto* top = dynamic_cast<wxTopLevelWindow*>(window)) top->SetIcon(icon);
+    }
   }
 }
 

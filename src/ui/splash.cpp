@@ -8,6 +8,7 @@
 #include <wx/frame.h>
 #include <wx/gauge.h>
 #include <wx/image.h>
+#include <wx/panel.h>
 #include <wx/statbmp.h>
 #include <wx/stattext.h>
 #include <wx/sizer.h>

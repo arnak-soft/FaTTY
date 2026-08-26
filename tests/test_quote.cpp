@@ -2,9 +2,10 @@
 #include "core/quote.hpp"
 
 using namespace fatty;
-using namespace fatty::test;
 
-void fatty::test::test_quote() {
+namespace fatty::test {
+
+void test_quote() {
   expect(shlex_quote("abc") == "abc", "safe quote");
   expect(shlex_quote("") == "''", "empty quote");
   expect(shlex_quote("a b").find('\'') == 0, "space quoted");
@@ -20,3 +21,5 @@ void fatty::test::test_quote() {
   expect(filt.cwd() == "/home/app", "cwd captured");
   expect(out.find(mark) == std::string::npos, "mark hidden");
 }
+
+}  // namespace fatty::test

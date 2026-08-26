@@ -2,9 +2,10 @@
 #include "core/vault.hpp"
 
 using namespace fatty;
-using namespace fatty::test;
 
-void fatty::test::test_vault() {
+namespace fatty::test {
+
+void test_vault() {
   SessionVault vault;
   auto meta = vault.create("correct-horse");
   expect(vault.unlocked(), "vault unlocked after create");
@@ -39,3 +40,5 @@ void fatty::test::test_vault() {
   }
   expect(short_threw, "short password rejected");
 }
+
+}  // namespace fatty::test

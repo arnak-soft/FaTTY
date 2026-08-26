@@ -5,9 +5,10 @@
 #include <filesystem>
 
 using namespace fatty;
-using namespace fatty::test;
 
-void fatty::test::test_journal() {
+namespace fatty::test {
+
+void test_journal() {
   auto dir = std::filesystem::temp_directory_path() / ("fatty-test-" + new_uuid());
   std::filesystem::create_directories(dir);
   Journal journal(dir / "journal.jsonl", 100);
@@ -51,3 +52,5 @@ void fatty::test::test_journal() {
   std::error_code ec;
   std::filesystem::remove_all(dir, ec);
 }
+
+}  // namespace fatty::test

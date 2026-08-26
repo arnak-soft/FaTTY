@@ -14,6 +14,7 @@
 #include <wx/textctrl.h>
 #include <wx/imaglist.h>
 #include <wx/artprov.h>
+#include <thread>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN

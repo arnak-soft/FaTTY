@@ -114,7 +114,7 @@ void JournalWindow::delete_selected() {
   detail_->Clear();
   reload();
   if (list_->GetItemCount() == 0) return;
-  long next = std::min(i, list_->GetItemCount() - 1);
+  long next = std::min(i, static_cast<long>(list_->GetItemCount()) - 1);
   list_->SetItemState(next, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
                       wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
   if (next >= 0 && next < static_cast<long>(entries_.size())) {

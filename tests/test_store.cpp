@@ -7,9 +7,10 @@
 #include <nlohmann/json.hpp>
 
 using namespace fatty;
-using namespace fatty::test;
 
-void fatty::test::test_store() {
+namespace fatty::test {
+
+void test_store() {
   Config cfg;
   auto s = Server::make_new();
   s.name = "alpha";
@@ -51,3 +52,5 @@ void fatty::test::test_store() {
   result = import_into_config(cfg, payload, "merge", false);
   expect(result.servers_skipped == 1, "import skip existing");
 }
+
+}  // namespace fatty::test

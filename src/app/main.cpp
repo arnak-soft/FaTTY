@@ -18,6 +18,7 @@
 #endif
 #include <windows.h>
 #include <commctrl.h>
+#include <shobjidl.h>
 #endif
 
 #include <fstream>

@@ -426,7 +426,10 @@ void AppFrame::build_ui() {
     rebuild_folder_tabs();
     refresh_commands();
   });
-  servers_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { sedit->GetEventHandler()->ProcessEvent(wxCommandEvent(wxEVT_BUTTON)); });
+  servers_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this, sedit](wxListEvent&) {
+    wxCommandEvent ev(wxEVT_BUTTON);
+    sedit->GetEventHandler()->ProcessEvent(ev);
+  });
   commands_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) {
     auto* c = selected_command();
     auto* s = selected_server();
@@ -747,8 +750,8 @@ void AppFrame::build_ui() {
     run_command(*s, cmd, config_.settings.default_command_timeout, true, "разовая команда", "", "quick");
   });
   quick_->Bind(wxEVT_TEXT_ENTER, [this, qrun](wxCommandEvent&) {
-    wxCommandEvent ev;
-    qrun->GetEventHandler()->ProcessEvent(wxCommandEvent(wxEVT_BUTTON));
+    wxCommandEvent ev(wxEVT_BUTTON);
+    qrun->GetEventHandler()->ProcessEvent(ev);
   });
   cwd_reset_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* s = selected_server();
@@ -955,8 +958,9 @@ void AppFrame::run_command(const Server& server, const std::string& command, int
   set_busy(true);
   auto cwd = remote_cwd_[server.id];
   status_->SetLabel(wxString::FromUTF8("Выполняется: " + title + " → " + server.name));
-  append_output("\n" + std::string(60, '-') + "\n", &Theme::meta());
-  append_output(title + "  •  " + server.name + "\n", &Theme::meta());
+  const wxColour meta = Theme::meta();
+  append_output("\n" + std::string(60, '-') + "\n", &meta);
+  append_output(title + "  •  " + server.name + "\n", &meta);
   session_ = std::make_unique<SSHSession>();
   auto started = now_iso();
   auto t0 = std::chrono::steady_clock::now();
@@ -979,7 +983,8 @@ void AppFrame::run_command(const Server& server, const std::string& command, int
       CallAfter([this, code, col] { append_output("\n← код выхода " + std::to_string(code) + "\n", &col); });
     } catch (const std::exception& exc) {
       error = exc.what();
-      CallAfter([this, error] { append_output("\n" + error + "\n", &Theme::err()); });
+      const wxColour err = Theme::err();
+      CallAfter([this, error, err] { append_output("\n" + error + "\n", &err); });
     }
     auto duration = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     CallAfter([this, srv, command, title, command_id, kind, login_shell, timeout, started, duration, code, status, error,
