@@ -21,6 +21,7 @@
 
 - Приложение переписано на **C++20** (wxWidgets, libssh2, OpenSSL). Сборка: CMake + vcpkg + `build.bat`. Конфиг, вольт и журнал совместимы с Python-версией.
 - `OneFile.exe` — один нативный exe (статическая линковка), без распаковки PyInstaller.
+- GitHub Actions (CI/Release): явный Ninja, pin vcpkg к `builtin-baseline`, кэш `vcpkg_installed` + binary cache, проверка артефактов `dist\` перед релизом.
 
 ### Added
 

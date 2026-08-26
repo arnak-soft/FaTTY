@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
+#include <fstream>
+#include <regex>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN

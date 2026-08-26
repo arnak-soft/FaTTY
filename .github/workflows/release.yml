@@ -7,9 +7,19 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Keep in sync with builtin-baseline in vcpkg.json
+  VCPKG_COMMIT: ddd0023b0eee70986e42ed49d9d4afb8098f212e
+  VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,6 +29,9 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Install Ninja
+        run: choco install ninja --yes --no-progress
+
       - name: Install Inno Setup
         run: choco install innosetup --yes --no-progress
 
@@ -27,21 +40,67 @@ jobs:
         with:
           path: |
             third_party/vcpkg
+            vcpkg_installed
             build/vcpkg_installed
-          key: vcpkg-rel-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+            .vcpkg-cache
+          key: vcpkg-rel-${{ runner.os }}-msvc-static-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json', 'CMakePresets.json') }}
+          restore-keys: |
+            vcpkg-rel-${{ runner.os }}-msvc-static-${{ env.VCPKG_COMMIT }}-
+            vcpkg-${{ runner.os }}-msvc-static-${{ env.VCPKG_COMMIT }}-
+
+      - name: Bootstrap vcpkg
+        shell: cmd
+        run: |
+          if not exist ".vcpkg-cache" mkdir ".vcpkg-cache"
+          if not exist "third_party" mkdir "third_party"
+          if not exist "third_party\vcpkg\.git" (
+            mkdir "third_party\vcpkg" 2>nul
+            git -C "third_party\vcpkg" init
+            git -C "third_party\vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+          )
+          git -C "third_party\vcpkg" fetch --depth 1 origin %VCPKG_COMMIT%
+          if errorlevel 1 exit /b 1
+          git -C "third_party\vcpkg" checkout --force FETCH_HEAD
+          if errorlevel 1 exit /b 1
+          if not exist "third_party\vcpkg\vcpkg.exe" (
+            call "third_party\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+            if errorlevel 1 exit /b 1
+          )
+          where ninja
+          where cl
+          where iscc
+          where cmake
 
       - name: Build
         shell: cmd
         run: build.bat
+        env:
+          ISCC: C:\Program Files (x86)\Inno Setup 6\ISCC.exe
+
+      - name: Verify dist artifacts
+        shell: pwsh
+        run: |
+          $ver = (Get-Content build/generated/_version.txt -Raw).Trim()
+          if (-not $ver) { throw "build/generated/_version.txt empty" }
+          Write-Host "Version: $ver"
+          $need = @(
+            "dist\FaTTY $ver Setup.exe",
+            "dist\FaTTY $ver OneFile.exe",
+            "dist\FaTTY $ver Portable\FaTTY.exe"
+          )
+          foreach ($p in $need) {
+            if (-not (Test-Path -LiteralPath $p)) { throw "Missing artifact: $p" }
+            Write-Host "OK $p"
+          }
 
       - name: Zip Portable
         shell: pwsh
         run: |
           $ver = (Get-Content build/generated/_version.txt -Raw).Trim()
-          $portable = Get-ChildItem dist -Directory | Where-Object { $_.Name -like "FaTTY *Portable" } | Select-Object -First 1
-          if (-not $portable) { throw "Portable folder missing" }
-          $zip = Join-Path dist ($portable.Name + ".zip")
-          Compress-Archive -Path ($portable.FullName + "\*") -DestinationPath $zip -Force
+          $portable = "dist\FaTTY $ver Portable"
+          $zip = "dist\FaTTY $ver Portable.zip"
+          if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
+          Compress-Archive -Path "$portable\*" -DestinationPath $zip -Force
           Write-Host "Wrote $zip"
 
       - name: GitHub Release

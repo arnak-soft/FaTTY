@@ -6,9 +6,19 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep in sync with builtin-baseline in vcpkg.json
+  VCPKG_COMMIT: ddd0023b0eee70986e42ed49d9d4afb8098f212e
+  VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache
+
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with:
@@ -18,25 +28,73 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Install Ninja
+        run: choco install ninja --yes --no-progress
+
       - name: Cache vcpkg
         uses: actions/cache@v4
         with:
           path: |
             third_party/vcpkg
+            vcpkg_installed
             build/vcpkg_installed
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('vcpkg.json') }}
+            .vcpkg-cache
+          key: vcpkg-${{ runner.os }}-msvc-static-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json', 'CMakePresets.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-msvc-static-${{ env.VCPKG_COMMIT }}-
+            vcpkg-${{ runner.os }}-msvc-static-
+
+      - name: Bootstrap vcpkg
+        shell: cmd
+        run: |
+          if not exist ".vcpkg-cache" mkdir ".vcpkg-cache"
+          if not exist "third_party" mkdir "third_party"
+          if not exist "third_party\vcpkg\.git" (
+            mkdir "third_party\vcpkg" 2>nul
+            git -C "third_party\vcpkg" init
+            git -C "third_party\vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+          )
+          git -C "third_party\vcpkg" fetch --depth 1 origin %VCPKG_COMMIT%
+          if errorlevel 1 exit /b 1
+          git -C "third_party\vcpkg" checkout --force FETCH_HEAD
+          if errorlevel 1 exit /b 1
+          if not exist "third_party\vcpkg\vcpkg.exe" (
+            call "third_party\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+            if errorlevel 1 exit /b 1
+          )
+          where ninja
+          where cl
+          where cmake
 
       - name: Configure
         shell: cmd
         run: |
-          if not exist third_party\vcpkg\vcpkg.exe (
-            git clone --depth 1 https://github.com/microsoft/vcpkg.git third_party\vcpkg
-            call third_party\vcpkg\bootstrap-vcpkg.bat -disableMetrics
-          )
           cmake --preset msvc-static
+          if errorlevel 1 exit /b 1
+          if not exist "build\CMakeCache.txt" (
+            echo CMakeCache.txt missing after configure
+            exit /b 1
+          )
+          findstr /C:"CMAKE_GENERATOR:INTERNAL=Ninja" "build\CMakeCache.txt" >nul
+          if errorlevel 1 (
+            echo Expected Ninja generator in CMakeCache.txt
+            exit /b 1
+          )
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --parallel
 
       - name: Test
         run: ctest --test-dir build --output-on-failure -C Release
+
+      - name: Upload FaTTY.exe
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: FaTTY-ci-${{ github.sha }}
+          path: |
+            build/FaTTY.exe
+            build/Release/FaTTY.exe
+            build/generated/_version.txt
+          if-no-files-found: error
+          retention-days: 14
