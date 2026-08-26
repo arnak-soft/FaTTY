@@ -150,7 +150,7 @@ void FilesWindow::refresh() {
   for (const auto& e : entries_) {
     row = list_->InsertItem(list_->GetItemCount(), wxString::FromUTF8(e.name));
     list_->SetItem(row, 1, wxString::FromUTF8(e.kind_label()));
-    list_->SetItem(row, 2, e.is_dir ? "—" : wxString::FromUTF8(format_size(e.size)));
+    list_->SetItem(row, 2, wxString::FromUTF8(e.is_dir ? "—" : format_size(e.size)));
     list_->SetItem(row, 3, wxString::FromUTF8(format_mtime(e.mtime)));
   }
 }
