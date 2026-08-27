@@ -70,7 +70,7 @@ void set_icon(wxWindow* window) {
 
 wxButton* accent_button(wxWindow* parent, const wxString& label, wxWindowID id) {
   auto* btn = new wxButton(parent, id, label);
-  btn->SetName("accent");
+  btn->SetName(L"accent");
   btn->SetBackgroundColour(Theme::accent());
   btn->SetForegroundColour(*wxWHITE);
   return btn;
@@ -78,7 +78,7 @@ wxButton* accent_button(wxWindow* parent, const wxString& label, wxWindowID id) 
 
 wxStaticText* section_label(wxWindow* parent, const wxString& text) {
   auto* label = new wxStaticText(parent, wxID_ANY, text.Upper());
-  label->SetName("section");
+  label->SetName(L"section");
   label->SetFont(Theme::ui_section());
   label->SetForegroundColour(Theme::muted());
   return label;

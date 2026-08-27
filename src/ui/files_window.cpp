@@ -35,23 +35,23 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
   set_icon(this);
   SetSize(FromDIP(wxSize(780, 520)));
   auto* panel = new wxPanel(this);
-  path_ = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
-  auto* up = new wxButton(panel, wxID_ANY, "Вверх");
-  auto* mkdir = new wxButton(panel, wxID_ANY, "Новая папка");
-  auto* upload_btn = new wxButton(panel, wxID_ANY, "Загрузить");
-  auto* download_btn = new wxButton(panel, wxID_ANY, "Скачать");
-  auto* del = new wxButton(panel, wxID_ANY, "Удалить");
-  auto* stop = new wxButton(panel, wxID_ANY, "Стоп");
+  path_ = new wxTextCtrl(panel, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+  auto* up = new wxButton(panel, wxID_ANY, L"Вверх");
+  auto* mkdir = new wxButton(panel, wxID_ANY, L"Новая папка");
+  auto* upload_btn = new wxButton(panel, wxID_ANY, L"Загрузить");
+  auto* download_btn = new wxButton(panel, wxID_ANY, L"Скачать");
+  auto* del = new wxButton(panel, wxID_ANY, L"Удалить");
+  auto* stop = new wxButton(panel, wxID_ANY, L"Стоп");
   stop_btn_ = stop;
   busy_disable_ = {up, mkdir, upload_btn, download_btn, del, path_};
   list_ = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
-  list_->AppendColumn("Имя", wxLIST_FORMAT_LEFT, FromDIP(280));
-  list_->AppendColumn("Тип", wxLIST_FORMAT_LEFT, FromDIP(120));
-  list_->AppendColumn("Размер", wxLIST_FORMAT_RIGHT, FromDIP(90));
-  list_->AppendColumn("Изменён", wxLIST_FORMAT_LEFT, FromDIP(140));
+  list_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(280));
+  list_->AppendColumn(L"Тип", wxLIST_FORMAT_LEFT, FromDIP(120));
+  list_->AppendColumn(L"Размер", wxLIST_FORMAT_RIGHT, FromDIP(90));
+  list_->AppendColumn(L"Изменён", wxLIST_FORMAT_LEFT, FromDIP(140));
   gauge_ = new wxGauge(panel, wxID_ANY, 100);
-  status_ = new wxStaticText(panel, wxID_ANY, "Подключение…");
-  status_->SetName("muted");
+  status_ = new wxStaticText(panel, wxID_ANY, L"Подключение…");
+  status_->SetName(L"muted");
   auto* top = new wxBoxSizer(wxHORIZONTAL);
   top->Add(path_, 1, wxEXPAND | wxRIGHT, 8);
   top->Add(up);
@@ -79,7 +79,7 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
       session_->enter(std::string(path_->GetValue().utf8_string()));
       refresh();
     } catch (const std::exception& exc) {
-      wxMessageBox(wxString::FromUTF8(exc.what()), "Файлы", wxOK | wxICON_ERROR, this);
+      wxMessageBox(wxString::FromUTF8(exc.what()), L"Файлы", wxOK | wxICON_ERROR, this);
     }
   });
   list_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent& e) {
@@ -95,20 +95,20 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
         session_->enter(ent.path);
         refresh();
       } catch (const std::exception& exc) {
-        wxMessageBox(wxString::FromUTF8(exc.what()), "Файлы", wxOK | wxICON_ERROR, this);
+        wxMessageBox(wxString::FromUTF8(exc.what()), L"Файлы", wxOK | wxICON_ERROR, this);
       }
     } else {
       download_selected();
     }
   });
   mkdir->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    wxTextEntryDialog dlg(this, "Имя папки", "Новая папка");
+    wxTextEntryDialog dlg(this, L"Имя папки", L"Новая папка");
     if (dlg.ShowModal() != wxID_OK) return;
     try {
       session_->mkdir(std::string(dlg.GetValue().utf8_string()));
       refresh();
     } catch (const std::exception& exc) {
-      wxMessageBox(wxString::FromUTF8(exc.what()), "Файлы", wxOK | wxICON_ERROR, this);
+      wxMessageBox(wxString::FromUTF8(exc.what()), L"Файлы", wxOK | wxICON_ERROR, this);
     }
   });
   upload_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { upload(); });
@@ -117,12 +117,12 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
     long i = list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
     if (i <= 0) return;
     auto& ent = entries_[static_cast<std::size_t>(i - 1)];
-    if (wxMessageBox("Удалить «" + wxString::FromUTF8(ent.name) + "»?", "Файлы", wxYES_NO, this) != wxYES) return;
+    if (wxMessageBox(L"Удалить «" + wxString::FromUTF8(ent.name) + L"»?", L"Файлы", wxYES_NO, this) != wxYES) return;
     try {
       session_->remove(ent);
       refresh();
     } catch (const std::exception& exc) {
-      wxMessageBox(wxString::FromUTF8(exc.what()), "Файлы", wxOK | wxICON_ERROR, this);
+      wxMessageBox(wxString::FromUTF8(exc.what()), L"Файлы", wxOK | wxICON_ERROR, this);
     }
   });
   stop->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { session_->cancel_transfer(); });
@@ -152,7 +152,7 @@ void FilesWindow::set_busy(bool busy) {
 
 void FilesWindow::connect() {
   set_busy(true);
-  status_->SetLabel("Подключение…");
+  status_->SetLabel(L"Подключение…");
   auto alive = alive_;
   auto session = session_;
   auto server = server_;
@@ -169,10 +169,10 @@ void FilesWindow::connect() {
       set_busy(false);
       if (err.empty()) {
         refresh();
-        status_->SetLabel("Готово");
+        status_->SetLabel(L"Готово");
       } else {
         status_->SetLabel(wxString::FromUTF8(err));
-        wxMessageBox(wxString::FromUTF8(err), "Файлы", wxOK | wxICON_ERROR, this);
+        wxMessageBox(wxString::FromUTF8(err), L"Файлы", wxOK | wxICON_ERROR, this);
       }
     });
   }).detach();
@@ -182,8 +182,8 @@ void FilesWindow::refresh() {
   entries_ = session_->listdir();
   path_->SetValue(wxString::FromUTF8(session_->remote_cwd));
   list_->DeleteAllItems();
-  long row = list_->InsertItem(0, "..");
-  list_->SetItem(row, 1, "папка");
+  long row = list_->InsertItem(0, L"..");
+  list_->SetItem(row, 1, L"папка");
   for (const auto& e : entries_) {
     row = list_->InsertItem(list_->GetItemCount(), wxString::FromUTF8(e.name));
     list_->SetItem(row, 1, wxString::FromUTF8(e.kind_label()));
@@ -198,7 +198,7 @@ void FilesWindow::go_up() {
     session_->go_up();
     refresh();
   } catch (const std::exception& exc) {
-    wxMessageBox(wxString::FromUTF8(exc.what()), "Файлы", wxOK | wxICON_ERROR, this);
+    wxMessageBox(wxString::FromUTF8(exc.what()), L"Файлы", wxOK | wxICON_ERROR, this);
   }
 }
 
@@ -208,11 +208,11 @@ void FilesWindow::download_selected() {
   if (i <= 0) return;
   auto& ent = entries_[static_cast<std::size_t>(i - 1)];
   if (ent.is_dir) return;
-  wxFileDialog dlg(this, "Сохранить как", "", wxString::FromUTF8(ent.name), "All|*.*", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+  wxFileDialog dlg(this, L"Сохранить как", L"", wxString::FromUTF8(ent.name), L"All|*.*", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
   if (dlg.ShowModal() != wxID_OK) return;
   auto dest = std::filesystem::path(dlg.GetPath().utf8_string());
   set_busy(true);
-  status_->SetLabel("Скачивание…");
+  status_->SetLabel(L"Скачивание…");
   auto alive = alive_;
   auto session = session_;
   std::thread([this, alive, session, name = ent.name, size = ent.size, dest] {
@@ -231,20 +231,20 @@ void FilesWindow::download_selected() {
     wxTheApp->CallAfter([this, alive, err] {
       if (!alive->load()) return;
       set_busy(false);
-      if (err.empty()) status_->SetLabel("Скачано");
-      else wxMessageBox(wxString::FromUTF8(err), "Файлы", wxOK | wxICON_ERROR, this);
+      if (err.empty()) status_->SetLabel(L"Скачано");
+      else wxMessageBox(wxString::FromUTF8(err), L"Файлы", wxOK | wxICON_ERROR, this);
     });
   }).detach();
 }
 
 void FilesWindow::upload() {
   if (busy_) return;
-  wxFileDialog dlg(this, "Загрузить", "", "", "All|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+  wxFileDialog dlg(this, L"Загрузить", L"", L"", L"All|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
   if (dlg.ShowModal() != wxID_OK) return;
   auto local = std::filesystem::path(dlg.GetPath().utf8_string());
   auto remote = local.filename().string();
   set_busy(true);
-  status_->SetLabel("Загрузка…");
+  status_->SetLabel(L"Загрузка…");
   auto alive = alive_;
   auto session = session_;
   std::thread([this, alive, session, local, remote] {
@@ -264,10 +264,10 @@ void FilesWindow::upload() {
       if (!alive->load()) return;
       set_busy(false);
       if (err.empty()) {
-        status_->SetLabel("Загружено");
+        status_->SetLabel(L"Загружено");
         refresh();
       } else {
-        wxMessageBox(wxString::FromUTF8(err), "Файлы", wxOK | wxICON_ERROR, this);
+        wxMessageBox(wxString::FromUTF8(err), L"Файлы", wxOK | wxICON_ERROR, this);
       }
     });
   }).detach();

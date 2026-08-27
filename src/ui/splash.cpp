@@ -20,18 +20,18 @@ wxFrame* g_splash = nullptr;
 
 void show_splash() {
   hide_splash();
-  auto* f = new wxFrame(nullptr, wxID_ANY, "FaTTY — загрузка", wxDefaultPosition, wxDefaultSize,
+  auto* f = new wxFrame(nullptr, wxID_ANY, L"FaTTY — загрузка", wxDefaultPosition, wxDefaultSize,
                         wxFRAME_NO_TASKBAR | wxSTAY_ON_TOP | wxBORDER_NONE);
   f->SetSize(f->FromDIP(wxSize(420, 268)));
   f->SetBackgroundColour(Theme::bg());
   auto* body = new wxPanel(f);
   body->SetBackgroundColour(Theme::bg());
-  auto* title = new wxStaticText(body, wxID_ANY, kAppName);
+  auto* title = new wxStaticText(body, wxID_ANY, wxString::FromUTF8(kAppName));
   title->SetForegroundColour(Theme::text_bright());
   title->SetFont(Theme::ui_title());
   auto* ver = new wxStaticText(body, wxID_ANY, wxString::FromUTF8(resolve_version()));
   ver->SetForegroundColour(Theme::meta());
-  auto* st = new wxStaticText(body, wxID_ANY, "Загрузка…");
+  auto* st = new wxStaticText(body, wxID_ANY, L"Загрузка…");
   st->SetForegroundColour(Theme::text());
   auto* bar = new wxGauge(body, wxID_ANY, 100, wxDefaultPosition, f->FromDIP(wxSize(260, 16)),
                           wxGA_HORIZONTAL | wxGA_SMOOTH);

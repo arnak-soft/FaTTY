@@ -19,29 +19,29 @@ namespace fatty {
 
 JournalWindow::JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
                              std::function<void(const JournalEntry&)> on_rerun)
-    : wxFrame(parent, wxID_ANY, "Журнал команд", wxDefaultPosition, wxDefaultSize),
+    : wxFrame(parent, wxID_ANY, L"Журнал команд", wxDefaultPosition, wxDefaultSize),
       journal_(std::move(journal)),
       on_rerun_(std::move(on_rerun)) {
   set_icon(this);
   SetSize(FromDIP(wxSize(960, 580)));
   auto* panel = new wxPanel(this);
   filter_ = new wxTextCtrl(panel, wxID_ANY);
-  auto* rerun = new wxButton(panel, wxID_ANY, "Повтор");
-  auto* copy = new wxButton(panel, wxID_ANY, "Копировать");
-  auto* save = new wxButton(panel, wxID_ANY, "Сохранить…");
-  auto* del = new wxButton(panel, wxID_ANY, "Удалить");
-  auto* clear = new wxButton(panel, wxID_ANY, "Очистить");
+  auto* rerun = new wxButton(panel, wxID_ANY, L"Повтор");
+  auto* copy = new wxButton(panel, wxID_ANY, L"Копировать");
+  auto* save = new wxButton(panel, wxID_ANY, L"Сохранить…");
+  auto* del = new wxButton(panel, wxID_ANY, L"Удалить");
+  auto* clear = new wxButton(panel, wxID_ANY, L"Очистить");
   list_ = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
-  list_->AppendColumn("Время", wxLIST_FORMAT_LEFT, FromDIP(150));
-  list_->AppendColumn("VPS", wxLIST_FORMAT_LEFT, FromDIP(140));
-  list_->AppendColumn("Команда", wxLIST_FORMAT_LEFT, FromDIP(280));
-  list_->AppendColumn("Результат", wxLIST_FORMAT_LEFT, FromDIP(100));
-  list_->AppendColumn("Длит.", wxLIST_FORMAT_LEFT, FromDIP(90));
-  detail_ = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY);
+  list_->AppendColumn(L"Время", wxLIST_FORMAT_LEFT, FromDIP(150));
+  list_->AppendColumn(L"VPS", wxLIST_FORMAT_LEFT, FromDIP(140));
+  list_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(280));
+  list_->AppendColumn(L"Результат", wxLIST_FORMAT_LEFT, FromDIP(100));
+  list_->AppendColumn(L"Длит.", wxLIST_FORMAT_LEFT, FromDIP(90));
+  detail_ = new wxTextCtrl(panel, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY);
   style_text(detail_, true);
   bind_copy_on_select(detail_);
   auto* top = new wxBoxSizer(wxHORIZONTAL);
-  top->Add(new wxStaticText(panel, wxID_ANY, "Фильтр"), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
+  top->Add(new wxStaticText(panel, wxID_ANY, L"Фильтр"), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
   top->Add(filter_, 1, wxEXPAND | wxRIGHT, 8);
   top->Add(rerun, 0, wxRIGHT, 4);
   top->Add(copy, 0, wxRIGHT, 4);
@@ -81,14 +81,14 @@ JournalWindow::JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
     }
   });
   save->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    wxFileDialog dlg(this, "Сохранить журнал", "", "journal.txt", "Text|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    wxFileDialog dlg(this, L"Сохранить журнал", L"", L"journal.txt", L"Text|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
     if (dlg.ShowModal() != wxID_OK) return;
     std::ofstream out(std::filesystem::path(dlg.GetPath().utf8_string()), std::ios::binary);
     out << journal_->export_text(&entries_);
   });
   del->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { delete_selected(); });
   clear->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    if (wxMessageBox("Очистить журнал?", "Журнал", wxYES_NO, this) != wxYES) return;
+    if (wxMessageBox(L"Очистить журнал?", L"Журнал", wxYES_NO, this) != wxYES) return;
     journal_->clear();
     detail_->Clear();
     reload();
@@ -146,9 +146,9 @@ void JournalWindow::delete_selected() {
   if (i < 0 || i >= static_cast<long>(entries_.size())) return;
   const auto& e = entries_[static_cast<std::size_t>(i)];
   auto preview = e.command_preview(48);
-  auto msg = preview.empty() ? wxString("Удалить эту запись из журнала?")
+  auto msg = preview.empty() ? wxString(L"Удалить эту запись из журнала?")
                              : wxString::FromUTF8("Удалить запись «" + preview + "»?");
-  if (wxMessageBox(msg, "Журнал", wxYES_NO | wxNO_DEFAULT, this) != wxYES) return;
+  if (wxMessageBox(msg, L"Журнал", wxYES_NO | wxNO_DEFAULT, this) != wxYES) return;
   journal_->remove(e.id);
   detail_->Clear();
   reload();

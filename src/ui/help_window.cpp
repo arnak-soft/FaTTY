@@ -28,49 +28,49 @@ wxTextCtrl* prose(wxWindow* parent, const wxString& text) {
 }  // namespace
 
 HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)> on_insert_quick)
-    : wxFrame(parent, wxID_ANY, wxString::FromUTF8(std::string("Справка — ") + kAppName), wxDefaultPosition,
+    : wxFrame(parent, wxID_ANY, wxString(L"Справка — ") + wxString::FromUTF8(kAppName), wxDefaultPosition,
               wxDefaultSize) {
   set_icon(this);
   SetSize(FromDIP(wxSize(840, 600)));
   nb_ = new wxNotebook(this, wxID_ANY);
-  auto start = wxString::FromUTF8(
-      "Что это\n\nFaTTY хранит список VPS и команды к ним, затем запускает выбранную команду по SSH.\n\n"
-      "Как начать\n\n1. Добавьте VPS: имя, хост, порт, логин, пароль и/или ключ.\n"
-      "2. Команды сами не создаются — «Пресеты…» или «Добавить».\n"
-      "3. F5 / двойной клик / Enter — запуск. «Стоп» обрывает сессию.\n\n"
-      "Окно\n\nСлева серверы, справа команды по папкам-вкладкам, внизу лог. Колонка «Последний раз» — из журнала.\n"
-      "«Сбросить в ~» возвращает рабочую папку в домашнюю.\n\n"
-      "Файлы, консоль, PuTTY\n\n«Файлы» — SFTP. «Открыть консоль» — ssh.exe. «PuTTY» подставляет пароль или ключ.\n"
-      "Интерактивное (htop, nano) — в консоли, не через F5.\n\n"
-      "Журнал: Ctrl+J. Настройки: Ctrl+,.");
-  auto keys = wxString::FromUTF8(
-      "F5              запустить выбранную команду\n"
-      "F2              изменить команду\n"
-      "Enter           запустить (фокус в списке команд)\n"
-      "Ctrl+↑ / Ctrl+↓ порядок команд\n"
-      "Ctrl+J          журнал запусков\n"
-      "Delete          удалить запись в журнале\n"
-      "Ctrl+,          настройки\n"
-      "F1              эта справка\n\n"
-      "Выделение мышью  сразу копирует текст (как в PuTTY)\n"
-      "Ctrl+C           копировать выделение в выводе\n"
-      "Escape           закрыть диалог\n\n"
-      "Файлы: Enter / двойной клик — папка или скачать\n"
-      "Backspace / Alt+↑ — на уровень вверх");
-  auto tips = wxString::FromUTF8(
-      "• Login-shell лучше не выключать — иначе может не быть PATH из .bashrc.\n"
-      "• FaTTY помнит рабочую папку. Случайный cd уедет в следующий Deploy — «Сбросить в ~».\n"
-      "• Не запускайте через F5 интерактивное: top, less, vim, pm2 logs без --nostream.\n"
-      "• Для sudo нужен NOPASSWD, иначе команда зависнет на Password:.\n"
-      "• Мастер-пароль нельзя восстановить.\n"
-      "• Журнал не хранит пароли.\n\n"
-      "Конфиг: %APPDATA%\\FaTTY\\config.json");
+  auto start = wxString(
+      L"Что это\n\nFaTTY хранит список VPS и команды к ним, затем запускает выбранную команду по SSH.\n\n"
+      L"Как начать\n\n1. Добавьте VPS: имя, хост, порт, логин, пароль и/или ключ.\n"
+      L"2. Команды сами не создаются — «Пресеты…» или «Добавить».\n"
+      L"3. F5 / двойной клик / Enter — запуск. «Стоп» обрывает сессию.\n\n"
+      L"Окно\n\nСлева серверы, справа команды по папкам-вкладкам, внизу лог. Колонка «Последний раз» — из журнала.\n"
+      L"«Сбросить в ~» возвращает рабочую папку в домашнюю.\n\n"
+      L"Файлы, консоль, PuTTY\n\n«Файлы» — SFTP. «Открыть консоль» — ssh.exe. «PuTTY» подставляет пароль или ключ.\n"
+      L"Интерактивное (htop, nano) — в консоли, не через F5.\n\n"
+      L"Журнал: Ctrl+J. Настройки: Ctrl+,.");
+  auto keys = wxString(
+      L"F5              запустить выбранную команду\n"
+      L"F2              изменить команду\n"
+      L"Enter           запустить (фокус в списке команд)\n"
+      L"Ctrl+↑ / Ctrl+↓ порядок команд\n"
+      L"Ctrl+J          журнал запусков\n"
+      L"Delete          удалить запись в журнале\n"
+      L"Ctrl+,          настройки\n"
+      L"F1              эта справка\n\n"
+      L"Выделение мышью  сразу копирует текст (как в PuTTY)\n"
+      L"Ctrl+C           копировать выделение в выводе\n"
+      L"Escape           закрыть диалог\n\n"
+      L"Файлы: Enter / двойной клик — папка или скачать\n"
+      L"Backspace / Alt+↑ — на уровень вверх");
+  auto tips = wxString(
+      L"• Login-shell лучше не выключать — иначе может не быть PATH из .bashrc.\n"
+      L"• FaTTY помнит рабочую папку. Случайный cd уедет в следующий Deploy — «Сбросить в ~».\n"
+      L"• Не запускайте через F5 интерактивное: top, less, vim, pm2 logs без --nostream.\n"
+      L"• Для sudo нужен NOPASSWD, иначе команда зависнет на Password:.\n"
+      L"• Мастер-пароль нельзя восстановить.\n"
+      L"• Журнал не хранит пароли.\n\n"
+      L"Конфиг: %APPDATA%\\FaTTY\\config.json");
 
   auto* p0 = new wxPanel(nb_);
   auto* s0 = new wxBoxSizer(wxVERTICAL);
   s0->Add(prose(p0, start), 1, wxEXPAND | wxALL, 8);
   p0->SetSizer(s0);
-  nb_->AddPage(p0, "Как пользоваться");
+  nb_->AddPage(p0, L"Как пользоваться");
 
   auto* p1 = new wxPanel(nb_);
   auto* s1 = new wxBoxSizer(wxVERTICAL);
@@ -78,13 +78,13 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
   k->SetFont(Theme::mono());
   s1->Add(k, 1, wxEXPAND | wxALL, 8);
   p1->SetSizer(s1);
-  nb_->AddPage(p1, "Клавиши");
+  nb_->AddPage(p1, L"Клавиши");
 
   auto* p2 = new wxPanel(nb_);
   auto* list = new wxListCtrl(p2, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
-  list->AppendColumn("Группа", wxLIST_FORMAT_LEFT, FromDIP(100));
-  list->AppendColumn("Название", wxLIST_FORMAT_LEFT, FromDIP(140));
-  list->AppendColumn("Команда", wxLIST_FORMAT_LEFT, FromDIP(420));
+  list->AppendColumn(L"Группа", wxLIST_FORMAT_LEFT, FromDIP(100));
+  list->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(140));
+  list->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(420));
   struct Item {
     std::string group, name, command, tip;
   };
@@ -103,8 +103,8 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
     list->SetItem(row, 1, wxString::FromUTF8(c.name));
     list->SetItem(row, 2, wxString::FromUTF8(c.command));
   }
-  auto* copy = new wxButton(p2, wxID_ANY, "Копировать");
-  auto* insert = new wxButton(p2, wxID_ANY, "В разовую");
+  auto* copy = new wxButton(p2, wxID_ANY, L"Копировать");
+  auto* insert = new wxButton(p2, wxID_ANY, L"В разовую");
   auto* row = new wxBoxSizer(wxHORIZONTAL);
   row->Add(copy, 0, wxRIGHT, 8);
   row->Add(insert);
@@ -112,7 +112,7 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
   s2->Add(list, 1, wxEXPAND | wxALL, 8);
   s2->Add(row, 0, wxALL, 8);
   p2->SetSizer(s2);
-  nb_->AddPage(p2, "Команды");
+  nb_->AddPage(p2, L"Команды");
   copy->Bind(wxEVT_BUTTON, [list, cmds](wxCommandEvent&) {
     long i = list->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
     if (i < 0) return;
@@ -130,7 +130,7 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
   auto* s3 = new wxBoxSizer(wxVERTICAL);
   s3->Add(prose(p3, tips), 1, wxEXPAND | wxALL, 8);
   p3->SetSizer(s3);
-  nb_->AddPage(p3, "Советы");
+  nb_->AddPage(p3, L"Советы");
 
   auto* outer = new wxBoxSizer(wxVERTICAL);
   outer->Add(nb_, 1, wxEXPAND);

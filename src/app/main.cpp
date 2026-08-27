@@ -48,8 +48,11 @@ std::string peek_theme() {
 class FattyApp : public wxApp {
  public:
   bool Initialize(int& argc, wxChar** argv) override {
-    // Sources compile as UTF-8 (/utf-8). wxString(const char*) otherwise uses the
-    // ANSI code page (CP1251 on Russian Windows) and turns Cyrillic into mojibake.
+    // Задаёт кодировку для обратного направления, wxString -> narrow (mbc_str
+    // и т.п.). На wxString(const char*) не влияет: там жёстко зашит wxConvLibc,
+    // то есть ANSI-кодовая страница. От крякозябр защищает не эта строка, а
+    // wxNO_IMPLICIT_WXSTRING_ENCODING (см. CMakeLists.txt): текст UI — L"…",
+    // UTF-8 std::string из core/net — только через wxString::FromUTF8().
     wxConvCurrent = &wxConvUTF8;
     return wxApp::Initialize(argc, argv);
   }
@@ -75,7 +78,7 @@ class FattyApp : public wxApp {
       config = load_config();
     } catch (const std::exception& exc) {
       hide_splash();
-      wxMessageBox(wxString::FromUTF8(exc.what()), kAppName, wxOK | wxICON_ERROR);
+      wxMessageBox(wxString::FromUTF8(exc.what()), wxString::FromUTF8(kAppName), wxOK | wxICON_ERROR);
       return false;
     }
     hide_splash();
@@ -88,8 +91,8 @@ class FattyApp : public wxApp {
     try {
       save_config(config, vault);
     } catch (const std::exception& exc) {
-      wxMessageBox(wxString::FromUTF8(std::string("Не удалось сохранить хранилище: ") + exc.what()), kAppName,
-                   wxOK | wxICON_ERROR);
+      wxMessageBox(L"Не удалось сохранить хранилище: " + wxString::FromUTF8(exc.what()),
+                   wxString::FromUTF8(kAppName), wxOK | wxICON_ERROR);
       return false;
     }
     auto* frame = new AppFrame(std::move(config), std::move(vault));

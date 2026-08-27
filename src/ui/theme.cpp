@@ -63,7 +63,7 @@ const Palette& pal() { return g_dark ? kDark : kLight; }
 
 const wxString& mono_face() {
   static const wxString face = [] {
-    return wxFontEnumerator::IsValidFacename("Cascadia Mono") ? wxString("Cascadia Mono") : wxString("Consolas");
+    return wxFontEnumerator::IsValidFacename(L"Cascadia Mono") ? wxString(L"Cascadia Mono") : wxString(L"Consolas");
   }();
   return face;
 }
@@ -89,10 +89,10 @@ wxColour Theme::err() { return pal().err; }
 wxColour Theme::warn() { return pal().warn; }
 wxColour Theme::cancel() { return pal().cancel; }
 wxColour Theme::terminal() { return pal().terminal; }
-wxFont Theme::ui() { return wxFont(10, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, "Segoe UI"); }
-wxFont Theme::ui_small() { return wxFont(9, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, "Segoe UI"); }
-wxFont Theme::ui_section() { return wxFont(8, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_SEMIBOLD, false, "Segoe UI"); }
-wxFont Theme::ui_title() { return wxFont(18, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, "Segoe UI"); }
+wxFont Theme::ui() { return wxFont(10, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
+wxFont Theme::ui_small() { return wxFont(9, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
+wxFont Theme::ui_section() { return wxFont(8, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_SEMIBOLD, false, L"Segoe UI"); }
+wxFont Theme::ui_title() { return wxFont(18, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, L"Segoe UI"); }
 wxFont Theme::mono() { return wxFont(10, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, mono_face()); }
 
 void apply_dark_titlebar(wxWindow* window) {
@@ -109,38 +109,38 @@ void apply_dark_titlebar(wxWindow* window) {
 void apply_theme(wxWindow* window) {
   if (!window) return;
   const wxString name = window->GetName();
-  if (name != "title" && name != "mono" && name != "section") window->SetFont(Theme::ui());
+  if (name != L"title" && name != L"mono" && name != L"section") window->SetFont(Theme::ui());
   wxWindow* parent = window->GetParent();
   const wxColour parent_bg = parent ? parent->GetBackgroundColour() : Theme::bg();
-  if (name == "accent") {
+  if (name == L"accent") {
     window->SetBackgroundColour(Theme::accent());
     window->SetForegroundColour(*wxWHITE);
-  } else if (name == "title") {
+  } else if (name == L"title") {
     window->SetFont(Theme::ui_title());
     window->SetBackgroundColour(parent_bg);
     window->SetForegroundColour(Theme::text_bright());
-  } else if (name == "section") {
+  } else if (name == L"section") {
     window->SetFont(Theme::ui_section());
     window->SetBackgroundColour(parent_bg);
     window->SetForegroundColour(Theme::muted());
-  } else if (name == "muted") {
+  } else if (name == L"muted") {
     window->SetBackgroundColour(parent_bg);
     window->SetForegroundColour(Theme::muted());
-  } else if (name == "error") {
+  } else if (name == L"error") {
     window->SetBackgroundColour(parent_bg);
     window->SetForegroundColour(Theme::err());
-  } else if (name == "meta") {
+  } else if (name == L"meta") {
     window->SetBackgroundColour(parent_bg);
     window->SetForegroundColour(Theme::meta());
   } else if (auto* tc = dynamic_cast<wxTextCtrl*>(window)) {
-    style_text(tc, name == "terminal");
+    style_text(tc, name == L"terminal");
   } else if (dynamic_cast<wxListCtrl*>(window) || dynamic_cast<wxNotebook*>(window)) {
     window->SetBackgroundColour(Theme::elevated());
     window->SetForegroundColour(Theme::text());
   } else if (dynamic_cast<wxButton*>(window)) {
     window->SetBackgroundColour(Theme::btn());
     window->SetForegroundColour(Theme::text_bright());
-  } else if (name == "chrome") {
+  } else if (name == L"chrome") {
     window->SetBackgroundColour(Theme::chrome());
     window->SetForegroundColour(Theme::text());
   } else if (dynamic_cast<wxStaticText*>(window) || dynamic_cast<wxCheckBox*>(window)) {
@@ -160,7 +160,7 @@ void apply_theme(wxWindow* window) {
 void apply_dark(wxWindow* window) { apply_theme(window); }
 
 void style_text(wxTextCtrl* ctrl, bool terminal) {
-  if (terminal) ctrl->SetName("terminal");
+  if (terminal) ctrl->SetName(L"terminal");
   ctrl->SetBackgroundColour(terminal ? Theme::terminal() : Theme::elevated());
   ctrl->SetForegroundColour(Theme::text());
   ctrl->SetFont(terminal ? Theme::mono() : Theme::ui());

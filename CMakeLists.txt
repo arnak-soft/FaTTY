@@ -97,6 +97,11 @@ endif()
 
 add_executable(fatty WIN32 ${FATTY_UI_SOURCES} src/app/fatty.rc)
 target_include_directories(fatty PRIVATE "${CMAKE_SOURCE_DIR}/src" "${CMAKE_BINARY_DIR}/generated")
+# Неявное wxString(const char*) идёт через wxConvLibc, т.е. через ANSI-кодовую
+# страницу (CP1251 на русской Windows), и UTF-8-литералы превращаются в
+# крякозябры. Флаг убирает эту перегрузку: текст UI пишем как L"…", а UTF-8
+# std::string из core/net переводим явным wxString::FromUTF8().
+target_compile_definitions(fatty PRIVATE wxNO_IMPLICIT_WXSTRING_ENCODING)
 target_link_libraries(fatty PRIVATE
   fatty_core
   fatty_net
@@ -115,6 +120,10 @@ if(MSVC)
   )
   set_property(TARGET fatty fatty_core fatty_net PROPERTY
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  # Манифест уже приходит из fatty.rc (wx/msw/wx.rc: comctl32 v6 + DPI).
+  # По умолчанию link.exe встраивает ещё и свой (/MANIFEST:EMBED,ID=1), и cvtres
+  # падает с CVT1100: duplicate resource type:MANIFEST name:1. Отключаем линкерный.
+  target_link_options(fatty PRIVATE "/MANIFEST:NO")
 else()
   target_compile_options(fatty_core PUBLIC -Wall -Wextra -Wno-unused-parameter)
   target_compile_definitions(fatty_core PUBLIC
