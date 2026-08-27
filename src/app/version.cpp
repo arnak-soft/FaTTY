@@ -73,7 +73,7 @@ std::string run_git(const std::vector<std::string>& args) {
 std::string git_version() {
   auto inside = run_git({"rev-parse", "--is-inside-work-tree"});
   if (inside != "true") return {};
-  bool dirty = !run_git({"status", "--porcelain"}).empty();
+  bool dirty = !run_git({"status", "--porcelain", "--untracked-files=no"}).empty();
   auto tags = run_git({"tag", "--list", "\"v[0-9]*\"", "--sort=-version:refname"});
   std::string chosen;
   if (!tags.empty()) {

@@ -83,6 +83,9 @@ jobs:
           $ver = (Get-Content build/generated/_version.txt -Raw).Trim()
           if (-not $ver) { throw "build/generated/_version.txt empty" }
           Write-Host "Version: $ver"
+          if ($ver -match '-dirty$') {
+            throw "Tag build produced a dirty version ($ver). Working tree must be clean."
+          }
           $need = @(
             "dist\FaTTY $ver Setup.exe",
             "dist\FaTTY $ver OneFile.exe",

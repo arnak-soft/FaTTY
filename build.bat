@@ -92,7 +92,16 @@ if "%ISCC%"=="" (
   exit /b 0
 )
 
-for /f "tokens=1-4 delims=.,-" %%a in ("%VER%") do (
+set "VERINFO="
+if exist "build\generated\_version_info.txt" (
+  set /p VERINFO=<build\generated\_version_info.txt
+)
+for /f "tokens=* delims= " %%A in ("%VERINFO%") do set "VERINFO=%%A"
+if not "%VERINFO%"=="" goto :got_verinfo
+
+rem Fallback: 1.5.18-dirty -> 1.5.18.0; 1.5.18-3-gabc -> 1.5.18.3
+set "V1=0" & set "V2=0" & set "V3=0" & set "V4=0"
+for /f "tokens=1-4 delims=.-" %%a in ("%VER%") do (
   set "V1=%%a"
   set "V2=%%b"
   set "V3=%%c"
@@ -101,8 +110,15 @@ for /f "tokens=1-4 delims=.,-" %%a in ("%VER%") do (
 if "%V2%"=="" set "V2=0"
 if "%V3%"=="" set "V3=0"
 if "%V4%"=="" set "V4=0"
+echo(%V1%| findstr /r "[^0-9]" >nul && set "V1=0"
+echo(%V2%| findstr /r "[^0-9]" >nul && set "V2=0"
+echo(%V3%| findstr /r "[^0-9]" >nul && set "V3=0"
+echo(%V4%| findstr /r "[^0-9]" >nul && set "V4=0"
+set "VERINFO=%V1%.%V2%.%V3%.%V4%"
+
+:got_verinfo
 echo Building installer...
-"%ISCC%" "/DMyAppVersion=%VER%" "/DMyVersionInfo=%V1%.%V2%.%V3%.%V4%" "/DPortableDirName=FaTTY %VER% Portable" fatty.iss
+"%ISCC%" "/DMyAppVersion=%VER%" "/DMyVersionInfo=%VERINFO%" "/DPortableDirName=FaTTY %VER% Portable" fatty.iss
 if errorlevel 1 exit /b 1
 echo   dist\FaTTY %VER% Setup.exe
 exit /b 0

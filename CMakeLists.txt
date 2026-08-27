@@ -30,6 +30,8 @@ configure_file(
   @ONLY
 )
 file(WRITE "${CMAKE_BINARY_DIR}/generated/_version.txt" "${FATTY_VERSION}\n")
+string(REPLACE "," "." FATTY_VERSION_INFO "${FATTY_VERSION_TUPLE}")
+file(WRITE "${CMAKE_BINARY_DIR}/generated/_version_info.txt" "${FATTY_VERSION_INFO}\n")
 
 find_package(wxWidgets CONFIG REQUIRED)
 find_package(Libssh2 CONFIG REQUIRED)

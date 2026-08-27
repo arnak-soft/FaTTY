@@ -9,10 +9,11 @@ function(fatty_resolve_git_version OUT_VERSION OUT_TUPLE)
   )
   if(_inside STREQUAL "true")
     execute_process(
-      COMMAND git status --porcelain
+      COMMAND git status --porcelain --untracked-files=no
       WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
       OUTPUT_VARIABLE _dirty
       ERROR_QUIET
+      OUTPUT_STRIP_TRAILING_WHITESPACE
     )
     execute_process(
       COMMAND git tag --list "v[0-9]*" --sort=-version:refname

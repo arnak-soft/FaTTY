@@ -20,6 +20,7 @@
 ### Fixed
 
 - Escape закрывает журнал, справку, файлы и остальные диалоги.
+- Релизная сборка: кэш vcpkg на GitHub Actions больше не добавляет суффикс `-dirty`, из‑за которого Inno Setup отклонял `VersionInfoVersion`.
 
 ### Changed
 

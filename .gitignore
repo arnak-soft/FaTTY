@@ -26,6 +26,7 @@ out/
 /cmake-build-*/
 /vcpkg_installed/
 /third_party/vcpkg/
+.vcpkg-cache/
 CMakeUserPresets.json
 CMakeCache.txt
 CMakeFiles/
