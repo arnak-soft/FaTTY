@@ -36,12 +36,14 @@ namespace fatty {
 
 AppFrame::AppFrame(Config config, SessionVault vault)
     : wxFrame(nullptr, wxID_ANY, wxString::FromUTF8(std::string(kAppName) + " " + resolve_version()),
-              wxDefaultPosition, wxSize(1100, 720)),
+              wxDefaultPosition, wxDefaultSize),
       config_(std::move(config)),
       vault_(std::move(vault)),
       journal_(journal_path(), config_.settings.journal_max_entries) {
   set_icon(this);
-  SetMinSize(wxSize(860, 560));
+  SetMinSize(FromDIP(wxSize(860, 560)));
+  SetSize(FromDIP(wxSize(1100, 720)));
+  Centre();
   last_runs_ = journal_.latest_by_command_id();
   journal_.add_listener([this] {
     CallAfter([this] {
@@ -76,7 +78,6 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       }
     }
     if (e.GetKeyCode() == WXK_F5) {
-      wxCommandEvent ev;
       if (auto* c = selected_command()) {
         auto* s = selected_server();
         if (s) {
@@ -102,46 +103,15 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       return;
     }
     if (e.GetKeyCode() == WXK_F1) {
-      if (!help_window_) {
-        help_window_ = new HelpWindow(this, [this](const std::string& cmd) { quick_->SetValue(wxString::FromUTF8(cmd)); });
-        help_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
-          help_window_ = nullptr;
-          ev.Skip();
-        });
-      }
-      help_window_->Show();
-      help_window_->Raise();
+      show_help();
       return;
     }
     if (e.ControlDown() && (e.GetKeyCode() == 'J' || e.GetKeyCode() == 'j')) {
-      if (!journal_window_) {
-        journal_window_ = new JournalWindow(this, journal_, [this](const JournalEntry& e) {
-          auto* s = config_.server_by_id(e.server_id);
-          if (!s) {
-            wxMessageBox("VPS из этой записи больше нет в списке.", "Журнал", wxOK | wxICON_ERROR, this);
-            return;
-          }
-          run_command(*s, e.command, e.timeout_sec, e.login_shell, e.title.empty() ? "журнал" : e.title, e.command_id,
-                      e.kind);
-        });
-        journal_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
-          journal_window_ = nullptr;
-          ev.Skip();
-        });
-      }
-      journal_window_->Show();
-      journal_window_->Raise();
+      show_journal();
       return;
     }
     if (e.ControlDown() && e.GetKeyCode() == ',') {
-      SettingsDialog dlg(this, config_, vault_, [this] { persist(); apply_ui_theme(); },
-                         [this] {
-                           ChangeMasterDialog d(this, vault_, config_.settings.allow_short_master_password);
-                           if (d.ShowModal() == wxID_OK && d.ok) persist();
-                         },
-                         [this] { /* manual updates from settings */ }, [this] { refresh_servers(); });
-      dlg.setup_layout(&config_.settings, "settings", true, [this] { persist(); });
-      dlg.ShowModal();
+      open_settings();
       return;
     }
     e.Skip();
@@ -205,12 +175,7 @@ void AppFrame::build_menu() {
   bar->Append(help, "Справка");
   SetMenuBar(bar);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { open_directory(app_dir()); }, 1001);
-  Bind(wxEVT_MENU, [this](wxCommandEvent& e) {
-    wxKeyEvent k;
-    k.m_controlDown = true;
-    k.m_keyCode = 'J';
-    ProcessWindowEvent(k);
-  }, 1002);
+  Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_journal(); }, 1002);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     bool secrets = wxMessageBox("Включить пароли VPS в файл?", "Экспорт", wxYES_NO, this) == wxYES;
     if (secrets && wxMessageBox("Файл будет содержать пароли в открытом виде. Продолжить?", "Экспорт", wxYES_NO, this) !=
@@ -242,15 +207,7 @@ void AppFrame::build_menu() {
     }
   }, 1004);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { Close(); }, wxID_EXIT);
-  Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    SettingsDialog dlg(this, config_, vault_, [this] { persist(); apply_ui_theme(); },
-                       [this] {
-                         ChangeMasterDialog d(this, vault_, config_.settings.allow_short_master_password);
-                         if (d.ShowModal() == wxID_OK && d.ok) persist();
-                       },
-                       [this] {}, [this] { refresh_servers(); });
-    dlg.ShowModal();
-  }, 1010);
+  Bind(wxEVT_MENU, [this](wxCommandEvent&) { open_settings(); }, 1010);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     ChangeMasterDialog d(this, vault_, config_.settings.allow_short_master_password);
     d.setup_layout(&config_.settings, "change_master", false, [this] { persist(); });
@@ -259,33 +216,9 @@ void AppFrame::build_menu() {
       wxMessageBox("Мастер-пароль обновлён.", "Мастер-пароль");
     }
   }, 1011);
-  Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    wxKeyEvent k;
-    k.m_keyCode = WXK_F1;
-    ProcessWindowEvent(k);
-  }, 1020);
-  Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    if (!help_window_) {
-      help_window_ = new HelpWindow(this, [this](const std::string& cmd) { quick_->SetValue(wxString::FromUTF8(cmd)); });
-    }
-    help_window_->Show();
-    help_window_->show_tab("Команды");
-  }, 1021);
-  Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    try {
-      auto r = check_for_updates(resolve_version());
-      if (r.status == "update") {
-        if (wxMessageBox("Доступна новая версия. Открыть?", "Обновления", wxYES_NO, this) == wxYES && r.page_url)
-          open_url(*r.page_url);
-      } else if (r.status == "current") {
-        wxMessageBox("У вас актуальная версия.", "Обновления");
-      } else {
-        wxMessageBox("На GitHub пока нет опубликованных релизов.", "Обновления");
-      }
-    } catch (const std::exception& exc) {
-      wxMessageBox(wxString::FromUTF8(exc.what()), "Обновления", wxOK | wxICON_ERROR);
-    }
-  }, 1022);
+  Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_help(); }, 1020);
+  Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_help("Команды"); }, 1021);
+  Bind(wxEVT_MENU, [this](wxCommandEvent&) { check_updates_interactive(); }, 1022);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     wxMessageBox(wxString::FromUTF8(std::string(kAppName) + " " + resolve_version() +
                                     "\n\nЗапуск команд на VPS по SSH.\n\nСправка: F1"),
@@ -294,49 +227,49 @@ void AppFrame::build_menu() {
 }
 
 void AppFrame::build_ui() {
+  const int pad = FromDIP(10);
+  const int gap = FromDIP(6);
   auto* panel = new wxPanel(this);
-  status_ = new wxStaticText(panel, wxID_ANY, "Готово");
-  status_->SetForegroundColour(Theme::muted());
   vsplit_ = new wxSplitterWindow(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
   auto* top = new wxPanel(vsplit_);
   hsplit_ = new wxSplitterWindow(top, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
   auto* left = new wxPanel(hsplit_);
   auto* right = new wxPanel(hsplit_);
   servers_ = new wxListCtrl(left, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
-  servers_->AppendColumn("Имя", wxLIST_FORMAT_LEFT, 160);
-  servers_->AppendColumn("Адрес", wxLIST_FORMAT_LEFT, 220);
+  servers_->AppendColumn("Имя", wxLIST_FORMAT_LEFT, FromDIP(160));
+  servers_->AppendColumn("Адрес", wxLIST_FORMAT_LEFT, FromDIP(220));
   auto* sbtns = new wxBoxSizer(wxHORIZONTAL);
   auto* sadd = new wxButton(left, wxID_ANY, "Добавить");
   auto* sedit = new wxButton(left, wxID_ANY, "Изменить");
   auto* sdup = new wxButton(left, wxID_ANY, "Дублировать");
   auto* sdel = new wxButton(left, wxID_ANY, "Удалить");
-  sbtns->Add(sadd, 0, wxRIGHT, 4);
-  sbtns->Add(sedit, 0, wxRIGHT, 4);
-  sbtns->Add(sdup, 0, wxRIGHT, 4);
+  sbtns->Add(sadd, 0, wxRIGHT, gap);
+  sbtns->Add(sedit, 0, wxRIGHT, gap);
+  sbtns->Add(sdup, 0, wxRIGHT, gap);
   sbtns->Add(sdel);
   auto* sact = new wxBoxSizer(wxHORIZONTAL);
   auto* files = new wxButton(left, wxID_ANY, "Файлы");
   auto* cons = new wxButton(left, wxID_ANY, "Открыть консоль");
   auto* putty = new wxButton(left, wxID_ANY, "PuTTY");
   auto* test = new wxButton(left, wxID_ANY, "Проверить связь");
-  sact->Add(files, 0, wxRIGHT, 4);
-  sact->Add(cons, 0, wxRIGHT, 4);
-  sact->Add(putty, 0, wxRIGHT, 4);
+  sact->Add(files, 0, wxRIGHT, gap);
+  sact->Add(cons, 0, wxRIGHT, gap);
+  sact->Add(putty, 0, wxRIGHT, gap);
   sact->Add(test);
   auto* ls = new wxBoxSizer(wxVERTICAL);
-  ls->Add(new wxStaticText(left, wxID_ANY, "VPS-серверы"), 0, wxBOTTOM, 4);
+  ls->Add(section_label(left, "VPS-серверы"), 0, wxBOTTOM, gap);
   ls->Add(servers_, 1, wxEXPAND);
-  ls->Add(sbtns, 0, wxTOP, 8);
-  ls->Add(sact, 0, wxTOP, 4);
+  ls->Add(sbtns, 0, wxTOP, pad);
+  ls->Add(sact, 0, wxTOP, gap);
   left->SetSizer(ls);
 
   folders_nb_ = new wxNotebook(right, wxID_ANY);
   auto* first_page = new wxPanel(folders_nb_);
   auto* page_sz = new wxBoxSizer(wxVERTICAL);
   commands_ = new wxListCtrl(first_page, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
-  commands_->AppendColumn("Название", wxLIST_FORMAT_LEFT, 180);
-  commands_->AppendColumn("Команда", wxLIST_FORMAT_LEFT, 320);
-  commands_->AppendColumn("Последний раз", wxLIST_FORMAT_LEFT, 140);
+  commands_->AppendColumn("Название", wxLIST_FORMAT_LEFT, FromDIP(180));
+  commands_->AppendColumn("Команда", wxLIST_FORMAT_LEFT, FromDIP(320));
+  commands_->AppendColumn("Последний раз", wxLIST_FORMAT_LEFT, FromDIP(140));
   page_sz->Add(commands_, 1, wxEXPAND);
   first_page->SetSizer(page_sz);
   folders_nb_->AddPage(first_page, "Общее");
@@ -348,11 +281,11 @@ void AppFrame::build_ui() {
   auto* fadd = new wxButton(right, wxID_ANY, "Папка+");
   auto* frename = new wxButton(right, wxID_ANY, "Переименовать");
   auto* fdel = new wxButton(right, wxID_ANY, "Удалить папку");
-  corder->Add(up, 0, wxRIGHT, 4);
-  corder->Add(down, 0, wxRIGHT, 4);
-  corder->Add(byname, 0, wxRIGHT, 12);
-  corder->Add(fadd, 0, wxRIGHT, 4);
-  corder->Add(frename, 0, wxRIGHT, 4);
+  corder->Add(up, 0, wxRIGHT, gap);
+  corder->Add(down, 0, wxRIGHT, gap);
+  corder->Add(byname, 0, wxRIGHT, FromDIP(16));
+  corder->Add(fadd, 0, wxRIGHT, gap);
+  corder->Add(frename, 0, wxRIGHT, gap);
   corder->Add(fdel);
   auto* cbtns = new wxBoxSizer(wxHORIZONTAL);
   auto* cadd = new wxButton(right, wxID_ANY, "Добавить");
@@ -363,34 +296,35 @@ void AppFrame::build_ui() {
   stop_btn_ = new wxButton(right, wxID_ANY, "Стоп");
   run_btn_ = accent_button(right, "Запустить  (F5)");
   stop_btn_->Enable(false);
-  cbtns->Add(cadd, 0, wxRIGHT, 4);
-  cbtns->Add(cedit, 0, wxRIGHT, 4);
-  cbtns->Add(cdup, 0, wxRIGHT, 4);
-  cbtns->Add(cdel, 0, wxRIGHT, 4);
-  cbtns->Add(presets, 0, wxRIGHT, 8);
+  cbtns->Add(cadd, 0, wxRIGHT, gap);
+  cbtns->Add(cedit, 0, wxRIGHT, gap);
+  cbtns->Add(cdup, 0, wxRIGHT, gap);
+  cbtns->Add(cdel, 0, wxRIGHT, gap);
+  cbtns->Add(presets, 0, wxRIGHT, pad);
   cbtns->AddStretchSpacer();
-  cbtns->Add(run_btn_, 0, wxRIGHT, 4);
+  cbtns->Add(run_btn_, 0, wxRIGHT, gap);
   cbtns->Add(stop_btn_);
   auto* qrow = new wxBoxSizer(wxHORIZONTAL);
   qrow->Add(new wxStaticText(right, wxID_ANY, "Разовая команда:"), 0, wxALIGN_CENTER_VERTICAL);
   quick_ = new wxTextCtrl(right, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
   auto* qrun = new wxButton(right, wxID_ANY, "Выполнить");
-  qrow->Add(quick_, 1, wxEXPAND | wxLEFT | wxRIGHT, 6);
+  qrow->Add(quick_, 1, wxEXPAND | wxLEFT | wxRIGHT, pad);
   qrow->Add(qrun);
   auto* rs = new wxBoxSizer(wxVERTICAL);
-  rs->Add(new wxStaticText(right, wxID_ANY, "Команды выбранного VPS"), 0, wxBOTTOM, 4);
+  rs->Add(section_label(right, "Команды"), 0, wxBOTTOM, gap);
   rs->Add(folders_nb_, 1, wxEXPAND);
-  rs->Add(corder, 0, wxTOP, 8);
-  rs->Add(cbtns, 0, wxTOP, 4);
-  rs->Add(qrow, 0, wxEXPAND | wxTOP, 8);
+  rs->Add(corder, 0, wxTOP, pad);
+  rs->Add(cbtns, 0, wxTOP, gap);
+  rs->Add(qrow, 0, wxEXPAND | wxTOP, pad);
   right->SetSizer(rs);
-  hsplit_->SplitVertically(left, right, 360);
+  hsplit_->SplitVertically(left, right, FromDIP(360));
   auto* ts = new wxBoxSizer(wxVERTICAL);
   ts->Add(hsplit_, 1, wxEXPAND);
   top->SetSizer(ts);
 
   auto* outp = new wxPanel(vsplit_);
   cwd_label_ = new wxStaticText(outp, wxID_ANY, "Папка: ~");
+  cwd_label_->SetName("muted");
   cwd_reset_ = new wxButton(outp, wxID_ANY, "Сбросить в ~");
   cwd_reset_->Enable(false);
   auto* clear = new wxButton(outp, wxID_ANY, "Очистить");
@@ -402,21 +336,31 @@ void AppFrame::build_ui() {
     status_->SetLabel(wxString::Format("Скопировано в буфер (%d симв.)", (int)t.size()));
   });
   auto* ot = new wxBoxSizer(wxHORIZONTAL);
+  ot->Add(section_label(outp, "Вывод"), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, pad);
   ot->Add(cwd_label_, 1, wxALIGN_CENTER_VERTICAL);
-  ot->Add(cwd_reset_, 0, wxLEFT, 8);
+  ot->Add(cwd_reset_, 0, wxLEFT, pad);
   ot->AddStretchSpacer();
-  ot->Add(jbtn, 0, wxRIGHT, 4);
+  ot->Add(jbtn, 0, wxRIGHT, gap);
   ot->Add(clear);
   auto* os = new wxBoxSizer(wxVERTICAL);
-  os->Add(new wxStaticText(outp, wxID_ANY, "Вывод"), 0);
-  os->Add(ot, 0, wxEXPAND | wxTOP, 4);
-  os->Add(output_, 1, wxEXPAND | wxTOP, 4);
+  os->Add(ot, 0, wxEXPAND);
+  os->Add(output_, 1, wxEXPAND | wxTOP, gap);
   outp->SetSizer(os);
-  vsplit_->SplitHorizontally(top, outp, 420);
+  vsplit_->SplitHorizontally(top, outp, FromDIP(420));
+
+  auto* status_bar = new wxPanel(panel);
+  status_bar->SetName("chrome");
+  status_ = new wxStaticText(status_bar, wxID_ANY, "Готово");
+  status_->SetName("muted");
+  status_->SetForegroundColour(Theme::muted());
+  auto* sbs = new wxBoxSizer(wxHORIZONTAL);
+  sbs->Add(status_, 1, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, pad);
+  status_bar->SetSizer(sbs);
+  status_bar->SetMinSize(wxSize(-1, FromDIP(26)));
 
   auto* root = new wxBoxSizer(wxVERTICAL);
-  root->Add(vsplit_, 1, wxEXPAND | wxALL, 8);
-  root->Add(status_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
+  root->Add(vsplit_, 1, wxEXPAND | wxALL, pad);
+  root->Add(status_bar, 0, wxEXPAND);
   panel->SetSizer(root);
   auto* outer = new wxBoxSizer(wxVERTICAL);
   outer->Add(panel, 1, wxEXPAND);
@@ -437,7 +381,7 @@ void AppFrame::build_ui() {
   });
   commands_->Bind(wxEVT_LIST_COL_CLICK, [this](wxListEvent& e) {
     auto* s = selected_server();
-    if (!s) return;
+    if (!s || e.GetColumn() > 1) return;
     config_.sort_commands_for(s->id, current_folder_id(), e.GetColumn() == 1 ? "command" : "name");
     persist();
     refresh_commands();
@@ -456,6 +400,7 @@ void AppFrame::build_ui() {
     auto* s = selected_server();
     if (!s) return;
     ServerDialog dlg(this, *s, wxString::FromUTF8("VPS: " + s->name), false);
+    dlg.setup_layout(&config_.settings, "server", false, [this] { persist(); });
     if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
       *s = dlg.result;
       persist();
@@ -761,10 +706,68 @@ void AppFrame::build_ui() {
     status_->SetLabel("Рабочая папка сброшена в домашнюю");
   });
   clear->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { output_->Clear(); });
-  jbtn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    wxCommandEvent e(wxEVT_MENU, 1002);
-    ProcessWindowEvent(e);
-  });
+  jbtn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { show_journal(); });
+}
+
+void AppFrame::show_journal() {
+  if (!journal_window_) {
+    journal_window_ = new JournalWindow(this, journal_, [this](const JournalEntry& e) {
+      auto* s = config_.server_by_id(e.server_id);
+      if (!s) {
+        wxMessageBox("VPS из этой записи больше нет в списке.", "Журнал", wxOK | wxICON_ERROR, this);
+        return;
+      }
+      run_command(*s, e.command, e.timeout_sec, e.login_shell, e.title.empty() ? "журнал" : e.title, e.command_id,
+                  e.kind);
+    });
+    journal_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
+      journal_window_ = nullptr;
+      ev.Skip();
+    });
+  }
+  journal_window_->Show();
+  journal_window_->Raise();
+}
+
+void AppFrame::show_help(const std::string& tab) {
+  if (!help_window_) {
+    help_window_ = new HelpWindow(this, [this](const std::string& cmd) { quick_->SetValue(wxString::FromUTF8(cmd)); });
+    help_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
+      help_window_ = nullptr;
+      ev.Skip();
+    });
+  }
+  help_window_->Show();
+  if (!tab.empty()) help_window_->show_tab(tab);
+  help_window_->Raise();
+}
+
+void AppFrame::check_updates_interactive() {
+  try {
+    auto r = check_for_updates(resolve_version());
+    if (r.status == "update") {
+      if (wxMessageBox("Доступна новая версия. Открыть?", "Обновления", wxYES_NO, this) == wxYES && r.page_url)
+        open_url(*r.page_url);
+    } else if (r.status == "current") {
+      wxMessageBox("У вас актуальная версия.", "Обновления");
+    } else {
+      wxMessageBox("На GitHub пока нет опубликованных релизов.", "Обновления");
+    }
+  } catch (const std::exception& exc) {
+    wxMessageBox(wxString::FromUTF8(exc.what()), "Обновления", wxOK | wxICON_ERROR);
+  }
+}
+
+void AppFrame::open_settings() {
+  SettingsDialog dlg(this, config_, vault_, [this] { persist(); apply_ui_theme(); },
+                     [this] {
+                       ChangeMasterDialog d(this, vault_, config_.settings.allow_short_master_password);
+                       d.setup_layout(&config_.settings, "change_master", false, [this] { persist(); });
+                       if (d.ShowModal() == wxID_OK && d.ok) persist();
+                     },
+                     [this] { check_updates_interactive(); }, [this] { refresh_servers(); });
+  dlg.setup_layout(&config_.settings, "settings", true, [this] { persist(); });
+  dlg.ShowModal();
 }
 
 void AppFrame::persist() {

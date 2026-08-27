@@ -20,8 +20,9 @@ wxFrame* g_splash = nullptr;
 
 void show_splash() {
   hide_splash();
-  auto* f = new wxFrame(nullptr, wxID_ANY, "FaTTY — загрузка", wxDefaultPosition, wxSize(420, 268),
+  auto* f = new wxFrame(nullptr, wxID_ANY, "FaTTY — загрузка", wxDefaultPosition, wxDefaultSize,
                         wxFRAME_NO_TASKBAR | wxSTAY_ON_TOP | wxBORDER_NONE);
+  f->SetSize(f->FromDIP(wxSize(420, 268)));
   f->SetBackgroundColour(Theme::bg());
   auto* body = new wxPanel(f);
   body->SetBackgroundColour(Theme::bg());
@@ -32,7 +33,8 @@ void show_splash() {
   ver->SetForegroundColour(Theme::meta());
   auto* st = new wxStaticText(body, wxID_ANY, "Загрузка…");
   st->SetForegroundColour(Theme::text());
-  auto* bar = new wxGauge(body, wxID_ANY, 100, wxDefaultPosition, wxSize(260, 16), wxGA_HORIZONTAL | wxGA_SMOOTH);
+  auto* bar = new wxGauge(body, wxID_ANY, 100, wxDefaultPosition, f->FromDIP(wxSize(260, 16)),
+                          wxGA_HORIZONTAL | wxGA_SMOOTH);
   bar->Pulse();
   auto* s = new wxBoxSizer(wxVERTICAL);
   s->AddStretchSpacer();

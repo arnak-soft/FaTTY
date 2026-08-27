@@ -23,8 +23,27 @@
 #endif
 
 #include <fstream>
+#include <nlohmann/json.hpp>
 
 namespace fatty {
+namespace {
+
+// MSWEnableDarkMode должен быть вызван до создания первого окна, т.е. до
+// полного load_config(). Читаем только тему, молча падая обратно на тёмную.
+std::string peek_theme() {
+  try {
+    std::ifstream in(config_path(), std::ios::binary);
+    if (!in) return "dark";
+    auto data = nlohmann::json::parse(in, nullptr, false);
+    if (data.is_discarded()) return "dark";
+    auto theme = data.value("settings", nlohmann::json::object()).value("theme", std::string("dark"));
+    return theme == "light" ? "light" : "dark";
+  } catch (...) {
+    return "dark";
+  }
+}
+
+}  // namespace
 
 class FattyApp : public wxApp {
  public:
@@ -44,6 +63,10 @@ class FattyApp : public wxApp {
       activate_existing();
       return false;
     }
+    set_theme(peek_theme());
+#ifdef __WXMSW__
+    if (theme_is_dark()) MSWEnableDarkMode(DarkMode_Always);
+#endif
     wxInitAllImageHandlers();
     show_splash();
     Config config;

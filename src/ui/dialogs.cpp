@@ -13,6 +13,13 @@
 #include <wx/filename.h>
 #include <wx/stdpaths.h>
 
+#ifdef __WXMSW__
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 namespace fatty {
 namespace {
 
@@ -55,6 +62,7 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   }
   grid->Add(new wxStaticText(body, wxID_ANY, ""), 0);
   auto* note_l = new wxStaticText(body, wxID_ANY, note);
+  note_l->SetName("muted");
   note_l->SetForegroundColour(Theme::muted());
   grid->Add(note_l, 1, wxEXPAND);
   if (!stored_password_.empty()) {
@@ -77,6 +85,7 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   auto* cancel = new wxButton(body, wxID_CANCEL, "Отмена");
   btns->Add(save, 0, wxRIGHT, 8);
   btns->Add(cancel);
+  save->SetDefault();
 
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(grid, 1, wxEXPAND | wxALL, 12);
@@ -88,14 +97,13 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   apply_dark(this);
 
   show_pw_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
-    long style = show_pw_->GetValue() ? 0 : wxTE_PASSWORD;
-    auto val = password_->GetValue();
-    auto* parent = password_->GetParent();
-    // toggle echo
-    password_->SetWindowStyleFlag(style ? wxTE_PASSWORD : 0);
+#ifdef __WXMSW__
+    // wxTE_PASSWORD не переключается через SetWindowStyleFlag на MSW —
+    // меняем символ-маску напрямую.
+    auto hwnd = static_cast<HWND>(password_->GetHWND());
+    SendMessageW(hwnd, EM_SETPASSWORDCHAR, show_pw_->GetValue() ? 0 : 0x25CF, 0);
     password_->Refresh();
-    (void)val;
-    (void)parent;
+#endif
   });
   if (clear_pw_) {
     clear_pw_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
@@ -110,18 +118,6 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
     if (dlg.ShowModal() == wxID_OK) key_->SetValue(dlg.GetPath());
   });
   save->Bind(wxEVT_BUTTON, &ServerDialog::on_ok, this);
-  Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
-    if (e.GetKeyCode() == WXK_RETURN) {
-      wxCommandEvent ev;
-      on_ok(ev);
-      return;
-    }
-    if (e.GetKeyCode() == WXK_ESCAPE) {
-      EndModal(wxID_CANCEL);
-      return;
-    }
-    e.Skip();
-  });
 }
 
 void ServerDialog::on_ok(wxCommandEvent&) {
@@ -187,6 +183,7 @@ PresetDialog::PresetDialog(wxWindow* parent, const Server& server)
   auto* add = accent_button(body, "Добавить выбранные");
   btns->Add(add, 0, wxRIGHT, 8);
   btns->Add(new wxButton(body, wxID_CANCEL, "Отмена"));
+  add->SetDefault();
 
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(form, 0, wxEXPAND | wxALL, 12);
@@ -267,10 +264,10 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   preset_ = new wxComboBox(body, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, pname, wxCB_READONLY);
   form->Add(preset_, 1, wxEXPAND);
 
-  text_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(command.command), wxDefaultPosition, wxSize(-1, 160),
-                         wxTE_MULTILINE | wxTE_WORDWRAP);
+  text_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(command.command), wxDefaultPosition,
+                         wxSize(-1, FromDIP(160)), wxTE_MULTILINE | wxTE_WORDWRAP);
   style_text(text_, true);
-  text_->SetMinSize(wxSize(-1, 120));
+  text_->SetMinSize(wxSize(-1, FromDIP(120)));
 
   auto* btns = new wxBoxSizer(wxHORIZONTAL);
   btns->AddStretchSpacer();
@@ -278,6 +275,7 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   btns->Add(save, 0, wxRIGHT, 8);
   btns->Add(new wxButton(body, wxID_CANCEL, "Отмена"));
 
+  save->SetDefault();
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(form, 0, wxEXPAND | wxALL, 12);
   root->Add(new wxStaticText(body, wxID_ANY, "Команда"), 0, wxLEFT | wxRIGHT, 12);
@@ -288,9 +286,9 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   auto* outer = new wxBoxSizer(wxVERTICAL);
   outer->Add(body, 1, wxEXPAND);
   SetSizerAndFit(outer);
-  SetMinSize(wxSize(520, 420));
-  if (GetSize().GetHeight() < 420) {
-    SetSize(GetSize().GetWidth(), 520);
+  SetMinSize(FromDIP(wxSize(520, 420)));
+  if (GetSize().GetHeight() < FromDIP(420)) {
+    SetSize(GetSize().GetWidth(), FromDIP(520));
   }
   apply_dark(this);
   server_->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) { fill_folders(); });
@@ -391,11 +389,13 @@ MasterPasswordDialog::MasterPasswordDialog(wxWindow* parent, Config& config, Ses
     style_text(pw2_);
     form->Add(pw2_, 1, wxEXPAND);
     auto* hint = new wxStaticText(body, wxID_ANY, wxString::Format("Не короче %d символов.", kMinPasswordLen));
+    hint->SetName("muted");
     hint->SetForegroundColour(Theme::muted());
     form->Add(new wxStaticText(body, wxID_ANY, ""), 0);
     form->Add(hint, 1);
   }
   error_ = new wxStaticText(body, wxID_ANY, "");
+  error_->SetName("error");
   error_->SetForegroundColour(Theme::err());
   auto* btns = new wxBoxSizer(wxHORIZONTAL);
   btns->AddStretchSpacer();
@@ -412,15 +412,8 @@ MasterPasswordDialog::MasterPasswordDialog(wxWindow* parent, Config& config, Ses
   outer->Add(body, 1, wxEXPAND);
   SetSizer(outer);
   apply_dark(this);
+  continue_btn_->SetDefault();
   continue_btn_->Bind(wxEVT_BUTTON, &MasterPasswordDialog::on_submit, this);
-  Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
-    if (e.GetKeyCode() == WXK_RETURN) {
-      wxCommandEvent ev;
-      on_submit(ev);
-      return;
-    }
-    e.Skip();
-  });
   if (!setup_) refresh_lockout();
 }
 
@@ -491,12 +484,14 @@ ChangeMasterDialog::ChangeMasterDialog(wxWindow* parent, SessionVault& vault, bo
   neu_ = labeled_entry(body, form, "Новый", "", wxTE_PASSWORD);
   neu2_ = labeled_entry(body, form, "Новый ещё раз", "", wxTE_PASSWORD);
   error_ = new wxStaticText(body, wxID_ANY, "");
+  error_->SetName("error");
   error_->SetForegroundColour(Theme::err());
   auto* btns = new wxBoxSizer(wxHORIZONTAL);
   btns->AddStretchSpacer();
   auto* go = accent_button(body, "Сменить");
   btns->Add(go, 0, wxRIGHT, 8);
   btns->Add(new wxButton(body, wxID_CANCEL, "Отмена"));
+  go->SetDefault();
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(intro, 0, wxALL, 16);
   root->Add(form, 0, wxEXPAND | wxLEFT | wxRIGHT, 16);

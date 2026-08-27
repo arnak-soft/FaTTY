@@ -130,6 +130,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* save = accent_button(this, "Сохранить");
   btns->Add(save, 0, wxRIGHT, 8);
   btns->Add(new wxButton(this, wxID_CANCEL, "Отмена"));
+  save->SetDefault();
 
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(nb, 1, wxEXPAND | wxALL, 12);
@@ -195,7 +196,13 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.confirm_before_run = confirm_->GetValue();
   config_.settings.check_updates_on_start = updates_->GetValue();
   config_.settings.clear_output_before_run = clear_output_->GetValue();
+  const std::string old_theme = config_.settings.theme;
   config_.settings.theme = theme_->GetSelection() == 1 ? "light" : "dark";
+  if (config_.settings.theme != old_theme) {
+    wxMessageBox("Тема применена. Системные элементы (меню, заголовки таблиц, скроллбары)\n"
+                 "полностью переключатся после перезапуска FaTTY.",
+                 "Тема", wxOK | wxICON_INFORMATION, this);
+  }
   config_.settings.default_command_timeout = clamp_int(timeout, 1, 86400);
   config_.settings.journal_max_entries = clamp_int(journal, 100, 50000);
   config_.settings.putty_path = std::string(putty_->GetValue().utf8_string());

@@ -40,6 +40,9 @@ jobs:
         with:
           path: |
             third_party/vcpkg
+            !third_party/vcpkg/buildtrees
+            !third_party/vcpkg/packages
+            !third_party/vcpkg/downloads
             vcpkg_installed
             build/vcpkg_installed
             .vcpkg-cache

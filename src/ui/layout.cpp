@@ -109,7 +109,9 @@ void store_list_columns(wxListCtrl* list, AppSettings& settings, const std::stri
 }
 
 PositionedDialog::PositionedDialog(wxWindow* parent, const wxString& title, const wxSize& size)
-    : wxDialog(parent, wxID_ANY, title, wxDefaultPosition, size, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER) {
+    : wxDialog(parent, wxID_ANY, title, wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER) {
+  SetSize(FromDIP(size));
+  if (parent) CentreOnParent();
   bind_escape_close(this);
 }
 

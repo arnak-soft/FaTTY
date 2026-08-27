@@ -28,10 +28,11 @@ namespace fatty {
 
 FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string start_path)
     : wxFrame(parent, wxID_ANY, wxString::FromUTF8("Файлы — " + (server.name.empty() ? server.host : server.name)),
-              wxDefaultPosition, wxSize(780, 520)),
+              wxDefaultPosition, wxDefaultSize),
       server_(server),
       start_path_(std::move(start_path)) {
   set_icon(this);
+  SetSize(FromDIP(wxSize(780, 520)));
   auto* panel = new wxPanel(this);
   path_ = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
   auto* up = new wxButton(panel, wxID_ANY, "Вверх");
@@ -41,12 +42,13 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
   auto* del = new wxButton(panel, wxID_ANY, "Удалить");
   auto* stop = new wxButton(panel, wxID_ANY, "Стоп");
   list_ = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
-  list_->AppendColumn("Имя", wxLIST_FORMAT_LEFT, 280);
-  list_->AppendColumn("Тип", wxLIST_FORMAT_LEFT, 120);
-  list_->AppendColumn("Размер", wxLIST_FORMAT_RIGHT, 90);
-  list_->AppendColumn("Изменён", wxLIST_FORMAT_LEFT, 140);
+  list_->AppendColumn("Имя", wxLIST_FORMAT_LEFT, FromDIP(280));
+  list_->AppendColumn("Тип", wxLIST_FORMAT_LEFT, FromDIP(120));
+  list_->AppendColumn("Размер", wxLIST_FORMAT_RIGHT, FromDIP(90));
+  list_->AppendColumn("Изменён", wxLIST_FORMAT_LEFT, FromDIP(140));
   gauge_ = new wxGauge(panel, wxID_ANY, 100);
   status_ = new wxStaticText(panel, wxID_ANY, "Подключение…");
+  status_->SetName("muted");
   auto* top = new wxBoxSizer(wxHORIZONTAL);
   top->Add(path_, 1, wxEXPAND | wxRIGHT, 8);
   top->Add(up);

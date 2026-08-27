@@ -3,6 +3,8 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 
 set "VCPKG_ROOT=%~dp0third_party\vcpkg"
+if not defined VCPKG_DEFAULT_BINARY_CACHE set "VCPKG_DEFAULT_BINARY_CACHE=%~dp0.vcpkg-cache"
+if not exist "%VCPKG_DEFAULT_BINARY_CACHE%" mkdir "%VCPKG_DEFAULT_BINARY_CACHE%"
 if not exist "%VCPKG_ROOT%\vcpkg.exe" (
   echo Cloning vcpkg...
   if not exist "third_party" mkdir third_party

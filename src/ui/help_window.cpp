@@ -29,8 +29,9 @@ wxTextCtrl* prose(wxWindow* parent, const wxString& text) {
 
 HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)> on_insert_quick)
     : wxFrame(parent, wxID_ANY, wxString::FromUTF8(std::string("Справка — ") + kAppName), wxDefaultPosition,
-              wxSize(840, 600)) {
+              wxDefaultSize) {
   set_icon(this);
+  SetSize(FromDIP(wxSize(840, 600)));
   nb_ = new wxNotebook(this, wxID_ANY);
   auto start = wxString::FromUTF8(
       "Что это\n\nFaTTY хранит список VPS и команды к ним, затем запускает выбранную команду по SSH.\n\n"
@@ -81,9 +82,9 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
 
   auto* p2 = new wxPanel(nb_);
   auto* list = new wxListCtrl(p2, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
-  list->AppendColumn("Группа", wxLIST_FORMAT_LEFT, 100);
-  list->AppendColumn("Название", wxLIST_FORMAT_LEFT, 140);
-  list->AppendColumn("Команда", wxLIST_FORMAT_LEFT, 420);
+  list->AppendColumn("Группа", wxLIST_FORMAT_LEFT, FromDIP(100));
+  list->AppendColumn("Название", wxLIST_FORMAT_LEFT, FromDIP(140));
+  list->AppendColumn("Команда", wxLIST_FORMAT_LEFT, FromDIP(420));
   struct Item {
     std::string group, name, command, tip;
   };

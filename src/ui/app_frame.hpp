@@ -42,6 +42,10 @@ class AppFrame : public wxFrame {
   void append_output(const std::string& text, const wxColour* colour = nullptr);
   void set_busy(bool busy);
   void update_cwd_label();
+  void show_journal();
+  void show_help(const std::string& tab = {});
+  void check_updates_interactive();
+  void open_settings();
 
   Config config_;
   SessionVault vault_;

@@ -17,10 +17,11 @@
 namespace fatty {
 
 JournalWindow::JournalWindow(wxWindow* parent, Journal& journal, std::function<void(const JournalEntry&)> on_rerun)
-    : wxFrame(parent, wxID_ANY, "Журнал команд", wxDefaultPosition, wxSize(960, 580)),
+    : wxFrame(parent, wxID_ANY, "Журнал команд", wxDefaultPosition, wxDefaultSize),
       journal_(journal),
       on_rerun_(std::move(on_rerun)) {
   set_icon(this);
+  SetSize(FromDIP(wxSize(960, 580)));
   auto* panel = new wxPanel(this);
   filter_ = new wxTextCtrl(panel, wxID_ANY);
   auto* rerun = new wxButton(panel, wxID_ANY, "Повтор");
@@ -29,11 +30,11 @@ JournalWindow::JournalWindow(wxWindow* parent, Journal& journal, std::function<v
   auto* del = new wxButton(panel, wxID_ANY, "Удалить");
   auto* clear = new wxButton(panel, wxID_ANY, "Очистить");
   list_ = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
-  list_->AppendColumn("Время", wxLIST_FORMAT_LEFT, 150);
-  list_->AppendColumn("VPS", wxLIST_FORMAT_LEFT, 140);
-  list_->AppendColumn("Команда", wxLIST_FORMAT_LEFT, 280);
-  list_->AppendColumn("Результат", wxLIST_FORMAT_LEFT, 100);
-  list_->AppendColumn("Длит.", wxLIST_FORMAT_LEFT, 90);
+  list_->AppendColumn("Время", wxLIST_FORMAT_LEFT, FromDIP(150));
+  list_->AppendColumn("VPS", wxLIST_FORMAT_LEFT, FromDIP(140));
+  list_->AppendColumn("Команда", wxLIST_FORMAT_LEFT, FromDIP(280));
+  list_->AppendColumn("Результат", wxLIST_FORMAT_LEFT, FromDIP(100));
+  list_->AppendColumn("Длит.", wxLIST_FORMAT_LEFT, FromDIP(90));
   detail_ = new wxTextCtrl(panel, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY);
   style_text(detail_, true);
   bind_copy_on_select(detail_);

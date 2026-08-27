@@ -1,5 +1,5 @@
 ; Inno Setup 6 — установщик FaTTY (обёртка над Portable из build.bat).
-; Версию и имя папки передаёт scripts/build_installer.py через /D...
+; Версию и имя папки передаёт build.bat через /D...
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0-dev"

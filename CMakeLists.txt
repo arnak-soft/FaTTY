@@ -123,6 +123,24 @@ else()
   )
   if(MINGW)
     target_link_options(fatty PRIVATE -static -static-libgcc -static-libstdc++)
+    # MinGW GCC линкует свой default-manifest.o (только longPathAware), и он
+    # конфликтует с нашим манифестом из fatty.rc (comctl32 v6 для тёмного режима):
+    # ld падает с «multiple non-default manifests». Подсовываем через -B пустой
+    # default-manifest.o, чтобы единственным манифестом остался наш.
+    set(_shim_dir "${CMAKE_BINARY_DIR}/mingw-manifest-shim")
+    set(_shim_obj "${_shim_dir}/default-manifest.o")
+    if(NOT EXISTS "${_shim_obj}")
+      file(MAKE_DIRECTORY "${_shim_dir}")
+      file(WRITE "${_shim_dir}/empty.cpp" "")
+      execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -c "${_shim_dir}/empty.cpp" -o "${_shim_obj}"
+                      RESULT_VARIABLE _shim_rc)
+      if(NOT _shim_rc EQUAL 0)
+        message(WARNING "Не удалось собрать manifest-shim; тёмная тема на MinGW может не включиться")
+      endif()
+    endif()
+    if(EXISTS "${_shim_obj}")
+      target_link_options(fatty PRIVATE "-B${_shim_dir}")
+    endif()
   endif()
 endif()
 
