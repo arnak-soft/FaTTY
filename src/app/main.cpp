@@ -11,6 +11,7 @@
 
 #include <wx/app.h>
 #include <wx/msgdlg.h>
+#include <wx/strconv.h>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -27,6 +28,13 @@ namespace fatty {
 
 class FattyApp : public wxApp {
  public:
+  bool Initialize(int& argc, wxChar** argv) override {
+    // Sources compile as UTF-8 (/utf-8). wxString(const char*) otherwise uses the
+    // ANSI code page (CP1251 on Russian Windows) and turns Cyrillic into mojibake.
+    wxConvCurrent = &wxConvUTF8;
+    return wxApp::Initialize(argc, argv);
+  }
+
   bool OnInit() override {
 #ifdef _WIN32
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
