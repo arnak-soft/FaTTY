@@ -1,6 +1,7 @@
 #include "ui/layout.hpp"
 
 #include "core/util.hpp"
+#include "ui/widgets.hpp"
 
 #include <algorithm>
 #include <regex>
@@ -108,7 +109,9 @@ void store_list_columns(wxListCtrl* list, AppSettings& settings, const std::stri
 }
 
 PositionedDialog::PositionedDialog(wxWindow* parent, const wxString& title, const wxSize& size)
-    : wxDialog(parent, wxID_ANY, title, wxDefaultPosition, size, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER) {}
+    : wxDialog(parent, wxID_ANY, title, wxDefaultPosition, size, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER) {
+  bind_escape_close(this);
+}
 
 void PositionedDialog::setup_layout(AppSettings* settings, const std::string& key, bool remember_size,
                                     std::function<void()> persist) {

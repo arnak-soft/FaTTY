@@ -17,6 +17,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Escape закрывает журнал, справку, файлы и остальные диалоги.
+
 ### Changed
 
 - Приложение переписано на **C++20** (wxWidgets, libssh2, OpenSSL). Сборка: CMake + vcpkg + `build.bat`. Конфиг, вольт и журнал совместимы с Python-версией.

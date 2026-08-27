@@ -5,6 +5,7 @@
 
 #include <wx/button.h>
 #include <wx/clipbrd.h>
+#include <wx/dialog.h>
 #include <wx/icon.h>
 #include <wx/toplevel.h>
 
@@ -32,6 +33,20 @@ void bind_copy_on_select(wxTextCtrl* ctrl, std::function<void(const std::string&
         wxTheClipboard->SetData(new wxTextDataObject(text));
         wxTheClipboard->Close();
         if (on_copied) on_copied(std::string(text.utf8_string()));
+      }
+      return;
+    }
+    event.Skip();
+  });
+}
+
+void bind_escape_close(wxWindow* window) {
+  window->Bind(wxEVT_CHAR_HOOK, [window](wxKeyEvent& event) {
+    if (event.GetKeyCode() == WXK_ESCAPE) {
+      if (auto* dlg = dynamic_cast<wxDialog*>(window); dlg && dlg->IsModal()) {
+        dlg->EndModal(wxID_CANCEL);
+      } else {
+        window->Close();
       }
       return;
     }

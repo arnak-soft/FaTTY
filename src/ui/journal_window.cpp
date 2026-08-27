@@ -100,6 +100,7 @@ JournalWindow::JournalWindow(wxWindow* parent, Journal& journal, std::function<v
     }
     e.Skip();
   });
+  bind_escape_close(this);
 }
 
 void JournalWindow::delete_selected() {

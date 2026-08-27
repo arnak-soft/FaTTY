@@ -123,6 +123,7 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
     session_.close();
     e.Skip();
   });
+  bind_escape_close(this);
   CallAfter([this] { connect(); });
 }
 

@@ -135,6 +135,7 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
   outer->Add(nb_, 1, wxEXPAND);
   SetSizer(outer);
   apply_dark(this);
+  bind_escape_close(this);
 }
 
 void HelpWindow::show_tab(const std::string& name) {
