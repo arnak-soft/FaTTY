@@ -57,8 +57,10 @@ class AppFrame : public wxFrame {
 
   Config config_;
   SessionVault vault_;
-  Journal journal_;
-  std::unique_ptr<SSHSession> session_;
+  // shared_ptr: фоновый поток команды удерживает журнал и сессию живыми, даже
+  // если окно закрыли до её завершения.
+  std::shared_ptr<Journal> journal_;
+  std::shared_ptr<SSHSession> session_;
   std::map<std::string, std::string> remote_cwd_;
   std::map<std::string, JournalEntry> last_runs_;
   bool busy_ = false;
@@ -71,6 +73,9 @@ class AppFrame : public wxFrame {
   // Живой-токен: воркеры проверяют его перед обращением к окну через CallAfter,
   // чтобы не работать по разрушенному AppFrame.
   std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
+  // Взводится на время работы потока команды: при выходе ждём его завершения,
+  // иначе поток может дёрнуть wxTheApp уже после разрушения приложения.
+  std::shared_ptr<std::atomic<bool>> worker_running_ = std::make_shared<std::atomic<bool>>(false);
 
   wxSplitterWindow* vsplit_{};
   wxSplitterWindow* hsplit_{};

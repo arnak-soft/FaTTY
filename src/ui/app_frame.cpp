@@ -40,15 +40,19 @@ AppFrame::AppFrame(Config config, SessionVault vault)
               wxDefaultPosition, wxDefaultSize),
       config_(std::move(config)),
       vault_(std::move(vault)),
-      journal_(journal_path(), config_.settings.journal_max_entries) {
+      journal_(std::make_shared<Journal>(journal_path(), config_.settings.journal_max_entries)) {
   set_icon(this);
   SetMinSize(FromDIP(wxSize(860, 560)));
   SetSize(FromDIP(wxSize(1100, 720)));
   Centre();
-  last_runs_ = journal_.latest_by_command_id();
-  journal_.add_listener([this] {
-    CallAfter([this] {
-      last_runs_ = journal_.latest_by_command_id();
+  last_runs_ = journal_->latest_by_command_id();
+  // Слушателя может дёрнуть фоновый поток команды, поэтому на главный поток
+  // возвращаемся через wxTheApp и проверяем живой-токен.
+  journal_->add_listener([this, alive = alive_, journal = journal_] {
+    if (!alive->load()) return;
+    wxTheApp->CallAfter([this, alive, journal] {
+      if (!alive->load()) return;
+      last_runs_ = journal->latest_by_command_id();
       refresh_commands();
     });
   });
@@ -71,6 +75,12 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     // Закрытие подтверждено: гасим живой-токен, чтобы фоновые задачи не трогали окно.
     alive_->store(false);
     busy_timer_.Stop();
+    // Даём потоку команды доработать (он уже получил cancel): цикл опрашивает
+    // флаг каждые 40 мс, поэтому ожидание короткое. Потолок — чтобы зависшая
+    // сеть не заблокировала выход насовсем.
+    for (int waited = 0; worker_running_->load() && waited < 3000; waited += 20) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
     persist();
     e.Skip();
   });
@@ -720,6 +730,10 @@ void AppFrame::build_ui() {
 void AppFrame::show_journal() {
   if (!journal_window_) {
     journal_window_ = new JournalWindow(this, journal_, [this](const JournalEntry& e) {
+      if (busy_) {
+        wxMessageBox("Дождитесь окончания текущей команды или нажмите Стоп.", "Занято", wxOK, this);
+        return;
+      }
       auto* s = config_.server_by_id(e.server_id);
       if (!s) {
         wxMessageBox("VPS из этой записи больше нет в списке.", "Журнал", wxOK | wxICON_ERROR, this);
@@ -802,7 +816,12 @@ void AppFrame::check_updates_async(bool interactive) {
 }
 
 void AppFrame::open_settings() {
-  SettingsDialog dlg(this, config_, vault_, [this] { persist(); apply_ui_theme(); },
+  SettingsDialog dlg(this, config_, vault_,
+                     [this] {
+                       journal_->max_entries = config_.settings.journal_max_entries;
+                       persist();
+                       apply_ui_theme();
+                     },
                      [this] {
                        ChangeMasterDialog d(this, vault_, config_.settings.allow_short_master_password);
                        d.setup_layout(&config_.settings, "change_master", false, [this] { persist(); });
@@ -1048,60 +1067,84 @@ void AppFrame::run_command(const Server& server, const std::string& command, int
   const wxColour meta = Theme::meta();
   append_output("\n" + std::string(60, '-') + "\n", &meta);
   append_output(title + "  •  " + server.name + "\n", &meta);
-  session_ = std::make_unique<SSHSession>();
+  session_ = std::make_shared<SSHSession>();
   auto started = now_iso();
   auto t0 = std::chrono::steady_clock::now();
   Server srv = server;
-  std::thread([this, srv, command, timeout, login_shell, title, command_id, kind, cwd, started, t0] {
+  // Поток держит собственные копии shared_ptr на сессию и журнал, а к окну
+  // обращается только через живой-токен: закрытие FaTTY во время выполнения
+  // больше не оставляет поток работать по разрушенному AppFrame.
+  auto alive = alive_;
+  auto session = session_;
+  auto journal = journal_;
+  auto running = worker_running_;
+  running->store(true);
+  std::thread([this, alive, session, journal, running, srv, command, timeout, login_shell, title, command_id, kind, cwd,
+               started, t0] {
+    struct RunningGuard {
+      std::shared_ptr<std::atomic<bool>> flag;
+      ~RunningGuard() { flag->store(false); }
+    } guard{running};
+    // Токен проверяется ДО обращения к wxTheApp: после закрытия окна поток не
+    // трогает wx вообще, даже если приложение уже сворачивается.
+    auto post = [alive](std::function<void()> fn) {
+      if (!alive->load()) return;
+      wxTheApp->CallAfter([alive, fn = std::move(fn)] {
+        if (!alive->load()) return;
+        fn();
+      });
+    };
     int code = 1;
     std::string status = "error";
     std::string error;
     std::string new_cwd = cwd;
     try {
-      auto result = session_->run(srv, command, timeout, login_shell,
-                                  [this](const std::string& chunk) {
-                                    CallAfter([this, chunk] { append_output(chunk); });
-                                  },
-                                  cwd);
+      auto result = session->run(srv, command, timeout, login_shell,
+                                 [this, post](const std::string& chunk) {
+                                   post([this, chunk] { append_output(chunk); });
+                                 },
+                                 cwd);
       code = result.exit_code;
       status = status_from_exit(code);
       if (!result.cwd.empty()) new_cwd = result.cwd;
       auto col = code == 0 ? Theme::ok() : Theme::err();
-      CallAfter([this, code, col] { append_output("\n← код выхода " + std::to_string(code) + "\n", &col); });
+      post([this, code, col] { append_output("\n← код выхода " + std::to_string(code) + "\n", &col); });
     } catch (const std::exception& exc) {
       error = exc.what();
       const wxColour err = Theme::err();
-      CallAfter([this, error, err] { append_output("\n" + error + "\n", &err); });
+      post([this, error, err] { append_output("\n" + error + "\n", &err); });
     }
     auto duration = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    CallAfter([this, srv, command, title, command_id, kind, login_shell, timeout, started, duration, code, status, error,
-               new_cwd] {
+    // Пишем в журнал прямо здесь: запись переживает закрытие окна, поэтому
+    // прерванная выходом команда всё равно попадает в историю.
+    JournalEntry e;
+    e.started_at = started;
+    e.finished_at = now_iso();
+    e.duration_sec = duration;
+    e.server_id = srv.id;
+    e.server_name = srv.name;
+    e.host = srv.host;
+    e.port = srv.port;
+    e.username = srv.username;
+    e.command_id = command_id;
+    e.title = title;
+    e.command = command;
+    e.cwd = new_cwd;
+    e.login_shell = login_shell;
+    e.timeout_sec = timeout;
+    if (error.empty()) e.exit_code = code;
+    e.status = status;
+    e.kind = kind;
+    e.error = error;
+    journal->append(e);
+    post([this, srv, title, code, status, error, new_cwd] {
       if (!new_cwd.empty()) remote_cwd_[srv.id] = new_cwd;
       update_cwd_label();
       set_busy(false);
       session_.reset();
-      status_->SetLabel(wxString::FromUTF8("Готово  •  код " + (status == "error" && code == 1 && !error.empty() ? std::string("—") : std::to_string(code)) +
-                                           "  •  " + title));
-      JournalEntry e;
-      e.started_at = started;
-      e.finished_at = now_iso();
-      e.duration_sec = duration;
-      e.server_id = srv.id;
-      e.server_name = srv.name;
-      e.host = srv.host;
-      e.port = srv.port;
-      e.username = srv.username;
-      e.command_id = command_id;
-      e.title = title;
-      e.command = command;
-      e.cwd = new_cwd;
-      e.login_shell = login_shell;
-      e.timeout_sec = timeout;
-      if (error.empty()) e.exit_code = code;
-      e.status = status;
-      e.kind = kind;
-      e.error = error;
-      journal_.append(e);
+      status_->SetLabel(wxString::FromUTF8(
+          "Готово  •  код " + (status == "error" && code == 1 && !error.empty() ? std::string("—") : std::to_string(code)) +
+          "  •  " + title));
     });
   }).detach();
 }

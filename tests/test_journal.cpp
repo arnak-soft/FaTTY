@@ -2,7 +2,10 @@
 #include "core/journal.hpp"
 #include "core/util.hpp"
 
+#include <atomic>
 #include <filesystem>
+#include <thread>
+#include <vector>
 
 using namespace fatty;
 
@@ -48,6 +51,42 @@ void test_journal() {
   expect(!journal.remove("missing"), "remove missing id");
   items = journal.load();
   expect(items.size() == 1, "size unchanged after missing");
+
+  // Слушатели: окно журнала подписывается и обязано отписаться при закрытии,
+  // иначе колбэк уйдёт по разрушенному окну.
+  int hits_a = 0;
+  int hits_b = 0;
+  int id_a = journal.add_listener([&] { ++hits_a; });
+  journal.add_listener([&] { ++hits_b; });
+  journal.append(other);
+  expect(hits_a == 1 && hits_b == 1, "both listeners notified");
+  journal.remove_listener(id_a);
+  journal.append(other);
+  expect(hits_a == 1, "removed listener is silent");
+  expect(hits_b == 2, "remaining listener still notified");
+  journal.remove_listener(id_a);
+  journal.append(other);
+  expect(hits_b == 3, "double remove is harmless");
+
+  // append() зовётся из потока команды параллельно с подпиской из GUI-потока.
+  {
+    Journal concurrent(dir / "concurrent.jsonl", 1000);
+    std::atomic<int> notified{0};
+    std::thread writer([&] {
+      JournalEntry w;
+      w.server_name = "s";
+      w.command = "echo";
+      w.status = "ok";
+      for (int i = 0; i < 50; ++i) concurrent.append(w);
+    });
+    std::vector<int> ids;
+    for (int i = 0; i < 50; ++i) {
+      ids.push_back(concurrent.add_listener([&] { ++notified; }));
+    }
+    for (int id : ids) concurrent.remove_listener(id);
+    writer.join();
+    expect(concurrent.load().size() == 50, "all concurrent appends stored");
+  }
 
   std::error_code ec;
   std::filesystem::remove_all(dir, ec);

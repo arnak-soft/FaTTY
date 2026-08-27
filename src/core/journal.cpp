@@ -262,20 +262,43 @@ Journal::Journal(std::filesystem::path path, int max_entries_in)
     : max_entries(std::max(100, std::min(50000, max_entries_in))),
       path_(path.empty() ? journal_path() : std::move(path)) {}
 
+// append() зовётся из потока команды, а подписка/отписка — из GUI-потока,
+// поэтому listeners_ живёт под своим мьютексом. Сами колбэки вызываются по
+// копии списка и вне блокировки, чтобы слушатель мог трогать журнал.
 int Journal::add_listener(std::function<void()> cb) {
+  std::lock_guard lock(listeners_mutex_);
   int id = next_listener_id_++;
   listeners_.emplace_back(id, std::move(cb));
   return id;
 }
 
 void Journal::remove_listener(int id) {
+  std::lock_guard lock(listeners_mutex_);
   listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
                                   [id](const auto& l) { return l.first == id; }),
                    listeners_.end());
 }
 
 void Journal::remove_listeners() {
+  std::lock_guard lock(listeners_mutex_);
   listeners_.clear();
+}
+
+void Journal::notify_listeners() {
+  std::vector<std::function<void()>> callbacks;
+  {
+    std::lock_guard lock(listeners_mutex_);
+    for (const auto& [id, cb] : listeners_) {
+      (void)id;
+      callbacks.push_back(cb);
+    }
+  }
+  for (auto& cb : callbacks) {
+    try {
+      cb();
+    } catch (...) {
+    }
+  }
 }
 
 void Journal::append(JournalEntry entry) {
@@ -309,13 +332,7 @@ void Journal::append(JournalEntry entry) {
     } catch (...) {
     }
   }
-  for (auto& [id, cb] : listeners_) {
-    (void)id;
-    try {
-      cb();
-    } catch (...) {
-    }
-  }
+  notify_listeners();
 }
 
 std::vector<JournalEntry> Journal::load(int limit) const {
@@ -399,13 +416,7 @@ bool Journal::remove(const std::string& id) {
     }
     atomic_write_text(path_, out.str());
   }
-  for (auto& [id, cb] : listeners_) {
-    (void)id;
-    try {
-      cb();
-    } catch (...) {
-    }
-  }
+  notify_listeners();
   return true;
 }
 
@@ -414,13 +425,7 @@ void Journal::clear() {
     std::lock_guard lock(mutex_);
     atomic_write_text(path_, "");
   }
-  for (auto& [id, cb] : listeners_) {
-    (void)id;
-    try {
-      cb();
-    } catch (...) {
-    }
-  }
+  notify_listeners();
 }
 
 std::string Journal::export_text(const std::vector<JournalEntry>* entries) const {

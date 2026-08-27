@@ -64,8 +64,11 @@ class Journal {
   int max_entries = 5000;
 
  private:
+  void notify_listeners();
+
   std::filesystem::path path_;
   mutable std::mutex mutex_;
+  std::mutex listeners_mutex_;
   std::vector<std::pair<int, std::function<void()>>> listeners_;
   int next_listener_id_ = 1;
 };

@@ -4,6 +4,7 @@
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
+#include <wx/app.h>
 #include <wx/clipbrd.h>
 #include <wx/button.h>
 #include <wx/filedlg.h>
@@ -16,9 +17,10 @@
 
 namespace fatty {
 
-JournalWindow::JournalWindow(wxWindow* parent, Journal& journal, std::function<void(const JournalEntry&)> on_rerun)
+JournalWindow::JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
+                             std::function<void(const JournalEntry&)> on_rerun)
     : wxFrame(parent, wxID_ANY, "Журнал команд", wxDefaultPosition, wxDefaultSize),
-      journal_(journal),
+      journal_(std::move(journal)),
       on_rerun_(std::move(on_rerun)) {
   set_icon(this);
   SetSize(FromDIP(wxSize(960, 580)));
@@ -82,12 +84,12 @@ JournalWindow::JournalWindow(wxWindow* parent, Journal& journal, std::function<v
     wxFileDialog dlg(this, "Сохранить журнал", "", "journal.txt", "Text|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
     if (dlg.ShowModal() != wxID_OK) return;
     std::ofstream out(std::filesystem::path(dlg.GetPath().utf8_string()), std::ios::binary);
-    out << journal_.export_text(&entries_);
+    out << journal_->export_text(&entries_);
   });
   del->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { delete_selected(); });
   clear->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     if (wxMessageBox("Очистить журнал?", "Журнал", wxYES_NO, this) != wxYES) return;
-    journal_.clear();
+    journal_->clear();
     detail_->Clear();
     reload();
   });
@@ -102,14 +104,26 @@ JournalWindow::JournalWindow(wxWindow* parent, Journal& journal, std::function<v
     e.Skip();
   });
   // Обновляемся сами, когда во время открытого окна завершилась команда.
-  listener_id_ = journal_.add_listener([this] {
-    CallAfter([this] { reload_preserving_selection(); });
+  // Слушателя зовёт в том числе поток команды, поэтому — через wxTheApp и токен.
+  listener_id_ = journal_->add_listener([this, alive = alive_] {
+    if (!alive->load()) return;
+    wxTheApp->CallAfter([this, alive] {
+      if (!alive->load()) return;
+      reload_preserving_selection();
+    });
   });
   Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
-    journal_.remove_listener(listener_id_);
+    alive_->store(false);
+    journal_->remove_listener(listener_id_);
     e.Skip();
   });
   bind_escape_close(this);
+}
+
+JournalWindow::~JournalWindow() {
+  // Родитель может уничтожить окно без wxEVT_CLOSE_WINDOW — снимаем подписку и здесь.
+  alive_->store(false);
+  journal_->remove_listener(listener_id_);
 }
 
 void JournalWindow::reload_preserving_selection() {
@@ -135,7 +149,7 @@ void JournalWindow::delete_selected() {
   auto msg = preview.empty() ? wxString("Удалить эту запись из журнала?")
                              : wxString::FromUTF8("Удалить запись «" + preview + "»?");
   if (wxMessageBox(msg, "Журнал", wxYES_NO | wxNO_DEFAULT, this) != wxYES) return;
-  journal_.remove(e.id);
+  journal_->remove(e.id);
   detail_->Clear();
   reload();
   if (list_->GetItemCount() == 0) return;
@@ -148,7 +162,7 @@ void JournalWindow::delete_selected() {
 }
 
 void JournalWindow::reload() {
-  auto all = journal_.load();
+  auto all = journal_->load();
   auto q = to_lower(trim(std::string(filter_->GetValue().utf8_string())));
   entries_.clear();
   for (const auto& e : all) {

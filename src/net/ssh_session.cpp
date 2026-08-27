@@ -257,11 +257,11 @@ SSHSession::~SSHSession() {
 }
 
 void SSHSession::cancel() {
+  // Только выставляем флаг. libssh2 не потокобезопасен в рамках одной сессии,
+  // поэтому закрывать канал отсюда (из GUI-потока) нельзя: рабочий поток в этот
+  // момент может сидеть в libssh2_channel_read. Цикл run() опрашивает флаг
+  // каждые 40 мс и сам корректно закрывает канал.
   cancel_ = true;
-  auto* ch = static_cast<LIBSSH2_CHANNEL*>(channel_.load());
-  if (ch) {
-    libssh2_channel_close(ch);
-  }
 }
 
 RunResult SSHSession::run(const Server& server, const std::string& command, int timeout_sec, bool login_shell,
