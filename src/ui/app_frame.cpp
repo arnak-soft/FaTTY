@@ -18,6 +18,7 @@
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
+#include <wx/app.h>
 #include <wx/button.h>
 #include <wx/filedlg.h>
 #include <wx/menu.h>
@@ -67,6 +68,9 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       }
       if (session_) session_->cancel();
     }
+    // Закрытие подтверждено: гасим живой-токен, чтобы фоновые задачи не трогали окно.
+    alive_->store(false);
+    busy_timer_.Stop();
     persist();
     e.Skip();
   });
@@ -120,31 +124,14 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     if (config_.settings.window_state == "zoomed") Maximize();
     if (config_.settings.sash_pos > 0) hsplit_->SetSashPosition(config_.settings.sash_pos);
     if (config_.settings.vsash_pos > 0) vsplit_->SetSashPosition(config_.settings.vsash_pos);
+    restore_columns();
     restoring_ = false;
   });
   if (config_.settings.check_updates_on_start) {
     using clock = std::chrono::system_clock;
     double now = std::chrono::duration<double>(clock::now().time_since_epoch()).count();
     if (now - config_.settings.last_update_check >= 24 * 3600) {
-      std::thread([this] {
-        try {
-          auto r = check_for_updates(resolve_version());
-          CallAfter([this, r] {
-            config_.settings.last_update_check =
-                std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
-            persist();
-            if (r.status == "update") {
-              status_->SetLabel(wxString::FromUTF8("Доступна версия " + (r.latest ? *r.latest : "?")));
-              if (wxMessageBox("Доступна новая версия. Открыть страницу загрузки?", "Обновления", wxYES_NO, this) ==
-                      wxYES &&
-                  r.download_url) {
-                open_url(*r.download_url);
-              }
-            }
-          });
-        } catch (...) {
-        }
-      }).detach();
+      check_updates_async(false);
     }
   }
 }
@@ -235,6 +222,10 @@ void AppFrame::build_ui() {
   hsplit_ = new wxSplitterWindow(top, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
   auto* left = new wxPanel(hsplit_);
   auto* right = new wxPanel(hsplit_);
+  server_search_ = new wxTextCtrl(left, wxID_ANY, "", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+#if wxCHECK_VERSION(3, 1, 0)
+  server_search_->SetHint("Поиск VPS…");
+#endif
   servers_ = new wxListCtrl(left, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
   servers_->AppendColumn("Имя", wxLIST_FORMAT_LEFT, FromDIP(160));
   servers_->AppendColumn("Адрес", wxLIST_FORMAT_LEFT, FromDIP(220));
@@ -258,10 +249,13 @@ void AppFrame::build_ui() {
   sact->Add(test);
   auto* ls = new wxBoxSizer(wxVERTICAL);
   ls->Add(section_label(left, "VPS-серверы"), 0, wxBOTTOM, gap);
+  ls->Add(server_search_, 0, wxEXPAND | wxBOTTOM, gap);
   ls->Add(servers_, 1, wxEXPAND);
   ls->Add(sbtns, 0, wxTOP, pad);
   ls->Add(sact, 0, wxTOP, gap);
   left->SetSizer(ls);
+  // Кнопки редактирования VPS/команд гасятся на время выполнения команды.
+  busy_disable_ = {sedit, sdup, sdel, cons, putty, test, files};
 
   folders_nb_ = new wxNotebook(right, wxID_ANY);
   auto* first_page = new wxPanel(folders_nb_);
@@ -317,6 +311,10 @@ void AppFrame::build_ui() {
   rs->Add(cbtns, 0, wxTOP, gap);
   rs->Add(qrow, 0, wxEXPAND | wxTOP, pad);
   right->SetSizer(rs);
+  for (wxButton* b : {cadd, cedit, cdup, cdel, presets, up, down, byname, fadd, frename, fdel, qrun}) {
+    busy_disable_.push_back(b);
+  }
+  busy_disable_.push_back(quick_);
   hsplit_->SplitVertically(left, right, FromDIP(360));
   auto* ts = new wxBoxSizer(wxVERTICAL);
   ts->Add(hsplit_, 1, wxEXPAND);
@@ -353,10 +351,16 @@ void AppFrame::build_ui() {
   status_ = new wxStaticText(status_bar, wxID_ANY, "Готово");
   status_->SetName("muted");
   status_->SetForegroundColour(Theme::muted());
+  busy_gauge_ = new wxGauge(status_bar, wxID_ANY, 100, wxDefaultPosition, FromDIP(wxSize(120, 12)),
+                            wxGA_HORIZONTAL | wxGA_SMOOTH);
+  busy_gauge_->Hide();
   auto* sbs = new wxBoxSizer(wxHORIZONTAL);
   sbs->Add(status_, 1, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, pad);
+  sbs->Add(busy_gauge_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, pad);
   status_bar->SetSizer(sbs);
   status_bar->SetMinSize(wxSize(-1, FromDIP(26)));
+  busy_timer_.SetOwner(this);
+  Bind(wxEVT_TIMER, [this](wxTimerEvent&) { update_busy_indicator(); });
 
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(vsplit_, 1, wxEXPAND | wxALL, pad);
@@ -366,6 +370,10 @@ void AppFrame::build_ui() {
   outer->Add(panel, 1, wxEXPAND);
   SetSizer(outer);
 
+  server_search_->Bind(wxEVT_TEXT, [this](wxCommandEvent&) {
+    server_filter_ = trim(std::string(server_search_->GetValue().utf8_string()));
+    refresh_servers();
+  });
   servers_->Bind(wxEVT_LIST_ITEM_SELECTED, [this](wxListEvent&) {
     rebuild_folder_tabs();
     refresh_commands();
@@ -742,20 +750,55 @@ void AppFrame::show_help(const std::string& tab) {
   help_window_->Raise();
 }
 
-void AppFrame::check_updates_interactive() {
-  try {
-    auto r = check_for_updates(resolve_version());
-    if (r.status == "update") {
-      if (wxMessageBox("Доступна новая версия. Открыть?", "Обновления", wxYES_NO, this) == wxYES && r.page_url)
-        open_url(*r.page_url);
-    } else if (r.status == "current") {
-      wxMessageBox("У вас актуальная версия.", "Обновления");
-    } else {
-      wxMessageBox("На GitHub пока нет опубликованных релизов.", "Обновления");
-    }
-  } catch (const std::exception& exc) {
-    wxMessageBox(wxString::FromUTF8(exc.what()), "Обновления", wxOK | wxICON_ERROR);
+void AppFrame::check_updates_interactive() { check_updates_async(true); }
+
+void AppFrame::check_updates_async(bool interactive) {
+  if (checking_updates_) {
+    if (interactive) status_->SetLabel("Проверка обновлений уже идёт…");
+    return;
   }
+  checking_updates_ = true;
+  if (interactive) status_->SetLabel("Проверка обновлений…");
+  auto alive = alive_;
+  std::thread([this, alive, interactive] {
+    UpdateCheckResult r;
+    std::string err;
+    try {
+      r = check_for_updates(resolve_version());
+    } catch (const std::exception& exc) {
+      err = exc.what();
+    }
+    // На главный поток идём через wxTheApp: если окно уже закрыто, alive == false
+    // и мы не трогаем this.
+    wxTheApp->CallAfter([this, alive, interactive, r, err] {
+      if (!alive->load()) return;
+      checking_updates_ = false;
+      if (!err.empty()) {
+        if (interactive) wxMessageBox(wxString::FromUTF8(err), "Обновления", wxOK | wxICON_ERROR, this);
+        else status_->SetLabel("Готово");
+        return;
+      }
+      if (r.status == "update") {
+        status_->SetLabel(wxString::FromUTF8("Доступна версия " + (r.latest ? *r.latest : "?")));
+        std::string url = r.page_url.value_or(r.download_url.value_or(""));
+        if (wxMessageBox("Доступна новая версия. Открыть страницу загрузки?", "Обновления", wxYES_NO, this) == wxYES &&
+            !url.empty()) {
+          open_url(url);
+        }
+      } else if (interactive && r.status == "current") {
+        wxMessageBox("У вас актуальная версия.", "Обновления", wxOK | wxICON_INFORMATION, this);
+      } else if (interactive) {
+        wxMessageBox("На GitHub пока нет опубликованных релизов.", "Обновления", wxOK | wxICON_INFORMATION, this);
+      } else {
+        status_->SetLabel("Готово");
+      }
+      if (!interactive) {
+        config_.settings.last_update_check =
+            std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+        persist();
+      }
+    });
+  }).detach();
 }
 
 void AppFrame::open_settings() {
@@ -795,18 +838,36 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
     else keep = config_.settings.last_server_id;
   }
   servers_->DeleteAllItems();
+  const std::string q = to_lower(server_filter_);
   long sel = -1;
+  long row = 0;
   for (std::size_t i = 0; i < config_.servers.size(); ++i) {
     const auto& s = config_.servers[i];
-    long row = servers_->InsertItem(static_cast<long>(i), wxString::FromUTF8(s.name));
+    if (!q.empty()) {
+      auto hay = to_lower(s.name + " " + s.username + " " + s.host);
+      if (hay.find(q) == std::string::npos) continue;
+    }
+    // Данные строки — индекс в config_.servers; selected_server() читает именно его,
+    // поэтому фильтрация не ломает соответствие строки и сервера.
+    servers_->InsertItem(row, wxString::FromUTF8(s.name));
     servers_->SetItem(row, 1, wxString::FromUTF8(s.username + "@" + s.host + ":" + std::to_string(s.port)));
     servers_->SetItemPtrData(row, static_cast<wxUIntPtr>(i));
     if (s.id == keep) sel = row;
+    ++row;
   }
-  if (sel < 0 && !config_.servers.empty()) sel = 0;
+  if (sel < 0 && servers_->GetItemCount() > 0) sel = 0;
   if (sel >= 0) servers_->SetItemState(sel, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
   rebuild_folder_tabs();
   refresh_commands();
+}
+
+void AppFrame::restore_columns() {
+  auto it_s = config_.settings.column_widths.find("servers");
+  if (it_s != config_.settings.column_widths.end())
+    apply_list_columns(servers_, it_s->second, {"name", "host"});
+  auto it_c = config_.settings.column_widths.find("commands");
+  if (it_c != config_.settings.column_widths.end())
+    apply_list_columns(commands_, it_c->second, {"name", "command", "last"});
 }
 
 void AppFrame::apply_ui_theme() {
@@ -909,9 +970,11 @@ void AppFrame::refresh_commands() {
 }
 
 Server* AppFrame::selected_server() {
-  long i = servers_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
-  if (i < 0 || i >= static_cast<long>(config_.servers.size())) return nullptr;
-  return &config_.servers[static_cast<std::size_t>(i)];
+  long row = servers_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (row < 0) return nullptr;
+  auto idx = static_cast<std::size_t>(servers_->GetItemData(row));
+  if (idx >= config_.servers.size()) return nullptr;
+  return &config_.servers[idx];
 }
 
 Command* AppFrame::selected_command() {
@@ -932,6 +995,26 @@ void AppFrame::set_busy(bool busy) {
   busy_ = busy;
   run_btn_->Enable(!busy);
   stop_btn_->Enable(busy);
+  for (wxWindow* w : busy_disable_) {
+    if (w) w->Enable(!busy);
+  }
+  if (busy) {
+    run_start_ = std::chrono::steady_clock::now();
+    busy_gauge_->Show();
+    busy_gauge_->Pulse();
+    busy_timer_.Start(250);
+  } else {
+    busy_timer_.Stop();
+    busy_gauge_->Hide();
+    if (auto* sizer = busy_gauge_->GetContainingSizer()) sizer->Layout();
+  }
+}
+
+void AppFrame::update_busy_indicator() {
+  if (!busy_) return;
+  busy_gauge_->Pulse();
+  auto secs = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - run_start_).count();
+  status_->SetLabel(wxString::FromUTF8(busy_label_ + "  •  " + std::to_string(secs) + " с"));
 }
 
 void AppFrame::update_cwd_label() {
@@ -958,9 +1041,10 @@ void AppFrame::run_command(const Server& server, const std::string& command, int
     return;
   }
   if (config_.settings.clear_output_before_run) output_->Clear();
+  busy_label_ = "Выполняется: " + title + " → " + server.name;
   set_busy(true);
   auto cwd = remote_cwd_[server.id];
-  status_->SetLabel(wxString::FromUTF8("Выполняется: " + title + " → " + server.name));
+  status_->SetLabel(wxString::FromUTF8(busy_label_));
   const wxColour meta = Theme::meta();
   append_output("\n" + std::string(60, '-') + "\n", &meta);
   append_output(title + "  •  " + server.name + "\n", &meta);

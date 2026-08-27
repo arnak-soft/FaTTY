@@ -262,8 +262,16 @@ Journal::Journal(std::filesystem::path path, int max_entries_in)
     : max_entries(std::max(100, std::min(50000, max_entries_in))),
       path_(path.empty() ? journal_path() : std::move(path)) {}
 
-void Journal::add_listener(std::function<void()> cb) {
-  listeners_.push_back(std::move(cb));
+int Journal::add_listener(std::function<void()> cb) {
+  int id = next_listener_id_++;
+  listeners_.emplace_back(id, std::move(cb));
+  return id;
+}
+
+void Journal::remove_listener(int id) {
+  listeners_.erase(std::remove_if(listeners_.begin(), listeners_.end(),
+                                  [id](const auto& l) { return l.first == id; }),
+                   listeners_.end());
 }
 
 void Journal::remove_listeners() {
@@ -301,7 +309,8 @@ void Journal::append(JournalEntry entry) {
     } catch (...) {
     }
   }
-  for (auto& cb : listeners_) {
+  for (auto& [id, cb] : listeners_) {
+    (void)id;
     try {
       cb();
     } catch (...) {
@@ -390,7 +399,8 @@ bool Journal::remove(const std::string& id) {
     }
     atomic_write_text(path_, out.str());
   }
-  for (auto& cb : listeners_) {
+  for (auto& [id, cb] : listeners_) {
+    (void)id;
     try {
       cb();
     } catch (...) {
@@ -404,7 +414,8 @@ void Journal::clear() {
     std::lock_guard lock(mutex_);
     atomic_write_text(path_, "");
   }
-  for (auto& cb : listeners_) {
+  for (auto& [id, cb] : listeners_) {
+    (void)id;
     try {
       cb();
     } catch (...) {

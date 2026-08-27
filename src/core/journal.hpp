@@ -51,7 +51,8 @@ class Journal {
  public:
   explicit Journal(std::filesystem::path path = {}, int max_entries = 5000);
 
-  void add_listener(std::function<void()> cb);
+  int add_listener(std::function<void()> cb);
+  void remove_listener(int id);
   void remove_listeners();
   void append(JournalEntry entry);
   std::vector<JournalEntry> load(int limit = 5000) const;
@@ -65,7 +66,8 @@ class Journal {
  private:
   std::filesystem::path path_;
   mutable std::mutex mutex_;
-  std::vector<std::function<void()>> listeners_;
+  std::vector<std::pair<int, std::function<void()>>> listeners_;
+  int next_listener_id_ = 1;
 };
 
 }  // namespace fatty

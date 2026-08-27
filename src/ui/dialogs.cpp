@@ -79,6 +79,10 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   keyrow->Add(browse, 0, wxLEFT, 8);
   grid->Add(keyrow, 1, wxEXPAND);
 
+  error_ = new wxStaticText(body, wxID_ANY, "");
+  error_->SetName("error");
+  error_->SetForegroundColour(Theme::err());
+
   auto* btns = new wxBoxSizer(wxHORIZONTAL);
   btns->AddStretchSpacer();
   auto* save = accent_button(body, "Сохранить");
@@ -89,6 +93,7 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
 
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(grid, 1, wxEXPAND | wxALL, 12);
+  root->Add(error_, 0, wxEXPAND | wxLEFT | wxRIGHT, 12);
   root->Add(btns, 0, wxEXPAND | wxALL, 12);
   body->SetSizer(root);
   auto* outer = new wxBoxSizer(wxVERTICAL);
@@ -118,19 +123,43 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
     if (dlg.ShowModal() == wxID_OK) key_->SetValue(dlg.GetPath());
   });
   save->Bind(wxEVT_BUTTON, &ServerDialog::on_ok, this);
+  for (wxTextCtrl* f : {name_, host_, user_, port_}) {
+    f->Bind(wxEVT_TEXT, [this](wxCommandEvent& e) { clear_errors(); e.Skip(); });
+  }
+}
+
+void ServerDialog::mark_error(wxTextCtrl* field, const wxString& message) {
+  error_->SetLabel(message);
+  if (field) {
+    field->SetBackgroundColour(Theme::err());
+    field->SetForegroundColour(*wxWHITE);
+    field->Refresh();
+    field->SetFocus();
+  }
+  Layout();
+}
+
+void ServerDialog::clear_errors() {
+  if (error_->GetLabel().empty()) return;
+  error_->SetLabel("");
+  for (wxTextCtrl* f : {name_, host_, user_, port_}) {
+    style_text(f);
+    f->Refresh();
+  }
+  Layout();
 }
 
 void ServerDialog::on_ok(wxCommandEvent&) {
+  clear_errors();
   auto name = trim(std::string(name_->GetValue().utf8_string()));
   auto host = trim(std::string(host_->GetValue().utf8_string()));
   auto user = trim(std::string(user_->GetValue().utf8_string()));
-  if (name.empty() || host.empty() || user.empty()) {
-    wxMessageBox("Заполните имя, хост и логин.", "Проверка", wxOK | wxICON_WARNING, this);
-    return;
-  }
+  if (name.empty()) { mark_error(name_, "Укажите имя VPS."); return; }
+  if (host.empty()) { mark_error(host_, "Укажите хост или IP."); return; }
+  if (user.empty()) { mark_error(user_, "Укажите логин."); return; }
   int port = 22;
   if (!parse_int(std::string(port_->GetValue().utf8_string()), port) || port < 1 || port > 65535) {
-    wxMessageBox("Порт должен быть числом 1–65535.", "Проверка", wxOK | wxICON_WARNING, this);
+    mark_error(port_, "Порт должен быть числом 1–65535.");
     return;
   }
   std::string password;

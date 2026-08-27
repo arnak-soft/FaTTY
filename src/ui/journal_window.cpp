@@ -101,7 +101,30 @@ JournalWindow::JournalWindow(wxWindow* parent, Journal& journal, std::function<v
     }
     e.Skip();
   });
+  // Обновляемся сами, когда во время открытого окна завершилась команда.
+  listener_id_ = journal_.add_listener([this] {
+    CallAfter([this] { reload_preserving_selection(); });
+  });
+  Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
+    journal_.remove_listener(listener_id_);
+    e.Skip();
+  });
   bind_escape_close(this);
+}
+
+void JournalWindow::reload_preserving_selection() {
+  long sel = list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  std::string keep_id;
+  if (sel >= 0 && sel < static_cast<long>(entries_.size())) keep_id = entries_[static_cast<std::size_t>(sel)].id;
+  reload();
+  if (keep_id.empty()) return;
+  for (std::size_t i = 0; i < entries_.size(); ++i) {
+    if (entries_[i].id == keep_id) {
+      list_->SetItemState(static_cast<long>(i), wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
+                          wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+      break;
+    }
+  }
 }
 
 void JournalWindow::delete_selected() {

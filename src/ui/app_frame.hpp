@@ -7,13 +7,18 @@
 
 #include <wx/button.h>
 #include <wx/frame.h>
+#include <wx/gauge.h>
 #include <wx/listctrl.h>
 #include <wx/notebook.h>
 #include <wx/splitter.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
+#include <wx/timer.h>
+#include <atomic>
+#include <chrono>
 #include <map>
 #include <memory>
+#include <vector>
 
 namespace fatty {
 
@@ -42,10 +47,13 @@ class AppFrame : public wxFrame {
   void append_output(const std::string& text, const wxColour* colour = nullptr);
   void set_busy(bool busy);
   void update_cwd_label();
+  void update_busy_indicator();
   void show_journal();
   void show_help(const std::string& tab = {});
   void check_updates_interactive();
+  void check_updates_async(bool interactive);
   void open_settings();
+  void restore_columns();
 
   Config config_;
   SessionVault vault_;
@@ -56,9 +64,17 @@ class AppFrame : public wxFrame {
   bool busy_ = false;
   bool restoring_ = true;
   bool updating_folders_ = false;
+  bool checking_updates_ = false;
+  std::string server_filter_;
+  std::string busy_label_;
+  std::chrono::steady_clock::time_point run_start_{};
+  // Живой-токен: воркеры проверяют его перед обращением к окну через CallAfter,
+  // чтобы не работать по разрушенному AppFrame.
+  std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
 
   wxSplitterWindow* vsplit_{};
   wxSplitterWindow* hsplit_{};
+  wxTextCtrl* server_search_{};
   wxListCtrl* servers_{};
   wxNotebook* folders_nb_{};
   wxListCtrl* commands_{};
@@ -69,6 +85,9 @@ class AppFrame : public wxFrame {
   wxButton* cwd_reset_{};
   wxButton* run_btn_{};
   wxButton* stop_btn_{};
+  wxGauge* busy_gauge_{};
+  wxTimer busy_timer_;
+  std::vector<wxWindow*> busy_disable_;
   wxStaticText* status_{};
   std::map<std::string, FilesWindow*> files_windows_;
   JournalWindow* journal_window_ = nullptr;

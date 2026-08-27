@@ -15,6 +15,7 @@ class JournalWindow : public wxFrame {
 
  private:
   void reload();
+  void reload_preserving_selection();
   void delete_selected();
   Journal& journal_;
   std::function<void(const JournalEntry&)> on_rerun_;
@@ -22,6 +23,7 @@ class JournalWindow : public wxFrame {
   wxListCtrl* list_{};
   wxTextCtrl* detail_{};
   wxTextCtrl* filter_{};
+  int listener_id_ = 0;
 };
 
 }  // namespace fatty
