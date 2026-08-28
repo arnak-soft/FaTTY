@@ -13,6 +13,10 @@ if not exist "%VCPKG_ROOT%\vcpkg.exe" (
   if errorlevel 1 exit /b 1
 )
 
+call :ensure_msvc
+call :ensure_cmake_ninja
+if errorlevel 1 exit /b 1
+
 set "GENERATOR=Ninja"
 set "TRIPLET="
 set "PRESET="
@@ -24,7 +28,10 @@ if not errorlevel 1 (
 ) else (
   where g++ >nul 2>nul
   if errorlevel 1 (
-    echo Neither MSVC cl nor MinGW g++ is in PATH.
+    echo No compiler in PATH.
+    echo Install Visual Studio 2022 with "Desktop development with C++",
+    echo then run build.bat from a regular cmd — it loads MSVC itself.
+    echo MinGW g++ also works if it is on PATH.
     exit /b 1
   )
   set "TRIPLET=x64-mingw-static"
@@ -123,4 +130,79 @@ echo Building installer...
 "%ISCC%" "/DMyAppVersion=%VER%" "/DMyVersionInfo=%VERINFO%" "/DPortableDirName=FaTTY %VER% Portable" fatty.iss
 if errorlevel 1 exit /b 1
 echo   dist\FaTTY %VER% Setup.exe
+exit /b 0
+
+:ensure_msvc
+where cl >nul 2>nul
+if not errorlevel 1 exit /b 0
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%VSWHERE%" exit /b 0
+set "VSINSTALL="
+for /f "usebackq delims=" %%i in (`"%VSWHERE%" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%i"
+if "%VSINSTALL%"=="" exit /b 0
+if not exist "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat" exit /b 0
+echo Loading MSVC x64 from "%VSINSTALL%"...
+call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat" >nul
+exit /b 0
+
+:ensure_cmake_ninja
+if defined VSINSTALLDIR (
+  if exist "%VSINSTALLDIR%Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" (
+    set "PATH=%VSINSTALLDIR%Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;%VSINSTALLDIR%Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;%PATH%"
+  )
+)
+if exist "%~dp0third_party\cmake\bin\cmake.exe" set "PATH=%~dp0third_party\cmake\bin;%PATH%"
+if exist "%~dp0third_party\ninja\ninja.exe" set "PATH=%~dp0third_party\ninja;%PATH%"
+where cmake >nul 2>nul
+if errorlevel 1 call :install_cmake
+if errorlevel 1 exit /b 1
+where ninja >nul 2>nul
+if errorlevel 1 call :install_ninja
+if errorlevel 1 exit /b 1
+exit /b 0
+
+:install_cmake
+echo CMake not in PATH — downloading portable CMake 3.31.8...
+if not exist "%~dp0third_party" mkdir "%~dp0third_party"
+curl.exe -L --fail --retry 3 -o "%TEMP%\fatty-cmake.zip" "https://github.com/Kitware/CMake/releases/download/v3.31.8/cmake-3.31.8-windows-x86_64.zip"
+if errorlevel 1 (
+  echo Failed to download CMake. Install CMake 3.24+ and Ninja, then retry.
+  exit /b 1
+)
+if exist "%~dp0third_party\_cmake_extract" rd /s /q "%~dp0third_party\_cmake_extract"
+mkdir "%~dp0third_party\_cmake_extract"
+tar.exe -xf "%TEMP%\fatty-cmake.zip" -C "%~dp0third_party\_cmake_extract"
+if errorlevel 1 (
+  echo Failed to unpack CMake zip.
+  exit /b 1
+)
+if exist "%~dp0third_party\cmake" rd /s /q "%~dp0third_party\cmake"
+move "%~dp0third_party\_cmake_extract\cmake-3.31.8-windows-x86_64" "%~dp0third_party\cmake" >nul
+rd /s /q "%~dp0third_party\_cmake_extract"
+if not exist "%~dp0third_party\cmake\bin\cmake.exe" (
+  echo CMake layout unexpected after unpack.
+  exit /b 1
+)
+set "PATH=%~dp0third_party\cmake\bin;%PATH%"
+exit /b 0
+
+:install_ninja
+echo Ninja not in PATH — downloading Ninja 1.12.1...
+if not exist "%~dp0third_party" mkdir "%~dp0third_party"
+if not exist "%~dp0third_party\ninja" mkdir "%~dp0third_party\ninja"
+curl.exe -L --fail --retry 3 -o "%TEMP%\fatty-ninja.zip" "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-win.zip"
+if errorlevel 1 (
+  echo Failed to download Ninja. Install Ninja, then retry.
+  exit /b 1
+)
+tar.exe -xf "%TEMP%\fatty-ninja.zip" -C "%~dp0third_party\ninja"
+if errorlevel 1 (
+  echo Failed to unpack Ninja zip.
+  exit /b 1
+)
+if not exist "%~dp0third_party\ninja\ninja.exe" (
+  echo ninja.exe missing after unpack.
+  exit /b 1
+)
+set "PATH=%~dp0third_party\ninja;%PATH%"
 exit /b 0

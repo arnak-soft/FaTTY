@@ -8,7 +8,7 @@
 
 ## Сборка
 
-Нужны CMake 3.24+, Ninja, Git и компилятор: Visual Studio 2022 (MSVC) или MinGW-w64. Зависимости подтягивает [vcpkg](https://github.com/microsoft/vcpkg) (клон в `third_party\vcpkg`, не в git).
+Нужны Git и компилятор: Visual Studio 2022 (MSVC, workload «Разработка классических приложений на C++») или MinGW-w64. CMake 3.24+ и Ninja — если их нет в PATH, `build.bat` сам скачает портативные копии в `third_party\`. Зависимости подтягивает [vcpkg](https://github.com/microsoft/vcpkg) (клон в `third_party\vcpkg`, не в git). `build.bat` можно запускать из обычного cmd: он сам находит VS и вызывает `vcvars64`.
 
 `build.bat` кладёт в `dist\` три варианта:
 

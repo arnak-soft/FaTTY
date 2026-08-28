@@ -14,6 +14,8 @@ __pycache__/
 /cmake-build-*/
 /vcpkg_installed/
 /third_party/vcpkg/
+/third_party/cmake/
+/third_party/ninja/
 .vcpkg-cache/
 CMakeUserPresets.json
 CMakeCache.txt
