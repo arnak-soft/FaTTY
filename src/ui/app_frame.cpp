@@ -20,9 +20,11 @@
 
 #include <wx/app.h>
 #include <wx/button.h>
+#include <wx/dialog.h>
 #include <wx/filedlg.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
+#include <wx/window.h>
 #include <wx/notebook.h>
 #include <wx/bookctrl.h>
 #include <wx/sizer.h>
@@ -65,13 +67,13 @@ AppFrame::AppFrame(Config config, SessionVault vault)
   register_window(GetHWND());
   refresh_servers(config_.settings.last_server_id);
   Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
-    if (busy_) {
+    if (busy_ && e.CanVeto() && !closing_for_install_) {
       if (wxMessageBox(L"Команда ещё выполняется. Выйти?", L"Выход", wxYES_NO, this) != wxYES) {
         e.Veto();
         return;
       }
-      if (session_) session_->cancel();
     }
+    if (busy_ && session_) session_->cancel();
     // Закрытие подтверждено: гасим живой-токен, чтобы фоновые задачи не трогали окно.
     alive_->store(false);
     busy_timer_.Stop();
@@ -830,6 +832,25 @@ void AppFrame::open_settings() {
                      [this] { check_updates_interactive(); }, [this] { refresh_servers(); });
   dlg.setup_layout(&config_.settings, "settings", true, [this] { persist(); });
   dlg.ShowModal();
+}
+
+bool AppFrame::files_busy() const {
+  for (const auto& pair : files_windows_) {
+    if (pair.second && pair.second->is_busy()) return true;
+  }
+  return false;
+}
+
+void AppFrame::request_close_for_install() {
+  closing_for_install_ = true;
+  if (session_) session_->cancel();
+  wxWindowList top = wxTopLevelWindows;
+  for (wxWindow* w : top) {
+    if (auto* dlg = wxDynamicCast(w, wxDialog); dlg && dlg->IsModal()) {
+      dlg->EndModal(wxID_CANCEL);
+    }
+  }
+  Close(true);
 }
 
 void AppFrame::persist() {

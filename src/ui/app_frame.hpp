@@ -29,6 +29,9 @@ class HelpWindow;
 class AppFrame : public wxFrame {
  public:
   AppFrame(Config config, SessionVault vault);
+  bool is_busy() const { return busy_; }
+  bool files_busy() const;
+  void request_close_for_install();
 
  private:
   void build_menu();
@@ -64,6 +67,7 @@ class AppFrame : public wxFrame {
   std::map<std::string, std::string> remote_cwd_;
   std::map<std::string, JournalEntry> last_runs_;
   bool busy_ = false;
+  bool closing_for_install_ = false;
   bool restoring_ = true;
   bool updating_folders_ = false;
   bool checking_updates_ = false;

@@ -5,13 +5,17 @@
 #include "core/util.hpp"
 #include "ui/app_frame.hpp"
 #include "ui/dialogs.hpp"
+#include "ui/files_window.hpp"
 #include "ui/splash.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
 #include <wx/app.h>
+#include <wx/dialog.h>
 #include <wx/msgdlg.h>
 #include <wx/strconv.h>
+#include <wx/timer.h>
+#include <wx/window.h>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -66,6 +70,10 @@ class FattyApp : public wxApp {
       activate_existing();
       return false;
     }
+    init_install_close_ipc();
+    install_close_timer_.SetOwner(this);
+    Bind(wxEVT_TIMER, [this](wxTimerEvent&) { on_install_close_tick(); });
+    install_close_timer_.Start(200);
     set_theme(peek_theme());
 #ifdef __WXMSW__
     if (theme_is_dark()) MSWEnableDarkMode(DarkMode_Always);
@@ -79,6 +87,8 @@ class FattyApp : public wxApp {
     } catch (const std::exception& exc) {
       hide_splash();
       wxMessageBox(wxString::FromUTF8(exc.what()), wxString::FromUTF8(kAppName), wxOK | wxICON_ERROR);
+      install_close_timer_.Stop();
+      shutdown_install_close_ipc();
       return false;
     }
     hide_splash();
@@ -86,6 +96,8 @@ class FattyApp : public wxApp {
     MasterPasswordDialog dlg(nullptr, config, vault);
     dlg.setup_layout(&config.settings, "master");
     if (dlg.ShowModal() != wxID_OK || !dlg.ok || !vault.unlocked()) {
+      install_close_timer_.Stop();
+      shutdown_install_close_ipc();
       return false;
     }
     try {
@@ -93,6 +105,8 @@ class FattyApp : public wxApp {
     } catch (const std::exception& exc) {
       wxMessageBox(L"Не удалось сохранить хранилище: " + wxString::FromUTF8(exc.what()),
                    wxString::FromUTF8(kAppName), wxOK | wxICON_ERROR);
+      install_close_timer_.Stop();
+      shutdown_install_close_ipc();
       return false;
     }
     auto* frame = new AppFrame(std::move(config), std::move(vault));
@@ -101,12 +115,64 @@ class FattyApp : public wxApp {
     return true;
   }
 
+  int OnExit() override {
+    install_close_timer_.Stop();
+    shutdown_install_close_ipc();
+    return wxApp::OnExit();
+  }
+
   void OnFatalException() override {
     try {
       std::filesystem::create_directories(app_dir());
       std::ofstream out(error_log_path(), std::ios::binary | std::ios::trunc);
       out << "fatal exception\n";
     } catch (...) {
+    }
+  }
+
+ private:
+  wxTimer install_close_timer_;
+  bool closing_for_install_ = false;
+
+  static AppFrame* find_frame() {
+    if (auto* frame = dynamic_cast<AppFrame*>(wxTheApp->GetTopWindow())) return frame;
+    for (wxWindow* w : wxTopLevelWindows) {
+      if (auto* frame = dynamic_cast<AppFrame*>(w)) return frame;
+    }
+    return nullptr;
+  }
+
+  void on_install_close_tick() {
+    bool busy = false;
+    bool modal = false;
+    if (auto* frame = find_frame()) {
+      busy = frame->is_busy() || frame->files_busy();
+      for (wxWindow* w : wxTopLevelWindows) {
+        if (w == frame) continue;
+        if (auto* files = dynamic_cast<FilesWindow*>(w); files && files->is_busy()) busy = true;
+        if (auto* dlg = wxDynamicCast(w, wxDialog); dlg && dlg->IsModal() && dlg->IsShown()) modal = true;
+      }
+    }
+    publish_install_state(busy, modal);
+    if (!take_install_close_request()) return;
+    close_for_install();
+  }
+
+  void close_for_install() {
+    if (closing_for_install_) return;
+    closing_for_install_ = true;
+    install_close_timer_.Stop();
+    if (auto* frame = find_frame()) {
+      frame->request_close_for_install();
+      return;
+    }
+    wxWindowList top = wxTopLevelWindows;
+    for (wxWindow* w : top) {
+      if (auto* dlg = wxDynamicCast(w, wxDialog); dlg && dlg->IsModal()) {
+        dlg->EndModal(wxID_CANCEL);
+      } else if (w) {
+        w->Close(true);
+      }
     }
   }
 };

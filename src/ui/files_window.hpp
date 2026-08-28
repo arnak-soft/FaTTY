@@ -20,6 +20,7 @@ class FilesWindow : public wxFrame {
  public:
   FilesWindow(wxWindow* parent, const Server& server, std::string start_path);
   ~FilesWindow() override;
+  bool is_busy() const { return busy_.load(); }
 
  private:
   void connect();

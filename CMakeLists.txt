@@ -109,7 +109,7 @@ target_link_libraries(fatty PRIVATE
   wx::base
 )
 if(WIN32)
-  target_link_libraries(fatty PRIVATE dwmapi user32 gdi32 comctl32 ole32 uuid)
+  target_link_libraries(fatty PRIVATE dwmapi user32 gdi32 comctl32 ole32 uuid advapi32)
 endif()
 
 if(MSVC)
