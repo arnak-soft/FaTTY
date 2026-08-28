@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -30,6 +31,7 @@ struct JournalEntry {
   std::string status = "error";
   std::string kind = "command";
   std::string error;
+  std::string output;
 
   std::string target() const;
   std::string started_display() const;
@@ -46,6 +48,8 @@ std::string format_duration(double seconds);
 std::string status_from_exit(int code);
 std::string status_label(const std::string& status);
 std::string kind_label(const std::string& kind);
+
+inline constexpr std::size_t kJournalOutputMax = 256 * 1024;
 
 class Journal {
  public:

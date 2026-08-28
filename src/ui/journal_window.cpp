@@ -6,9 +6,10 @@
 
 #include <wx/app.h>
 #include <wx/clipbrd.h>
-#include <wx/button.h>
 #include <wx/filedlg.h>
+#include <wx/listctrl.h>
 #include <wx/msgdlg.h>
+#include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
@@ -26,19 +27,28 @@ JournalWindow::JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
   SetSize(FromDIP(wxSize(960, 580)));
   auto* panel = new wxPanel(this);
   filter_ = new wxTextCtrl(panel, wxID_ANY);
-  auto* rerun = new wxButton(panel, wxID_ANY, L"Повтор");
-  auto* copy = new wxButton(panel, wxID_ANY, L"Копировать");
-  auto* save = new wxButton(panel, wxID_ANY, L"Сохранить…");
-  auto* del = new wxButton(panel, wxID_ANY, L"Удалить");
-  auto* clear = new wxButton(panel, wxID_ANY, L"Очистить");
-  list_ = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
+  auto* rerun = make_button(panel, L"Повтор");
+  auto* copy = make_button(panel, L"Копировать");
+  auto* save = make_button(panel, L"Сохранить…");
+  auto* del = make_button(panel, L"Удалить");
+  auto* clear = make_button(panel, L"Очистить");
+  auto* list_card = new RoundedCard(panel);
+  list_ = new wxListCtrl(list_card, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
   list_->AppendColumn(L"Время", wxLIST_FORMAT_LEFT, FromDIP(150));
   list_->AppendColumn(L"VPS", wxLIST_FORMAT_LEFT, FromDIP(140));
   list_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(280));
   list_->AppendColumn(L"Результат", wxLIST_FORMAT_LEFT, FromDIP(100));
   list_->AppendColumn(L"Длит.", wxLIST_FORMAT_LEFT, FromDIP(90));
-  detail_ = new wxTextCtrl(panel, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_MULTILINE | wxTE_READONLY);
+  auto* list_sz = new wxBoxSizer(wxVERTICAL);
+  list_sz->Add(list_, 1, wxEXPAND);
+  list_card->SetSizer(list_sz);
+  auto* detail_card = new RoundedCard(panel);
+  detail_ = new wxTextCtrl(detail_card, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize,
+                           wxTE_MULTILINE | wxTE_READONLY | wxBORDER_NONE);
   style_text(detail_, true);
+  auto* detail_sz = new wxBoxSizer(wxVERTICAL);
+  detail_sz->Add(detail_, 1, wxEXPAND);
+  detail_card->SetSizer(detail_sz);
   bind_copy_on_select(detail_);
   auto* top = new wxBoxSizer(wxHORIZONTAL);
   top->Add(new wxStaticText(panel, wxID_ANY, L"Фильтр"), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
@@ -49,8 +59,8 @@ JournalWindow::JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
   top->Add(del, 0, wxRIGHT, 4);
   top->Add(clear);
   auto* split = new wxBoxSizer(wxVERTICAL);
-  split->Add(list_, 1, wxEXPAND);
-  split->Add(detail_, 1, wxEXPAND | wxTOP, 8);
+  split->Add(list_card, 1, wxEXPAND);
+  split->Add(detail_card, 1, wxEXPAND | wxTOP, 8);
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(top, 0, wxEXPAND | wxALL, 8);
   root->Add(split, 1, wxEXPAND | wxALL, 8);
@@ -168,7 +178,7 @@ void JournalWindow::reload() {
   for (const auto& e : all) {
     if (!q.empty()) {
       auto hay = to_lower(e.server_name + " " + e.command + " " + e.title);
-      if (hay.find(q) == std::string::npos) continue;
+      if (hay.find(q) == std::string::npos && to_lower(e.output).find(q) == std::string::npos) continue;
     }
     entries_.push_back(e);
   }

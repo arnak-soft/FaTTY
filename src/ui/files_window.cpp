@@ -4,10 +4,10 @@
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
-#include <wx/button.h>
 #include <wx/dirdlg.h>
 #include <wx/filedlg.h>
 #include <wx/msgdlg.h>
+#include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textdlg.h>
@@ -36,19 +36,23 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
   SetSize(FromDIP(wxSize(780, 520)));
   auto* panel = new wxPanel(this);
   path_ = new wxTextCtrl(panel, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
-  auto* up = new wxButton(panel, wxID_ANY, L"Вверх");
-  auto* mkdir = new wxButton(panel, wxID_ANY, L"Новая папка");
-  auto* upload_btn = new wxButton(panel, wxID_ANY, L"Загрузить");
-  auto* download_btn = new wxButton(panel, wxID_ANY, L"Скачать");
-  auto* del = new wxButton(panel, wxID_ANY, L"Удалить");
-  auto* stop = new wxButton(panel, wxID_ANY, L"Стоп");
+  auto* up = make_button(panel, L"Вверх");
+  auto* mkdir = make_button(panel, L"Новая папка");
+  auto* upload_btn = make_button(panel, L"Загрузить");
+  auto* download_btn = make_button(panel, L"Скачать");
+  auto* del = make_button(panel, L"Удалить");
+  auto* stop = make_button(panel, L"Стоп");
   stop_btn_ = stop;
   busy_disable_ = {up, mkdir, upload_btn, download_btn, del, path_};
-  list_ = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
+  auto* list_card = new RoundedCard(panel);
+  list_ = new wxListCtrl(list_card, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
   list_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(280));
   list_->AppendColumn(L"Тип", wxLIST_FORMAT_LEFT, FromDIP(120));
   list_->AppendColumn(L"Размер", wxLIST_FORMAT_RIGHT, FromDIP(90));
   list_->AppendColumn(L"Изменён", wxLIST_FORMAT_LEFT, FromDIP(140));
+  auto* list_sz = new wxBoxSizer(wxVERTICAL);
+  list_sz->Add(list_, 1, wxEXPAND);
+  list_card->SetSizer(list_sz);
   gauge_ = new wxGauge(panel, wxID_ANY, 100);
   status_ = new wxStaticText(panel, wxID_ANY, L"Подключение…");
   status_->SetName(L"muted");
@@ -64,7 +68,7 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(top, 0, wxEXPAND | wxALL, 8);
   root->Add(acts, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
-  root->Add(list_, 1, wxEXPAND | wxALL, 8);
+  root->Add(list_card, 1, wxEXPAND | wxALL, 8);
   root->Add(gauge_, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
   root->Add(status_, 0, wxEXPAND | wxALL, 8);
   panel->SetSizer(root);

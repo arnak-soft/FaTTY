@@ -2,8 +2,8 @@
 
 #include "core/store.hpp"
 #include "net/sftp_session.hpp"
+#include "ui/chrome.hpp"
 
-#include <wx/button.h>
 #include <wx/frame.h>
 #include <wx/gauge.h>
 #include <wx/listctrl.h>
@@ -40,7 +40,7 @@ class FilesWindow : public wxFrame {
   wxListCtrl* list_{};
   wxGauge* gauge_{};
   wxStaticText* status_{};
-  wxButton* stop_btn_{};
+  RoundButton* stop_btn_{};
   std::vector<wxWindow*> busy_disable_;
   std::atomic<bool> busy_{false};
 };

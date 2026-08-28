@@ -6,14 +6,13 @@
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
-#include <wx/button.h>
 #include <wx/clipbrd.h>
 #include <wx/listctrl.h>
-#include <wx/notebook.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
+#include <vector>
 
 namespace fatty {
 namespace {
@@ -32,7 +31,8 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
               wxDefaultSize) {
   set_icon(this);
   SetSize(FromDIP(wxSize(840, 600)));
-  nb_ = new wxNotebook(this, wxID_ANY);
+  auto* panel = new wxPanel(this);
+  nb_ = new RoundedNotebook(panel);
   auto start = wxString(
       L"Что это\n\nFaTTY хранит список VPS и команды к ним, затем запускает выбранную команду по SSH.\n\n"
       L"Как начать\n\n1. Добавьте VPS: имя, хост, порт, логин, пароль и/или ключ.\n"
@@ -63,16 +63,18 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
       L"• Не запускайте через F5 интерактивное: top, less, vim, pm2 logs без --nostream.\n"
       L"• Для sudo нужен NOPASSWD, иначе команда зависнет на Password:.\n"
       L"• Мастер-пароль нельзя восстановить.\n"
-      L"• Журнал не хранит пароли.\n\n"
+      L"• Журнал не хранит пароли, но сохраняет вывод команды.\n\n"
       L"Конфиг: %APPDATA%\\FaTTY\\config.json");
 
   auto* p0 = new wxPanel(nb_);
+  p0->SetName(L"card-page");
   auto* s0 = new wxBoxSizer(wxVERTICAL);
   s0->Add(prose(p0, start), 1, wxEXPAND | wxALL, 8);
   p0->SetSizer(s0);
   nb_->AddPage(p0, L"Как пользоваться");
 
   auto* p1 = new wxPanel(nb_);
+  p1->SetName(L"card-page");
   auto* s1 = new wxBoxSizer(wxVERTICAL);
   auto* k = prose(p1, keys);
   k->SetFont(Theme::mono());
@@ -81,7 +83,9 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
   nb_->AddPage(p1, L"Клавиши");
 
   auto* p2 = new wxPanel(nb_);
-  auto* list = new wxListCtrl(p2, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
+  p2->SetName(L"card-page");
+  auto* list = new wxListCtrl(p2, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                             wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
   list->AppendColumn(L"Группа", wxLIST_FORMAT_LEFT, FromDIP(100));
   list->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(140));
   list->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(420));
@@ -103,8 +107,8 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
     list->SetItem(row, 1, wxString::FromUTF8(c.name));
     list->SetItem(row, 2, wxString::FromUTF8(c.command));
   }
-  auto* copy = new wxButton(p2, wxID_ANY, L"Копировать");
-  auto* insert = new wxButton(p2, wxID_ANY, L"В разовую");
+  auto* copy = make_button(p2, L"Копировать");
+  auto* insert = make_button(p2, L"В разовую");
   auto* row = new wxBoxSizer(wxHORIZONTAL);
   row->Add(copy, 0, wxRIGHT, 8);
   row->Add(insert);
@@ -127,14 +131,18 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
   });
 
   auto* p3 = new wxPanel(nb_);
+  p3->SetName(L"card-page");
   auto* s3 = new wxBoxSizer(wxVERTICAL);
   s3->Add(prose(p3, tips), 1, wxEXPAND | wxALL, 8);
   p3->SetSizer(s3);
   nb_->AddPage(p3, L"Советы");
 
   auto* outer = new wxBoxSizer(wxVERTICAL);
-  outer->Add(nb_, 1, wxEXPAND);
-  SetSizer(outer);
+  outer->Add(nb_, 1, wxEXPAND | wxALL, 8);
+  panel->SetSizer(outer);
+  auto* root = new wxBoxSizer(wxVERTICAL);
+  root->Add(panel, 1, wxEXPAND);
+  SetSizer(root);
   apply_dark(this);
   bind_escape_close(this);
 }
@@ -142,7 +150,7 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
 void HelpWindow::show_tab(const std::string& name) {
   for (size_t i = 0; i < nb_->GetPageCount(); ++i) {
     if (nb_->GetPageText(i) == wxString::FromUTF8(name)) {
-      nb_->SetSelection(i);
+      nb_->SetSelection(static_cast<int>(i));
       break;
     }
   }

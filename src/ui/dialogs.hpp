@@ -4,8 +4,8 @@
 #include "core/store.hpp"
 #include "core/vault.hpp"
 #include "ui/layout.hpp"
+#include "ui/chrome.hpp"
 
-#include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/combobox.h>
 #include <wx/stattext.h>
@@ -92,7 +92,7 @@ class MasterPasswordDialog : public PositionedDialog {
   wxTextCtrl* pw_{};
   wxTextCtrl* pw2_{};
   wxStaticText* error_{};
-  wxButton* continue_btn_{};
+  RoundButton* continue_btn_{};
 };
 
 class ChangeMasterDialog : public PositionedDialog {

@@ -24,10 +24,13 @@ void test_journal() {
   e.command_id = "cid";
   e.status = "ok";
   e.exit_code = 0;
+  e.output = "hello\nworld";
   e.started_at = now_iso();
   journal.append(e);
   auto items = journal.load();
   expect(items.size() == 1, "journal size");
+  expect(items[0].output == "hello\nworld", "journal stores output");
+  expect(items[0].as_text().find("hello") != std::string::npos, "as_text includes output");
   expect(status_from_exit(0) == "ok", "status ok");
   expect(status_from_exit(124) == "timeout", "status timeout");
   expect(status_from_exit(130) == "cancelled", "status cancel");

@@ -1,5 +1,7 @@
 #include "ui/theme.hpp"
 
+#include "ui/chrome.hpp"
+
 #include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/fontenum.h>
@@ -9,6 +11,8 @@
 #include <wx/settings.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
+#include <algorithm>
+#include <cmath>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -42,6 +46,8 @@ struct Palette {
   wxColour warn;
   wxColour cancel;
   wxColour terminal;
+  wxColour border;
+  wxColour hover;
 };
 
 // Тёмная палитра в духе GitHub Dark: холодный графит с синим акцентом.
@@ -50,6 +56,7 @@ const Palette kDark{
     {0xd9, 0xde, 0xe5}, {0xf2, 0xf5, 0xf8}, {0x8b, 0x94, 0x9e}, {0x2f, 0x81, 0xf7},
     {0x1f, 0x3a, 0x5f}, {0x79, 0xc0, 0xff}, {0x3f, 0xb9, 0x50}, {0xf8, 0x51, 0x49},
     {0xd2, 0x99, 0x22}, {0xbc, 0x8c, 0xff}, {0x0d, 0x11, 0x17},
+    {0x30, 0x38, 0x45}, {0x32, 0x3c, 0x4a},
 };
 
 const Palette kLight{
@@ -57,6 +64,7 @@ const Palette kLight{
     {0x24, 0x29, 0x2f}, {0x14, 0x18, 0x1c}, {0x65, 0x6d, 0x76}, {0x09, 0x69, 0xda},
     {0xcf, 0xe4, 0xfc}, {0x05, 0x50, 0xae}, {0x1a, 0x7f, 0x37}, {0xcf, 0x22, 0x2e},
     {0x9a, 0x67, 0x00}, {0x82, 0x50, 0xdf}, {0xff, 0xff, 0xff},
+    {0xd0, 0xd7, 0xde}, {0xdd, 0xe4, 0xeb},
 };
 
 const Palette& pal() { return g_dark ? kDark : kLight; }
@@ -89,6 +97,15 @@ wxColour Theme::err() { return pal().err; }
 wxColour Theme::warn() { return pal().warn; }
 wxColour Theme::cancel() { return pal().cancel; }
 wxColour Theme::terminal() { return pal().terminal; }
+wxColour Theme::border() { return pal().border; }
+wxColour Theme::hover() { return pal().hover; }
+wxColour Theme::blend(const wxColour& a, const wxColour& b, float t) {
+  t = std::clamp(t, 0.f, 1.f);
+  auto mix = [t](unsigned char x, unsigned char y) {
+    return static_cast<unsigned char>(std::lround(x + (static_cast<int>(y) - static_cast<int>(x)) * t));
+  };
+  return {mix(a.Red(), b.Red()), mix(a.Green(), b.Green()), mix(a.Blue(), b.Blue()), mix(a.Alpha(), b.Alpha())};
+}
 wxFont Theme::ui() { return wxFont(10, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
 wxFont Theme::ui_small() { return wxFont(9, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
 wxFont Theme::ui_section() { return wxFont(8, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_SEMIBOLD, false, L"Segoe UI"); }
@@ -112,7 +129,13 @@ void apply_theme(wxWindow* window) {
   if (name != L"title" && name != L"mono" && name != L"section") window->SetFont(Theme::ui());
   wxWindow* parent = window->GetParent();
   const wxColour parent_bg = parent ? parent->GetBackgroundColour() : Theme::bg();
-  if (name == L"accent") {
+  if (dynamic_cast<RoundButton*>(window) || dynamic_cast<RoundedNotebook*>(window) ||
+      dynamic_cast<RoundedCard*>(window) || dynamic_cast<TabStrip*>(window)) {
+    window->SetForegroundColour(Theme::text());
+  } else if (name == L"card-page") {
+    window->SetBackgroundColour(Theme::elevated());
+    window->SetForegroundColour(Theme::text());
+  } else if (name == L"accent") {
     window->SetBackgroundColour(Theme::accent());
     window->SetForegroundColour(*wxWHITE);
   } else if (name == L"title") {

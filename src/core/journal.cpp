@@ -22,6 +22,19 @@ constexpr int kTrimSlack = 200;
 constexpr int kCommandMax = 16384;
 constexpr int kErrorMax = 4096;
 
+std::string clip_utf8(std::string text, std::size_t limit) {
+  if (text.size() <= limit) return text;
+  std::size_t n = limit;
+  while (n > 0 && (static_cast<unsigned char>(text[n - 1]) & 0xC0) == 0x80) --n;
+  if (n > 0 && (static_cast<unsigned char>(text[n - 1]) & 0x80)) --n;
+  text.resize(n);
+  text.push_back('\n');
+  text.push_back(static_cast<char>(0xE2));
+  text.push_back(static_cast<char>(0x80));
+  text.push_back(static_cast<char>(0xA6));
+  return text;
+}
+
 std::tm local_tm(std::chrono::system_clock::time_point tp) {
   std::time_t t = std::chrono::system_clock::to_time_t(tp);
   std::tm out{};
@@ -66,6 +79,7 @@ json entry_to_json(const JournalEntry& e) {
       {"status", e.status},
       {"kind", e.kind},
       {"error", e.error},
+      {"output", e.output},
   };
   if (e.exit_code) {
     j["exit_code"] = *e.exit_code;
@@ -104,6 +118,7 @@ JournalEntry parse_entry(const json& raw) {
   e.status = raw.value("status", "error");
   e.kind = raw.value("kind", "command");
   e.error = raw.value("error", "");
+  e.output = raw.value("output", "");
   return e;
 }
 
@@ -255,6 +270,7 @@ std::string JournalEntry::as_text() const {
     ss << "Ошибка: " << error << "\n";
   }
   ss << "Команда:\n" << (command.empty() ? "—" : command);
+  ss << "\n\nВывод:\n" << (output.empty() ? "—" : output);
   return ss.str();
 }
 
@@ -304,10 +320,11 @@ void Journal::notify_listeners() {
 void Journal::append(JournalEntry entry) {
   entry.command = clip(entry.command, kCommandMax);
   entry.error = clip(entry.error, kErrorMax);
+  entry.output = clip_utf8(std::move(entry.output), kJournalOutputMax);
   if (entry.id.empty()) {
     entry.id = new_uuid();
   }
-  std::string line = entry_to_json(entry).dump();
+  std::string line = entry_to_json(entry).dump(-1, ' ', false, json::error_handler_t::replace);
   {
     std::lock_guard lock(mutex_);
     std::filesystem::create_directories(path_.parent_path());

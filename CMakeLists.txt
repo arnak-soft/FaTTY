@@ -62,6 +62,7 @@ set(FATTY_NET_SOURCES
 
 set(FATTY_UI_SOURCES
   src/ui/theme.cpp
+  src/ui/chrome.cpp
   src/ui/layout.cpp
   src/ui/widgets.cpp
   src/ui/dialogs.cpp

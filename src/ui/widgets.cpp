@@ -3,7 +3,6 @@
 #include "core/paths.hpp"
 #include "ui/theme.hpp"
 
-#include <wx/button.h>
 #include <wx/clipbrd.h>
 #include <wx/dialog.h>
 #include <wx/icon.h>
@@ -66,14 +65,6 @@ void set_icon(wxWindow* window) {
       if (auto* top = dynamic_cast<wxTopLevelWindow*>(window)) top->SetIcon(icon);
     }
   }
-}
-
-wxButton* accent_button(wxWindow* parent, const wxString& label, wxWindowID id) {
-  auto* btn = new wxButton(parent, id, label);
-  btn->SetName(L"accent");
-  btn->SetBackgroundColour(Theme::accent());
-  btn->SetForegroundColour(*wxWHITE);
-  return btn;
 }
 
 wxStaticText* section_label(wxWindow* parent, const wxString& text) {

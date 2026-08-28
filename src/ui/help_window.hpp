@@ -1,7 +1,7 @@
 #pragma once
 
+#include "ui/chrome.hpp"
 #include <wx/frame.h>
-#include <wx/notebook.h>
 #include <functional>
 #include <string>
 
@@ -13,7 +13,7 @@ class HelpWindow : public wxFrame {
   void show_tab(const std::string& name);
 
  private:
-  wxNotebook* nb_{};
+  RoundedNotebook* nb_{};
 };
 
 }  // namespace fatty

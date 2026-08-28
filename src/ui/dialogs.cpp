@@ -5,9 +5,9 @@
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
-#include <wx/button.h>
 #include <wx/filedlg.h>
 #include <wx/msgdlg.h>
+#include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/filename.h>
@@ -74,7 +74,7 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   auto* keyrow = new wxBoxSizer(wxHORIZONTAL);
   key_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(server.key_path));
   style_text(key_);
-  auto* browse = new wxButton(body, wxID_ANY, L"Обзор…");
+  auto* browse = make_button(body, L"Обзор…");
   keyrow->Add(key_, 1, wxEXPAND);
   keyrow->Add(browse, 0, wxLEFT, 8);
   grid->Add(keyrow, 1, wxEXPAND);
@@ -86,7 +86,7 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   auto* btns = new wxBoxSizer(wxHORIZONTAL);
   btns->AddStretchSpacer();
   auto* save = accent_button(body, L"Сохранить");
-  auto* cancel = new wxButton(body, wxID_CANCEL, L"Отмена");
+  auto* cancel = make_button(body, L"Отмена", wxID_CANCEL);
   btns->Add(save, 0, wxRIGHT, 8);
   btns->Add(cancel);
   save->SetDefault();
@@ -205,13 +205,13 @@ PresetDialog::PresetDialog(wxWindow* parent, const Server& server)
   style_text(pm2_);
   form->Add(pm2_, 1, wxEXPAND);
 
-  auto* refresh = new wxButton(body, wxID_ANY, L"Обновить список");
+  auto* refresh = make_button(body, L"Обновить список");
   list_ = new wxPanel(body);
   auto* btns = new wxBoxSizer(wxHORIZONTAL);
   btns->AddStretchSpacer();
   auto* add = accent_button(body, L"Добавить выбранные");
   btns->Add(add, 0, wxRIGHT, 8);
-  btns->Add(new wxButton(body, wxID_CANCEL, L"Отмена"));
+  btns->Add(make_button(body, L"Отмена", wxID_CANCEL));
   add->SetDefault();
 
   auto* root = new wxBoxSizer(wxVERTICAL);
@@ -302,7 +302,7 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   btns->AddStretchSpacer();
   auto* save = accent_button(body, L"Сохранить");
   btns->Add(save, 0, wxRIGHT, 8);
-  btns->Add(new wxButton(body, wxID_CANCEL, L"Отмена"));
+  btns->Add(make_button(body, L"Отмена", wxID_CANCEL));
 
   save->SetDefault();
   auto* root = new wxBoxSizer(wxVERTICAL);
@@ -430,7 +430,7 @@ MasterPasswordDialog::MasterPasswordDialog(wxWindow* parent, Config& config, Ses
   btns->AddStretchSpacer();
   continue_btn_ = accent_button(body, L"Продолжить");
   btns->Add(continue_btn_, 0, wxRIGHT, 8);
-  btns->Add(new wxButton(body, wxID_CANCEL, L"Выход"));
+  btns->Add(make_button(body, L"Выход", wxID_CANCEL));
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(intro, 0, wxALL, 16);
   root->Add(form, 0, wxEXPAND | wxLEFT | wxRIGHT, 16);
@@ -519,7 +519,7 @@ ChangeMasterDialog::ChangeMasterDialog(wxWindow* parent, SessionVault& vault, bo
   btns->AddStretchSpacer();
   auto* go = accent_button(body, L"Сменить");
   btns->Add(go, 0, wxRIGHT, 8);
-  btns->Add(new wxButton(body, wxID_CANCEL, L"Отмена"));
+  btns->Add(make_button(body, L"Отмена", wxID_CANCEL));
   go->SetDefault();
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(intro, 0, wxALL, 16);

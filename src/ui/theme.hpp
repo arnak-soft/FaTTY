@@ -25,6 +25,9 @@ struct Theme {
   static wxColour warn();
   static wxColour cancel();
   static wxColour terminal();
+  static wxColour border();
+  static wxColour hover();
+  static wxColour blend(const wxColour& a, const wxColour& b, float t);
   static wxFont ui();
   static wxFont ui_small();
   static wxFont ui_section();

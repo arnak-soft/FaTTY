@@ -4,12 +4,12 @@
 #include "core/store.hpp"
 #include "core/vault.hpp"
 #include "net/ssh_session.hpp"
+#include "ui/chrome.hpp"
 
 #include <wx/button.h>
 #include <wx/frame.h>
 #include <wx/gauge.h>
 #include <wx/listctrl.h>
-#include <wx/notebook.h>
 #include <wx/splitter.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
@@ -85,15 +85,15 @@ class AppFrame : public wxFrame {
   wxSplitterWindow* hsplit_{};
   wxTextCtrl* server_search_{};
   wxListCtrl* servers_{};
-  wxNotebook* folders_nb_{};
+  RoundedNotebook* folders_nb_{};
   wxListCtrl* commands_{};
   std::vector<std::string> folder_tab_ids_;
   wxTextCtrl* output_{};
   wxTextCtrl* quick_{};
   wxStaticText* cwd_label_{};
-  wxButton* cwd_reset_{};
-  wxButton* run_btn_{};
-  wxButton* stop_btn_{};
+  RoundButton* cwd_reset_{};
+  RoundButton* run_btn_{};
+  RoundButton* stop_btn_{};
   wxGauge* busy_gauge_{};
   wxTimer busy_timer_;
   std::vector<wxWindow*> busy_disable_;

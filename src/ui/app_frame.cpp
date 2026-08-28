@@ -19,14 +19,14 @@
 #include "ui/widgets.hpp"
 
 #include <wx/app.h>
+#include <wx/bookctrl.h>
 #include <wx/button.h>
 #include <wx/dialog.h>
 #include <wx/filedlg.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
+#include <wx/panel.h>
 #include <wx/window.h>
-#include <wx/notebook.h>
-#include <wx/bookctrl.h>
 #include <wx/sizer.h>
 #include <wx/statbox.h>
 #include <wx/stattext.h>
@@ -238,23 +238,28 @@ void AppFrame::build_ui() {
 #if wxCHECK_VERSION(3, 1, 0)
   server_search_->SetHint(L"Поиск VPS…");
 #endif
-  servers_ = new wxListCtrl(left, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
+  auto* servers_card = new RoundedCard(left);
+  servers_ = new wxListCtrl(servers_card, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                            wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
   servers_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(160));
   servers_->AppendColumn(L"Адрес", wxLIST_FORMAT_LEFT, FromDIP(220));
+  auto* servers_sz = new wxBoxSizer(wxVERTICAL);
+  servers_sz->Add(servers_, 1, wxEXPAND);
+  servers_card->SetSizer(servers_sz);
   auto* sbtns = new wxBoxSizer(wxHORIZONTAL);
-  auto* sadd = new wxButton(left, wxID_ANY, L"Добавить");
-  auto* sedit = new wxButton(left, wxID_ANY, L"Изменить");
-  auto* sdup = new wxButton(left, wxID_ANY, L"Дублировать");
-  auto* sdel = new wxButton(left, wxID_ANY, L"Удалить");
+  auto* sadd = make_button(left, L"Добавить");
+  auto* sedit = make_button(left, L"Изменить");
+  auto* sdup = make_button(left, L"Дублировать");
+  auto* sdel = make_button(left, L"Удалить");
   sbtns->Add(sadd, 0, wxRIGHT, gap);
   sbtns->Add(sedit, 0, wxRIGHT, gap);
   sbtns->Add(sdup, 0, wxRIGHT, gap);
   sbtns->Add(sdel);
   auto* sact = new wxBoxSizer(wxHORIZONTAL);
-  auto* files = new wxButton(left, wxID_ANY, L"Файлы");
-  auto* cons = new wxButton(left, wxID_ANY, L"Открыть консоль");
-  auto* putty = new wxButton(left, wxID_ANY, L"PuTTY");
-  auto* test = new wxButton(left, wxID_ANY, L"Проверить связь");
+  auto* files = make_button(left, L"Файлы");
+  auto* cons = make_button(left, L"Открыть консоль");
+  auto* putty = make_button(left, L"PuTTY");
+  auto* test = make_button(left, L"Проверить связь");
   sact->Add(files, 0, wxRIGHT, gap);
   sact->Add(cons, 0, wxRIGHT, gap);
   sact->Add(putty, 0, wxRIGHT, gap);
@@ -262,17 +267,21 @@ void AppFrame::build_ui() {
   auto* ls = new wxBoxSizer(wxVERTICAL);
   ls->Add(section_label(left, L"VPS-серверы"), 0, wxBOTTOM, gap);
   ls->Add(server_search_, 0, wxEXPAND | wxBOTTOM, gap);
-  ls->Add(servers_, 1, wxEXPAND);
+  ls->Add(servers_card, 1, wxEXPAND);
   ls->Add(sbtns, 0, wxTOP, pad);
   ls->Add(sact, 0, wxTOP, gap);
   left->SetSizer(ls);
   // Кнопки редактирования VPS/команд гасятся на время выполнения команды.
   busy_disable_ = {sedit, sdup, sdel, cons, putty, test, files};
 
-  folders_nb_ = new wxNotebook(right, wxID_ANY);
+  folders_nb_ = new RoundedNotebook(right);
   auto* first_page = new wxPanel(folders_nb_);
+  first_page->SetName(L"card-page");
+  first_page->SetBackgroundColour(Theme::elevated());
+  first_page->SetForegroundColour(Theme::text());
   auto* page_sz = new wxBoxSizer(wxVERTICAL);
-  commands_ = new wxListCtrl(first_page, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL);
+  commands_ = new wxListCtrl(first_page, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                             wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
   commands_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(180));
   commands_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(320));
   commands_->AppendColumn(L"Последний раз", wxLIST_FORMAT_LEFT, FromDIP(140));
@@ -281,12 +290,12 @@ void AppFrame::build_ui() {
   folders_nb_->AddPage(first_page, L"Общее");
   folder_tab_ids_.push_back("");
   auto* corder = new wxBoxSizer(wxHORIZONTAL);
-  auto* up = new wxButton(right, wxID_ANY, L"Вверх");
-  auto* down = new wxButton(right, wxID_ANY, L"Вниз");
-  auto* byname = new wxButton(right, wxID_ANY, L"По имени");
-  auto* fadd = new wxButton(right, wxID_ANY, L"Папка+");
-  auto* frename = new wxButton(right, wxID_ANY, L"Переименовать");
-  auto* fdel = new wxButton(right, wxID_ANY, L"Удалить папку");
+  auto* up = make_button(right, L"Вверх");
+  auto* down = make_button(right, L"Вниз");
+  auto* byname = make_button(right, L"По имени");
+  auto* fadd = make_button(right, L"Папка+");
+  auto* frename = make_button(right, L"Переименовать");
+  auto* fdel = make_button(right, L"Удалить папку");
   corder->Add(up, 0, wxRIGHT, gap);
   corder->Add(down, 0, wxRIGHT, gap);
   corder->Add(byname, 0, wxRIGHT, FromDIP(16));
@@ -294,12 +303,12 @@ void AppFrame::build_ui() {
   corder->Add(frename, 0, wxRIGHT, gap);
   corder->Add(fdel);
   auto* cbtns = new wxBoxSizer(wxHORIZONTAL);
-  auto* cadd = new wxButton(right, wxID_ANY, L"Добавить");
-  auto* cedit = new wxButton(right, wxID_ANY, L"Изменить  (F2)");
-  auto* cdup = new wxButton(right, wxID_ANY, L"Дублировать");
-  auto* cdel = new wxButton(right, wxID_ANY, L"Удалить");
-  auto* presets = new wxButton(right, wxID_ANY, L"Пресеты…");
-  stop_btn_ = new wxButton(right, wxID_ANY, L"Стоп");
+  auto* cadd = make_button(right, L"Добавить");
+  auto* cedit = make_button(right, L"Изменить  (F2)");
+  auto* cdup = make_button(right, L"Дублировать");
+  auto* cdel = make_button(right, L"Удалить");
+  auto* presets = make_button(right, L"Пресеты…");
+  stop_btn_ = make_button(right, L"Стоп");
   run_btn_ = accent_button(right, L"Запустить  (F5)");
   stop_btn_->Enable(false);
   cbtns->Add(cadd, 0, wxRIGHT, gap);
@@ -313,7 +322,7 @@ void AppFrame::build_ui() {
   auto* qrow = new wxBoxSizer(wxHORIZONTAL);
   qrow->Add(new wxStaticText(right, wxID_ANY, L"Разовая команда:"), 0, wxALIGN_CENTER_VERTICAL);
   quick_ = new wxTextCtrl(right, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
-  auto* qrun = new wxButton(right, wxID_ANY, L"Выполнить");
+  auto* qrun = make_button(right, L"Выполнить");
   qrow->Add(quick_, 1, wxEXPAND | wxLEFT | wxRIGHT, pad);
   qrow->Add(qrun);
   auto* rs = new wxBoxSizer(wxVERTICAL);
@@ -323,7 +332,7 @@ void AppFrame::build_ui() {
   rs->Add(cbtns, 0, wxTOP, gap);
   rs->Add(qrow, 0, wxEXPAND | wxTOP, pad);
   right->SetSizer(rs);
-  for (wxButton* b : {cadd, cedit, cdup, cdel, presets, up, down, byname, fadd, frename, fdel, qrun}) {
+  for (wxWindow* b : {cadd, cedit, cdup, cdel, presets, up, down, byname, fadd, frename, fdel, qrun}) {
     busy_disable_.push_back(b);
   }
   busy_disable_.push_back(quick_);
@@ -335,13 +344,17 @@ void AppFrame::build_ui() {
   auto* outp = new wxPanel(vsplit_);
   cwd_label_ = new wxStaticText(outp, wxID_ANY, L"Папка: ~");
   cwd_label_->SetName(L"muted");
-  cwd_reset_ = new wxButton(outp, wxID_ANY, L"Сбросить в ~");
+  cwd_reset_ = make_button(outp, L"Сбросить в ~");
   cwd_reset_->Enable(false);
-  auto* clear = new wxButton(outp, wxID_ANY, L"Очистить");
-  auto* jbtn = new wxButton(outp, wxID_ANY, L"Журнал");
-  output_ = new wxTextCtrl(outp, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize,
-                           wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2 | wxTE_WORDWRAP);
+  auto* clear = make_button(outp, L"Очистить");
+  auto* jbtn = make_button(outp, L"Журнал");
+  auto* out_card = new RoundedCard(outp);
+  output_ = new wxTextCtrl(out_card, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize,
+                           wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2 | wxTE_WORDWRAP | wxBORDER_NONE);
   style_text(output_, true);
+  auto* out_card_sz = new wxBoxSizer(wxVERTICAL);
+  out_card_sz->Add(output_, 1, wxEXPAND);
+  out_card->SetSizer(out_card_sz);
   bind_copy_on_select(output_, [this](const std::string& t) {
     status_->SetLabel(wxString::Format(L"Скопировано в буфер (%d симв.)", (int)t.size()));
   });
@@ -354,7 +367,7 @@ void AppFrame::build_ui() {
   ot->Add(clear);
   auto* os = new wxBoxSizer(wxVERTICAL);
   os->Add(ot, 0, wxEXPAND);
-  os->Add(output_, 1, wxEXPAND | wxTOP, gap);
+  os->Add(out_card, 1, wxEXPAND | wxTOP, gap);
   outp->SetSizer(os);
   vsplit_->SplitHorizontally(top, outp, FromDIP(420));
 
@@ -957,6 +970,9 @@ void AppFrame::rebuild_folder_tabs() {
   folder_tab_ids_.clear();
   auto add_page = [&](const wxString& title, const std::string& id) {
     auto* page = new wxPanel(folders_nb_);
+    page->SetName(L"card-page");
+    page->SetBackgroundColour(Theme::elevated());
+    page->SetForegroundColour(Theme::text());
     page->SetSizer(new wxBoxSizer(wxVERTICAL));
     folders_nb_->AddPage(page, title);
     folder_tab_ids_.push_back(id);
@@ -1119,9 +1135,17 @@ void AppFrame::run_command(const Server& server, const std::string& command, int
     std::string status = "error";
     std::string error;
     std::string new_cwd = cwd;
+    std::string captured;
+    captured.reserve(64 * 1024);
+    bool truncated = false;
     try {
       auto result = session->run(srv, command, timeout, login_shell,
-                                 [this, post](const std::string& chunk) {
+                                 [this, post, &captured, &truncated](const std::string& chunk) {
+                                   captured.append(chunk);
+                                   if (captured.size() > kJournalOutputMax) {
+                                     truncated = true;
+                                     captured.erase(0, captured.size() - kJournalOutputMax);
+                                   }
                                    post([this, chunk] { append_output(chunk); });
                                  },
                                  cwd);
@@ -1157,6 +1181,7 @@ void AppFrame::run_command(const Server& server, const std::string& command, int
     e.status = status;
     e.kind = kind;
     e.error = error;
+    e.output = truncated ? ("…\n" + captured) : captured;
     journal->append(e);
     post([this, srv, title, code, status, error, new_cwd] {
       if (!new_cwd.empty()) remote_cwd_[srv.id] = new_cwd;

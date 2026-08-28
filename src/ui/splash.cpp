@@ -4,6 +4,7 @@
 #include "core/paths.hpp"
 #include "core/util.hpp"
 #include "ui/theme.hpp"
+#include "ui/chrome.hpp"
 
 #include <wx/frame.h>
 #include <wx/gauge.h>
@@ -48,8 +49,17 @@ void show_splash() {
   outer->Add(body, 1, wxEXPAND);
   f->SetSizer(outer);
   f->Centre();
+  const int splash_r = f->FromDIP(16);
+  auto round_splash = [f, splash_r] {
+    apply_rounded_region(f, splash_r);
+  };
+  f->Bind(wxEVT_SIZE, [round_splash](wxSizeEvent& e) {
+    round_splash();
+    e.Skip();
+  });
   f->Show();
   f->Update();
+  round_splash();
   g_splash = f;
 }
 

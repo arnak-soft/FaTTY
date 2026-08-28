@@ -7,12 +7,11 @@
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
-#include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/choice.h>
 #include <wx/filedlg.h>
 #include <wx/msgdlg.h>
-#include <wx/notebook.h>
+#include <wx/panel.h>
 #include <wx/sizer.h>
 #include <wx/statbox.h>
 #include <wx/stattext.h>
@@ -30,10 +29,11 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
       on_change_master_(std::move(on_change_master)),
       on_check_updates_(std::move(on_check_updates)),
       on_import_done_(std::move(on_import_done)) {
-  auto* nb = new wxNotebook(this, wxID_ANY);
+  auto* nb = new RoundedNotebook(this);
   auto& st = config.settings;
 
   auto* general = new wxPanel(nb);
+  general->SetName(L"card-page");
   auto* gsz = new wxBoxSizer(wxVERTICAL);
   confirm_ = new wxCheckBox(general, wxID_ANY, L"Спрашивать подтверждение перед запуском");
   confirm_->SetValue(st.confirm_before_run);
@@ -57,7 +57,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   jrow->Add(new wxStaticText(general, wxID_ANY, L"Максимум записей журнала"), 0, wxALIGN_CENTER_VERTICAL);
   journal_ = new wxTextCtrl(general, wxID_ANY, std::to_wstring(st.journal_max_entries));
   jrow->Add(journal_, 0, wxLEFT, 8);
-  auto* check_now = new wxButton(general, wxID_ANY, L"Проверить сейчас…");
+  auto* check_now = make_button(general, L"Проверить сейчас…");
   gsz->Add(confirm_, 0, wxALL, 8);
   gsz->Add(clear_output_, 0, wxALL, 8);
   gsz->Add(theme_row, 0, wxALL, 8);
@@ -69,17 +69,18 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   nb->AddPage(general, L"Общие");
 
   auto* programs = new wxPanel(nb);
+  programs->SetName(L"card-page");
   auto* psz = new wxFlexGridSizer(2, 3, 8, 8);
   psz->AddGrowableCol(1);
   psz->Add(new wxStaticText(programs, wxID_ANY, L"PuTTY"), 0, wxALIGN_CENTER_VERTICAL);
   putty_ = new wxTextCtrl(programs, wxID_ANY, wxString::FromUTF8(st.putty_path));
   psz->Add(putty_, 1, wxEXPAND);
-  auto* pbrowse = new wxButton(programs, wxID_ANY, L"Обзор…");
+  auto* pbrowse = make_button(programs, L"Обзор…");
   psz->Add(pbrowse);
   psz->Add(new wxStaticText(programs, wxID_ANY, L"ssh.exe"), 0, wxALIGN_CENTER_VERTICAL);
   ssh_ = new wxTextCtrl(programs, wxID_ANY, wxString::FromUTF8(st.ssh_path));
   psz->Add(ssh_, 1, wxEXPAND);
-  auto* sbrowse = new wxButton(programs, wxID_ANY, L"Обзор…");
+  auto* sbrowse = make_button(programs, L"Обзор…");
   psz->Add(sbrowse);
   auto* proot = new wxBoxSizer(wxVERTICAL);
   proot->Add(psz, 0, wxEXPAND | wxALL, 12);
@@ -87,15 +88,16 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   nb->AddPage(programs, L"Программы");
 
   auto* data = new wxPanel(nb);
+  data->SetName(L"card-page");
   auto* dsz = new wxBoxSizer(wxVERTICAL);
-  auto* open_dir = new wxButton(data, wxID_ANY, L"Открыть папку конфига");
+  auto* open_dir = make_button(data, L"Открыть папку конфига");
   export_secrets_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить пароли");
   export_settings_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить настройки");
   export_settings_->SetValue(true);
   import_settings_ = new wxCheckBox(data, wxID_ANY, L"Импорт: применять настройки");
   import_settings_->SetValue(true);
-  auto* exp = new wxButton(data, wxID_ANY, L"Экспорт…");
-  auto* imp = new wxButton(data, wxID_ANY, L"Импорт…");
+  auto* exp = make_button(data, L"Экспорт…");
+  auto* imp = make_button(data, L"Импорт…");
   dsz->Add(open_dir, 0, wxALL, 8);
   dsz->Add(export_secrets_, 0, wxALL, 8);
   dsz->Add(export_settings_, 0, wxALL, 8);
@@ -106,6 +108,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   nb->AddPage(data, L"Данные");
 
   auto* sec = new wxPanel(nb);
+  sec->SetName(L"card-page");
   auto* ssz = new wxBoxSizer(wxVERTICAL);
   short_pw_ = new wxCheckBox(sec, wxID_ANY, L"Разрешить короткий мастер-пароль (от 4 символов)");
   short_pw_->SetValue(st.allow_short_master_password);
@@ -117,7 +120,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   mrow->Add(new wxStaticText(sec, wxID_ANY, L"Минут блокировки"), 0, wxALIGN_CENTER_VERTICAL);
   lockout_minutes_ = new wxTextCtrl(sec, wxID_ANY, std::to_wstring(st.master_password_lockout_minutes));
   mrow->Add(lockout_minutes_, 0, wxLEFT, 8);
-  auto* chpw = new wxButton(sec, wxID_ANY, L"Сменить мастер-пароль…");
+  auto* chpw = make_button(sec, L"Сменить мастер-пароль…");
   ssz->Add(short_pw_, 0, wxALL, 8);
   ssz->Add(arow, 0, wxALL, 8);
   ssz->Add(mrow, 0, wxALL, 8);
@@ -129,7 +132,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   btns->AddStretchSpacer();
   auto* save = accent_button(this, L"Сохранить");
   btns->Add(save, 0, wxRIGHT, 8);
-  btns->Add(new wxButton(this, wxID_CANCEL, L"Отмена"));
+  btns->Add(make_button(this, L"Отмена", wxID_CANCEL));
   save->SetDefault();
 
   auto* root = new wxBoxSizer(wxVERTICAL);
