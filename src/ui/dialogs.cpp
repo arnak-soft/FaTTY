@@ -237,8 +237,9 @@ void PresetDialog::rebuild() {
                          std::string(branch_->GetValue().utf8_string()),
                          std::string(pm2_->GetValue().utf8_string()), true);
   for (const auto& p : presets_) {
-    auto preview = p.command.size() > 80 ? p.command.substr(0, 77) + "…" : p.command;
-    auto* cb = new wxCheckBox(list_, wxID_ANY, wxString::FromUTF8(p.name + "  —  " + preview));
+    std::string extra = !p.comment.empty() ? p.comment
+                                           : (p.command.size() > 80 ? p.command.substr(0, 77) + "…" : p.command);
+    auto* cb = new wxCheckBox(list_, wxID_ANY, wxString::FromUTF8(p.name + "  —  " + extra));
     cb->SetValue(true);
     sizer->Add(cb, 0, wxBOTTOM, 4);
     checks_.push_back(cb);
@@ -263,11 +264,13 @@ void PresetDialog::on_ok(wxCommandEvent&) {
 
 CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std::vector<Server>& servers,
                              const std::vector<Folder>& folders, const wxString& title)
-    : PositionedDialog(parent, title, wxSize(640, 520)), command_(command), servers_(servers), folders_(folders) {
+    : PositionedDialog(parent, title, wxSize(640, 560)), command_(command), servers_(servers), folders_(folders) {
   auto* body = new wxPanel(this);
-  auto* form = new wxFlexGridSizer(6, 2, 6, 8);
+  auto* form = new wxFlexGridSizer(7, 2, 6, 8);
   form->AddGrowableCol(1);
   name_ = labeled_entry(body, form, L"Название", wxString::FromUTF8(command.name));
+  comment_ = labeled_entry(body, form, L"Комментарий", wxString::FromUTF8(command.comment));
+  comment_->SetHint(L"Необязательно — видно в списке");
   form->Add(new wxStaticText(body, wxID_ANY, L"VPS"), 0, wxALIGN_CENTER_VERTICAL);
   wxArrayString names;
   wxString current;
@@ -326,6 +329,7 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
     for (const auto& p : presets_) {
       if (p.name == chosen) {
         name_->SetValue(wxString::FromUTF8(p.name));
+        comment_->SetValue(wxString::FromUTF8(p.comment));
         timeout_->SetValue(std::to_wstring(p.timeout_sec));
         login_->SetValue(p.login_shell);
         text_->SetValue(wxString::FromUTF8(p.command));
@@ -381,6 +385,7 @@ void CommandDialog::on_ok(wxCommandEvent&) {
   }
   result = command_;
   result.name = name;
+  result.comment = trim(std::string(comment_->GetValue().utf8_string()));
   result.server_id = sid;
   result.command = cmd;
   result.timeout_sec = timeout;

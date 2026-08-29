@@ -38,6 +38,21 @@
 #include <thread>
 
 namespace fatty {
+namespace {
+
+wxString run_confirm_message(const Command& cmd, const std::string& server_name = {}) {
+  wxString msg = L"Выполнить «" + wxString::FromUTF8(cmd.name) + L"»";
+  if (!server_name.empty()) {
+    msg += L" на " + wxString::FromUTF8(server_name);
+  }
+  msg += L"?";
+  if (!cmd.comment.empty()) {
+    msg += L"\n\n" + wxString::FromUTF8(cmd.comment);
+  }
+  return msg;
+}
+
+}  // namespace
 
 AppFrame::AppFrame(Config config, SessionVault vault)
     : wxFrame(nullptr, wxID_ANY, wxString::FromUTF8(std::string(kAppName) + " " + resolve_version()),
@@ -100,7 +115,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
         auto* s = selected_server();
         if (s) {
           if (config_.settings.confirm_before_run &&
-              wxMessageBox(L"Выполнить «" + wxString::FromUTF8(c->name) + L"»?", L"Запуск", wxYES_NO, this) != wxYES)
+              wxMessageBox(run_confirm_message(*c), L"Запуск", wxYES_NO, this) != wxYES)
             return;
           run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
         }
@@ -416,13 +431,11 @@ void AppFrame::build_ui() {
   commands_->Bind(wxEVT_LIST_COL_CLICK, [this](wxListEvent& e) {
     auto* s = selected_server();
     if (!s) return;
-    const bool folder_col = config_.settings.show_command_folder_column;
+    const auto ids = command_column_ids();
     const int col = e.GetColumn();
-    std::string by;
-    if (col == 0) by = "name";
-    else if (folder_col && col == 2) by = "command";
-    else if (!folder_col && col == 1) by = "command";
-    else return;
+    if (col < 0 || col >= static_cast<int>(ids.size())) return;
+    const auto& by = ids[static_cast<std::size_t>(col)];
+    if (by != "name" && by != "command" && by != "comment") return;
     config_.sort_commands_for(s->id, current_folder_id(), by);
     persist();
     refresh_commands();
@@ -743,6 +756,7 @@ void AppFrame::build_ui() {
       if (std::find(names.begin(), names.end(), p.name) != names.end()) continue;
       auto cmd = Command::make_new(s->id);
       cmd.name = p.name;
+      cmd.comment = p.comment;
       cmd.command = p.command;
       cmd.timeout_sec = p.timeout_sec;
       cmd.login_shell = p.login_shell;
@@ -763,8 +777,7 @@ void AppFrame::build_ui() {
       return;
     }
     if (config_.settings.confirm_before_run &&
-        wxMessageBox(L"Выполнить «" + wxString::FromUTF8(c->name) + L"» на " + wxString::FromUTF8(s->name) + L"?", L"Запуск",
-                     wxYES_NO, this) != wxYES)
+        wxMessageBox(run_confirm_message(*c, s->name), L"Запуск", wxYES_NO, this) != wxYES)
       return;
     run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
   });
@@ -1080,8 +1093,11 @@ void AppFrame::refresh_commands() {
     const auto& c = cmds[i];
     auto preview = c.command;
     if (preview.size() > 90) preview = preview.substr(0, 87) + "…";
+    auto comment = c.comment;
+    if (comment.size() > 60) comment = comment.substr(0, 57) + "…";
     long row = commands_->InsertItem(static_cast<long>(i), wxString::FromUTF8(c.name));
     int col = 1;
+    commands_->SetItem(row, col++, wxString::FromUTF8(comment));
     if (folder_col) {
       commands_->SetItem(row, col++, wxString::FromUTF8(folder_display_name(c.folder_id)));
     }
@@ -1106,9 +1122,9 @@ void AppFrame::refresh_commands() {
 
 std::vector<std::string> AppFrame::command_column_ids() const {
   if (config_.settings.show_command_folder_column) {
-    return {"name", "folder", "command", "last"};
+    return {"name", "comment", "folder", "command", "last"};
   }
-  return {"name", "command", "last"};
+  return {"name", "comment", "command", "last"};
 }
 
 std::string AppFrame::folder_display_name(const std::string& folder_id) const {
@@ -1123,9 +1139,10 @@ void AppFrame::setup_command_columns() {
   while (commands_->GetColumnCount() > 0) {
     commands_->DeleteColumn(0);
   }
-  commands_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(180));
+  commands_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(160));
+  commands_->AppendColumn(L"Комментарий", wxLIST_FORMAT_LEFT, FromDIP(180));
   if (config_.settings.show_command_folder_column) {
-    commands_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(120));
+    commands_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(110));
   }
   commands_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(320));
   commands_->AppendColumn(L"Последний раз", wxLIST_FORMAT_LEFT, FromDIP(140));

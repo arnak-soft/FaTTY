@@ -8,20 +8,23 @@ std::vector<Preset> deploy_presets(std::string app, std::string branch, std::str
   if (branch.empty()) branch = kDefaultBranch;
   if (pm2.empty()) pm2 = kDefaultPm2;
   return {
-      {"Deploy", "cd " + app + " && git pull origin " + branch + " && pm2 restart " + pm2, 300, true},
-      {"Git pull", "cd " + app + " && git pull origin " + branch, 180, true},
-      {"PM2 restart", "pm2 restart " + pm2, 60, true},
-      {"PM2 status", "pm2 status", 30, true},
-      {"PM2 logs", "pm2 logs " + pm2 + " --lines 120 --nostream", 30, true},
-      {"Git status", "cd " + app + " && git status -sb && echo && git log -8 --oneline", 30, true},
+      {"Deploy", "cd " + app + " && git pull origin " + branch + " && pm2 restart " + pm2, 300, true,
+       "git pull и перезапуск pm2"},
+      {"Git pull", "cd " + app + " && git pull origin " + branch, 180, true, "подтянуть ветку без перезапуска"},
+      {"PM2 restart", "pm2 restart " + pm2, 60, true, "перезапустить процесс"},
+      {"PM2 status", "pm2 status", 30, true, "список процессов"},
+      {"PM2 logs", "pm2 logs " + pm2 + " --lines 120 --nostream", 30, true, "последние 120 строк, без follow"},
+      {"Git status", "cd " + app + " && git status -sb && echo && git log -8 --oneline", 30, true,
+       "ветка и последние коммиты"},
   };
 }
 
 std::vector<Preset> server_presets() {
   return {
-      {"Состояние сервера", "hostname; date; uptime; echo; df -hT; echo; free -h", 30, true},
-      {"Nginx reload", "nginx -t && (systemctl reload nginx || service nginx reload)", 30, true},
-      {"Nginx status", "systemctl status nginx --no-pager -l || service nginx status", 30, true},
+      {"Состояние сервера", "hostname; date; uptime; echo; df -hT; echo; free -h", 30, true, "диск, память, uptime"},
+      {"Nginx reload", "nginx -t && (systemctl reload nginx || service nginx reload)", 30, true,
+       "проверка конфига и reload"},
+      {"Nginx status", "systemctl status nginx --no-pager -l || service nginx status", 30, true, "статус сервиса"},
   };
 }
 

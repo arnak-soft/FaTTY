@@ -87,6 +87,7 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
         {"server_name", server->name},
         {"server_host", server->host},
         {"name", cmd.name},
+        {"comment", cmd.comment},
         {"command", cmd.command},
         {"timeout_sec", cmd.timeout_sec},
         {"login_shell", cmd.login_shell},
@@ -184,6 +185,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       item.folder_name = trim(raw.value("folder", raw.value("folder_name", "")));
       item.cmd = Command::make_new("");
       item.cmd.name = trim(raw.value("name", ""));
+      item.cmd.comment = trim(raw.value("comment", ""));
       item.cmd.command = trim(raw.value("command", ""));
       item.cmd.timeout_sec = raw.value("timeout_sec", 180);
       if (item.cmd.timeout_sec < 1) item.cmd.timeout_sec = 180;

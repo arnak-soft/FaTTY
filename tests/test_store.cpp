@@ -31,6 +31,13 @@ void test_store() {
   cfg.sort_commands_for(s.id, "name");
   expect(cfg.commands_for(s.id)[0].name == "a", "sort by name");
 
+  c1.comment = "zeta";
+  c2.comment = "alpha note";
+  cfg.commands[0].comment = c2.comment;
+  cfg.commands[1].comment = c1.comment;
+  cfg.sort_commands_for(s.id, "comment");
+  expect(cfg.commands_for(s.id)[0].comment == "alpha note", "sort by comment");
+
   auto folder = Folder::make_new(s.id, "proj-a");
   cfg.folders.push_back(folder);
   cfg.commands[0].folder_id = folder.id;
@@ -51,6 +58,16 @@ void test_store() {
   expect(result.servers_added == 1, "import merge add");
   result = import_into_config(cfg, payload, "merge", false);
   expect(result.servers_skipped == 1, "import skip existing");
+
+  auto with_comment = nlohmann::json::parse(
+      R"({"fatty_export":1,"app":"FaTTY","servers":[{"name":"gamma","host":"9.9.9.9","username":"u"}],"commands":[{"server_name":"gamma","server_host":"9.9.9.9","name":"restart","command":"reboot now","comment":"осторожно"}]})");
+  result = import_into_config(cfg, with_comment, "merge", false);
+  expect(result.commands_added == 1, "import command with comment");
+  bool found_comment = false;
+  for (const auto& cmd : cfg.commands) {
+    if (cmd.name == "restart" && cmd.comment == "осторожно") found_comment = true;
+  }
+  expect(found_comment, "imported comment kept");
 }
 
 }  // namespace fatty::test

@@ -25,6 +25,7 @@ struct Server {
 struct Command {
   std::string id;
   std::string name;
+  std::string comment;
   std::string server_id;
   std::string folder_id;
   std::string command;

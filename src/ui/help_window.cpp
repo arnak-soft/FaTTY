@@ -40,7 +40,8 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
       L"3. F5 / двойной клик / Enter — запуск. «Стоп» обрывает сессию.\n\n"
       L"Окно\n\nСлева серверы, справа команды по папкам-вкладкам, внизу лог. Колонка «Последний раз» — из журнала.\n"
       L"Цвет названия: зелёный — успех, жёлтый — таймаут/прервано, красный — ошибка.\n"
-      L"Колонку «Папка» можно скрыть в настройках. Несколько команд: Ctrl/Shift+клик, затем «Переместить в папку».\n"
+      L"Колонку «Папка» можно скрыть в настройках. У команды можно указать комментарий — колонка в списке и текст при подтверждении запуска.\n"
+      L"Несколько команд: Ctrl/Shift+клик, затем «Переместить в папку».\n"
       L"«Сбросить в ~» возвращает рабочую папку в домашнюю.\n\n"
       L"Файлы, консоль, PuTTY\n\n«Файлы» — SFTP. «Открыть консоль» — ssh.exe. «PuTTY» подставляет пароль или ключ.\n"
       L"Интерактивное (htop, nano) — в консоли, не через F5.\n\n"
@@ -90,26 +91,31 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
   p2->SetName(L"card-page");
   auto* list = new wxListCtrl(p2, wxID_ANY, wxDefaultPosition, wxDefaultSize,
                              wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
-  list->AppendColumn(L"Группа", wxLIST_FORMAT_LEFT, FromDIP(100));
-  list->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(140));
-  list->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(420));
+  list->AppendColumn(L"Группа", wxLIST_FORMAT_LEFT, FromDIP(90));
+  list->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(120));
+  list->AppendColumn(L"Комментарий", wxLIST_FORMAT_LEFT, FromDIP(200));
+  list->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(360));
   struct Item {
     std::string group, name, command, tip;
   };
   std::vector<Item> cmds = {
-      {"Деплой", "Deploy", std::string("cd ") + kDefaultAppDir + " && git pull origin main && pm2 restart app", ""},
-      {"Деплой", "Git pull", std::string("cd ") + kDefaultAppDir + " && git pull origin main", ""},
-      {"PM2", "Restart", "pm2 restart app", ""},
-      {"PM2", "Status", "pm2 status", ""},
-      {"PM2", "Logs", "pm2 logs app --lines 120 --nostream", ""},
-      {"Nginx", "Reload", "nginx -t && (systemctl reload nginx || service nginx reload)", ""},
-      {"Сервер", "Состояние", "hostname; date; uptime; echo; df -hT; echo; free -h", ""},
-      {"Сеть", "Кто слушает", "ss -tlnp", ""},
+      {"Деплой", "Deploy", std::string("cd ") + kDefaultAppDir + " && git pull origin main && pm2 restart app",
+       "git pull и перезапуск pm2"},
+      {"Деплой", "Git pull", std::string("cd ") + kDefaultAppDir + " && git pull origin main",
+       "подтянуть ветку без перезапуска"},
+      {"PM2", "Restart", "pm2 restart app", "перезапустить процесс"},
+      {"PM2", "Status", "pm2 status", "список процессов"},
+      {"PM2", "Logs", "pm2 logs app --lines 120 --nostream", "последние 120 строк, без follow"},
+      {"Nginx", "Reload", "nginx -t && (systemctl reload nginx || service nginx reload)",
+       "проверка конфига и reload"},
+      {"Сервер", "Состояние", "hostname; date; uptime; echo; df -hT; echo; free -h", "диск, память, uptime"},
+      {"Сеть", "Кто слушает", "ss -tlnp", "порты и процессы"},
   };
   for (const auto& c : cmds) {
     long row = list->InsertItem(list->GetItemCount(), wxString::FromUTF8(c.group));
     list->SetItem(row, 1, wxString::FromUTF8(c.name));
-    list->SetItem(row, 2, wxString::FromUTF8(c.command));
+    list->SetItem(row, 2, wxString::FromUTF8(c.tip));
+    list->SetItem(row, 3, wxString::FromUTF8(c.command));
   }
   auto* copy = make_button(p2, L"Копировать");
   auto* insert = make_button(p2, L"В разовую");

@@ -194,35 +194,29 @@ void Config::sort_commands_for(const std::string& server_id, const std::string& 
 
 void Config::sort_commands_for(const std::string& server_id, const std::string& folder_id, const std::string& by) {
   auto group = commands_for(server_id, folder_id);
-  if (by == "command") {
-    std::sort(group.begin(), group.end(), [](const Command& a, const Command& b) {
-      auto ca = to_lower(trim(a.command));
-      auto cb = to_lower(trim(b.command));
-      if (ca != cb) {
-        return ca < cb;
-      }
-      auto na = to_lower(trim(a.name));
-      auto nb = to_lower(trim(b.name));
-      if (na != nb) {
-        return na < nb;
-      }
-      return a.id < b.id;
-    });
-  } else {
-    std::sort(group.begin(), group.end(), [](const Command& a, const Command& b) {
-      auto na = to_lower(trim(a.name));
-      auto nb = to_lower(trim(b.name));
-      if (na != nb) {
-        return na < nb;
-      }
-      auto ca = to_lower(trim(a.command));
-      auto cb = to_lower(trim(b.command));
-      if (ca != cb) {
-        return ca < cb;
-      }
-      return a.id < b.id;
-    });
-  }
+  auto primary = [&](const Command& c) {
+    if (by == "command") return to_lower(trim(c.command));
+    if (by == "comment") return to_lower(trim(c.comment));
+    return to_lower(trim(c.name));
+  };
+  std::sort(group.begin(), group.end(), [&](const Command& a, const Command& b) {
+    auto ka = primary(a);
+    auto kb = primary(b);
+    if (ka != kb) {
+      return ka < kb;
+    }
+    auto na = to_lower(trim(a.name));
+    auto nb = to_lower(trim(b.name));
+    if (na != nb) {
+      return na < nb;
+    }
+    auto ca = to_lower(trim(a.command));
+    auto cb = to_lower(trim(b.command));
+    if (ca != cb) {
+      return ca < cb;
+    }
+    return a.id < b.id;
+  });
   set_commands_for(server_id, folder_id, group);
 }
 
@@ -339,6 +333,7 @@ Config load_config() {
     Command c;
     c.id = raw.value("id", new_uuid());
     c.name = raw.value("name", "");
+    c.comment = raw.value("comment", "");
     c.server_id = raw.value("server_id", "");
     c.command = raw.value("command", "");
     c.folder_id = raw.value("folder_id", "");
@@ -449,6 +444,7 @@ void save_config(Config& config, SessionVault& vault) {
     payload["commands"].push_back({
         {"id", c.id},
         {"name", c.name},
+        {"comment", c.comment},
         {"server_id", c.server_id},
         {"command", c.command},
         {"folder_id", c.folder_id},

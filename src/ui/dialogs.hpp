@@ -76,6 +76,7 @@ class CommandDialog : public PositionedDialog {
   wxTextCtrl* timeout_{};
   wxCheckBox* login_{};
   wxComboBox* preset_{};
+  wxTextCtrl* comment_{};
   wxTextCtrl* text_{};
 };
 

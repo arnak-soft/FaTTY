@@ -10,6 +10,7 @@ struct Preset {
   std::string command;
   int timeout_sec = 180;
   bool login_shell = true;
+  std::string comment;
 };
 
 inline constexpr const char* kDefaultAppDir = "/var/www/app";
