@@ -5,6 +5,7 @@
 #include <wx/dcbuffer.h>
 #include <wx/sizer.h>
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace fatty {
@@ -26,6 +27,7 @@ StripedListCtrl::Header::Header(StripedListCtrl* owner)
   Bind(wxEVT_LEFT_UP, &Header::on_mouse, this);
   Bind(wxEVT_MOTION, &Header::on_mouse, this);
   Bind(wxEVT_LEAVE_WINDOW, &Header::on_mouse, this);
+  Bind(wxEVT_MOUSE_CAPTURE_LOST, &Header::on_capture_lost, this);
 }
 
 wxSize StripedListCtrl::Header::DoGetBestSize() const { return {FromDIP(100), owner_->header_height()}; }
@@ -48,6 +50,15 @@ void StripedListCtrl::Header::on_paint(wxPaintEvent&) {
     dc.SetPen(wxPen(Theme::border()));
     dc.DrawLine(x - 1, FromDIP(4), x - 1, h - FromDIP(4));
   }
+  if (moving_ && drop_before_ >= 0) {
+    int mark = 0;
+    const int n = static_cast<int>(owner_->columns_.size());
+    for (int i = 0; i < drop_before_ && i < n; ++i) {
+      mark += owner_->columns_[static_cast<std::size_t>(i)].width;
+    }
+    dc.SetPen(wxPen(Theme::accent(), FromDIP(2)));
+    dc.DrawLine(mark, FromDIP(2), mark, h - FromDIP(2));
+  }
   dc.SetPen(wxPen(Theme::border()));
   dc.DrawLine(0, h - 1, GetClientSize().x, h - 1);
 }
@@ -62,6 +73,38 @@ int StripedListCtrl::Header::hit_split(int x) const {
   return -1;
 }
 
+int StripedListCtrl::Header::hit_column(int x) const {
+  int pos = 0;
+  for (int i = 0; i < static_cast<int>(owner_->columns_.size()); ++i) {
+    pos += owner_->columns_[static_cast<std::size_t>(i)].width;
+    if (x < pos) return i;
+  }
+  return -1;
+}
+
+int StripedListCtrl::Header::drop_before_at(int x) const {
+  int pos = 0;
+  const int n = static_cast<int>(owner_->columns_.size());
+  for (int i = 0; i < n; ++i) {
+    const int w = owner_->columns_[static_cast<std::size_t>(i)].width;
+    if (x < pos + w / 2) return i;
+    pos += w;
+  }
+  return n;
+}
+
+void StripedListCtrl::Header::reset_drag() {
+  if (HasCapture()) ReleaseMouse();
+  drag_col_ = -1;
+  press_col_ = -1;
+  moving_ = false;
+  drop_before_ = -1;
+  SetCursor(wxCURSOR_ARROW);
+  Refresh();
+}
+
+void StripedListCtrl::Header::on_capture_lost(wxMouseCaptureLostEvent&) { reset_drag(); }
+
 void StripedListCtrl::Header::on_mouse(wxMouseEvent& e) {
   const int x = e.GetX();
   if (e.LeftDown()) {
@@ -74,26 +117,67 @@ void StripedListCtrl::Header::on_mouse(wxMouseEvent& e) {
       SetCursor(wxCURSOR_SIZEWE);
       return;
     }
-    int pos = 0;
-    for (int i = 0; i < static_cast<int>(owner_->columns_.size()); ++i) {
-      pos += owner_->columns_[static_cast<std::size_t>(i)].width;
-      if (x < pos) {
-        owner_->emit_col_click(i);
-        break;
+    press_col_ = hit_column(x);
+    press_x_ = x;
+    moving_ = false;
+    drop_before_ = -1;
+    if (press_col_ >= 0) CaptureMouse();
+    return;
+  }
+  if (e.LeftUp()) {
+    if (HasCapture()) ReleaseMouse();
+    if (drag_col_ >= 0) {
+      owner_->emit_col_end_drag(drag_col_, -1);
+      drag_col_ = -1;
+      SetCursor(wxCURSOR_ARROW);
+      return;
+    }
+    if (press_col_ >= 0) {
+      if (moving_) {
+        const int dest = drop_before_at(x);
+        const int from = press_col_;
+        if (dest != from && dest != from + 1) {
+          owner_->MoveColumn(from, dest);
+          owner_->emit_col_end_drag(from, dest);
+        }
+      } else {
+        owner_->emit_col_click(press_col_);
+      }
+      press_col_ = -1;
+      moving_ = false;
+      drop_before_ = -1;
+      SetCursor(wxCURSOR_ARROW);
+      Refresh();
+      return;
+    }
+    SetCursor(wxCURSOR_ARROW);
+    return;
+  }
+  if (e.Dragging() && e.LeftIsDown()) {
+    if (drag_col_ >= 0) {
+      const int w = std::max(FromDIP(40), drag_start_w_ + (x - drag_start_x_));
+      owner_->columns_[static_cast<std::size_t>(drag_col_)].width = w;
+      Refresh();
+      owner_->refresh_body();
+      return;
+    }
+    if (press_col_ >= 0) {
+      if (!moving_ && std::abs(x - press_x_) >= FromDIP(8)) {
+        moving_ = true;
+        SetCursor(wxCURSOR_HAND);
+      }
+      if (moving_) {
+        drop_before_ = drop_before_at(x);
+        Refresh();
       }
     }
-  } else if (e.LeftUp() && drag_col_ >= 0) {
-    if (HasCapture()) ReleaseMouse();
-    drag_col_ = -1;
+    return;
+  }
+  if (e.Leaving() && drag_col_ < 0 && press_col_ < 0) {
     SetCursor(wxCURSOR_ARROW);
-  } else if (e.Dragging() && drag_col_ >= 0 && e.LeftIsDown()) {
-    const int w = std::max(FromDIP(40), drag_start_w_ + (x - drag_start_x_));
-    owner_->columns_[static_cast<std::size_t>(drag_col_)].width = w;
-    Refresh();
-    owner_->refresh_body();
-  } else if (e.Leaving() && drag_col_ < 0) {
-    SetCursor(wxCURSOR_ARROW);
-  } else if (!e.LeftIsDown() && drag_col_ < 0) {
+    return;
+  }
+  if (!e.LeftIsDown() && drag_col_ < 0 && press_col_ < 0) {
     SetCursor(hit_split(x) >= 0 ? wxCURSOR_SIZEWE : wxCURSOR_ARROW);
   }
 }
@@ -345,6 +429,37 @@ void StripedListCtrl::emit_col_click(int col) {
   e.SetEventObject(this);
   e.SetColumn(col);
   ProcessWindowEvent(e);
+}
+
+void StripedListCtrl::emit_col_end_drag(int from, int to_before) {
+  wxListEvent e(wxEVT_LIST_COL_END_DRAG, GetId());
+  e.SetEventObject(this);
+  e.SetColumn(from);
+  e.SetInt(to_before);
+  ProcessWindowEvent(e);
+}
+
+void StripedListCtrl::MoveColumn(int from, int to_before) {
+  const int n = GetColumnCount();
+  if (from < 0 || from >= n) return;
+  to_before = std::clamp(to_before, 0, n);
+  if (to_before == from || to_before == from + 1) return;
+  Column col = std::move(columns_[static_cast<std::size_t>(from)]);
+  columns_.erase(columns_.begin() + from);
+  int insert = to_before > from ? to_before - 1 : to_before;
+  columns_.insert(columns_.begin() + insert, std::move(col));
+  for (auto& row : rows_) {
+    ensure_cells(row);
+    if (from >= static_cast<int>(row.cells.size())) continue;
+    wxString cell = std::move(row.cells[static_cast<std::size_t>(from)]);
+    row.cells.erase(row.cells.begin() + from);
+    if (insert > static_cast<int>(row.cells.size())) {
+      row.cells.resize(static_cast<std::size_t>(insert));
+    }
+    row.cells.insert(row.cells.begin() + insert, std::move(cell));
+    ensure_cells(row);
+  }
+  refresh_body();
 }
 
 void StripedListCtrl::select_only(long row, bool notify) {

@@ -21,6 +21,8 @@ std::string to_lower(std::string_view text);
 std::string clip(std::string text, std::size_t limit);
 std::string new_uuid();
 std::string copy_name(const std::string& base, const std::vector<std::string>& taken);
+std::vector<std::string> prefer_order(const std::vector<std::string>& available,
+                                      const std::vector<std::string>& preferred);
 
 bool parse_int(std::string_view raw, int& out);
 int clamp_int(int value, int lo, int hi);

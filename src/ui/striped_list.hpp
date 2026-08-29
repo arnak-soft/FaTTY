@@ -1,6 +1,7 @@
 #pragma once
 
 #include <wx/colour.h>
+#include <wx/event.h>
 #include <wx/listctrl.h>
 #include <wx/panel.h>
 #include <wx/vscroll.h>
@@ -56,12 +57,20 @@ class StripedListCtrl : public wxPanel {
    private:
     void on_paint(wxPaintEvent&);
     void on_mouse(wxMouseEvent&);
+    void on_capture_lost(wxMouseCaptureLostEvent&);
     int hit_split(int x) const;
+    int hit_column(int x) const;
+    int drop_before_at(int x) const;
+    void reset_drag();
 
     StripedListCtrl* owner_;
     int drag_col_ = -1;
     int drag_start_x_ = 0;
     int drag_start_w_ = 0;
+    int press_col_ = -1;
+    int press_x_ = 0;
+    bool moving_ = false;
+    int drop_before_ = -1;
   };
 
   class Body : public wxVScrolledWindow {
@@ -83,6 +92,8 @@ class StripedListCtrl : public wxPanel {
   void emit_selected(long row);
   void emit_activated(long row);
   void emit_col_click(int col);
+  void emit_col_end_drag(int from, int to_before);
+  void MoveColumn(int from, int to_before);
   void select_only(long row, bool notify);
   void toggle_select(long row);
   void select_range(long from, long to);

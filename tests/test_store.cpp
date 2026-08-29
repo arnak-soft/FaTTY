@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <vector>
 
 using namespace fatty;
 
@@ -37,6 +38,12 @@ void test_store() {
   cfg.commands[1].comment = c1.comment;
   cfg.sort_commands_for(s.id, "comment");
   expect(cfg.commands_for(s.id)[0].comment == "alpha note", "sort by comment");
+
+  expect(prefer_order({"a", "b", "c"}, {"c", "a"}) == std::vector<std::string>({"c", "a", "b"}),
+         "prefer_order keeps leftovers");
+  expect(prefer_order({"a", "b"}, {"x", "b"}) == std::vector<std::string>({"b", "a"}),
+         "prefer_order drops unknown");
+  expect(prefer_order({"a", "b"}, {}) == std::vector<std::string>({"a", "b"}), "prefer_order empty preferred");
 
   auto folder = Folder::make_new(s.id, "proj-a");
   cfg.folders.push_back(folder);

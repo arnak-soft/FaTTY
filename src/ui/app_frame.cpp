@@ -36,6 +36,7 @@
 #include <wx/textdlg.h>
 #include <algorithm>
 #include <chrono>
+#include <map>
 #include <thread>
 
 namespace fatty {
@@ -51,6 +52,25 @@ wxString run_confirm_message(const Command& cmd, const std::string& server_name 
     msg += L"\n\n" + wxString::FromUTF8(cmd.comment);
   }
   return msg;
+}
+
+std::vector<std::string> moved_ids(std::vector<std::string> ids, int from, int to_before) {
+  if (from < 0 || from >= static_cast<int>(ids.size())) return ids;
+  to_before = std::clamp(to_before, 0, static_cast<int>(ids.size()));
+  if (to_before == from || to_before == from + 1) return ids;
+  auto id = ids[static_cast<std::size_t>(from)];
+  ids.erase(ids.begin() + from);
+  int insert = to_before > from ? to_before - 1 : to_before;
+  ids.insert(ids.begin() + insert, std::move(id));
+  return ids;
+}
+
+void fill_row(StripedListCtrl* list, long row, const std::vector<std::string>& ids,
+              const std::map<std::string, wxString>& cells) {
+  for (int col = 0; col < static_cast<int>(ids.size()); ++col) {
+    auto it = cells.find(ids[static_cast<std::size_t>(col)]);
+    list->SetItem(row, col, it == cells.end() ? wxString{} : it->second);
+  }
 }
 
 }  // namespace
@@ -260,8 +280,7 @@ void AppFrame::build_ui() {
   auto* servers_card = new RoundedCard(left);
   servers_ = new StripedListCtrl(servers_card, wxID_ANY,
                                  wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
-  servers_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(160));
-  servers_->AppendColumn(L"Адрес", wxLIST_FORMAT_LEFT, FromDIP(220));
+  setup_server_columns();
   auto* servers_sz = new wxBoxSizer(wxVERTICAL);
   servers_sz->Add(servers_, 1, wxEXPAND);
   servers_card->SetSizer(servers_sz);
@@ -441,6 +460,20 @@ void AppFrame::build_ui() {
     config_.sort_commands_for(s->id, current_folder_id(), by);
     persist();
     refresh_commands();
+  });
+  servers_->Bind(wxEVT_LIST_COL_END_DRAG, [this](wxListEvent& e) {
+    if (e.GetInt() >= 0) {
+      config_.settings.column_order["servers"] =
+          moved_ids(server_column_ids(), e.GetColumn(), e.GetInt());
+    }
+    if (!restoring_) persist();
+  });
+  commands_->Bind(wxEVT_LIST_COL_END_DRAG, [this](wxListEvent& e) {
+    if (e.GetInt() >= 0) {
+      config_.settings.column_order["commands"] =
+          moved_ids(command_column_ids(), e.GetColumn(), e.GetInt());
+    }
+    if (!restoring_) persist();
   });
 
   sadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
@@ -871,8 +904,14 @@ void AppFrame::check_updates_async(bool interactive) {
       if (!alive->load()) return;
       checking_updates_ = false;
       if (!err.empty()) {
-        if (interactive) wxMessageBox(wxString::FromUTF8(err), L"Обновления", wxOK | wxICON_ERROR, this);
-        else status_->SetLabel(L"Готово");
+        if (interactive) {
+          auto text = wxString::FromUTF8(err) + L"\n\nОткрыть страницу релизов в браузере?";
+          if (wxMessageBox(text, L"Обновления", wxYES_NO | wxICON_ERROR, this) == wxYES) {
+            open_url(std::string("https://github.com/") + kGithubOwner + "/" + kGithubRepo + "/releases");
+          }
+        } else {
+          status_->SetLabel(L"Готово");
+        }
         return;
       }
       bool persist_needed = false;
@@ -957,7 +996,7 @@ void AppFrame::persist() {
   config_.settings.window_state = IsMaximized() ? "zoomed" : "normal";
   if (hsplit_) config_.settings.sash_pos = hsplit_->GetSashPosition();
   if (vsplit_) config_.settings.vsash_pos = vsplit_->GetSashPosition();
-  store_list_columns(servers_, config_.settings, "servers", {"name", "host"});
+  store_list_columns(servers_, config_.settings, "servers", server_column_ids());
   store_list_columns(commands_, config_.settings, "commands", command_column_ids());
   if (auto* s = selected_server()) {
     config_.settings.last_server_id = s->id;
@@ -999,8 +1038,10 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
     }
     // Данные строки — индекс в config_.servers; selected_server() читает именно его,
     // поэтому фильтрация не ломает соответствие строки и сервера.
-    servers_->InsertItem(row, wxString::FromUTF8(s.name));
-    servers_->SetItem(row, 1, wxString::FromUTF8(s.username + "@" + s.host + ":" + std::to_string(s.port)));
+    servers_->InsertItem(row, L"");
+    fill_row(servers_, row, server_column_ids(),
+             {{"name", wxString::FromUTF8(s.name)},
+              {"host", wxString::FromUTF8(s.username + "@" + s.host + ":" + std::to_string(s.port))}});
     servers_->SetItemPtrData(row, static_cast<wxUIntPtr>(i));
     style_list_row(servers_, row, Theme::text());
     if (s.id == keep) sel = row;
@@ -1013,10 +1054,9 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
 }
 
 void AppFrame::restore_columns() {
-  auto it_s = config_.settings.column_widths.find("servers");
-  if (it_s != config_.settings.column_widths.end())
-    apply_list_columns(servers_, it_s->second, {"name", "host"});
+  setup_server_columns();
   setup_command_columns();
+  refresh_servers(config_.settings.last_server_id);
 }
 
 void AppFrame::apply_ui_theme() {
@@ -1029,6 +1069,7 @@ void AppFrame::apply_ui_theme() {
   for (auto& [id, win] : files_windows_) {
     if (win) apply_theme(win);
   }
+  setup_server_columns();
   setup_command_columns();
   refresh_servers();
 }
@@ -1099,7 +1140,6 @@ void AppFrame::refresh_commands() {
     update_cwd_label();
     return;
   }
-  const bool folder_col = config_.settings.show_command_folder_column;
   auto cmds = config_.commands_for(s->id, current_folder_id());
   long sel = -1;
   for (std::size_t i = 0; i < cmds.size(); ++i) {
@@ -1108,21 +1148,20 @@ void AppFrame::refresh_commands() {
     if (preview.size() > 90) preview = preview.substr(0, 87) + "…";
     auto comment = c.comment;
     if (comment.size() > 60) comment = comment.substr(0, 57) + "…";
-    long row = commands_->InsertItem(static_cast<long>(i), wxString::FromUTF8(c.name));
-    int col = 1;
-    commands_->SetItem(row, col++, wxString::FromUTF8(comment));
-    if (folder_col) {
-      commands_->SetItem(row, col++, wxString::FromUTF8(folder_display_name(c.folder_id)));
-    }
-    commands_->SetItem(row, col++, wxString::FromUTF8(preview));
-    auto it = last_runs_.find(c.id);
+    long row = commands_->InsertItem(static_cast<long>(i), L"");
+    wxString last = L"—";
     wxColour colour = Theme::text();
-    if (it == last_runs_.end()) {
-      commands_->SetItem(row, col, L"—");
-    } else {
-      commands_->SetItem(row, col, wxString::FromUTF8(it->second.last_run_label()));
+    auto it = last_runs_.find(c.id);
+    if (it != last_runs_.end()) {
+      last = wxString::FromUTF8(it->second.last_run_label());
       colour = Theme::run_status(it->second.status);
     }
+    fill_row(commands_, row, command_column_ids(),
+             {{"name", wxString::FromUTF8(c.name)},
+              {"comment", wxString::FromUTF8(comment)},
+              {"folder", wxString::FromUTF8(folder_display_name(c.folder_id))},
+              {"command", wxString::FromUTF8(preview)},
+              {"last", last}});
     style_list_row(commands_, row, colour);
     if (c.id == config_.settings.last_command_id) sel = row;
   }
@@ -1134,10 +1173,20 @@ void AppFrame::refresh_commands() {
 }
 
 std::vector<std::string> AppFrame::command_column_ids() const {
+  std::vector<std::string> available{"name", "comment", "command", "last"};
   if (config_.settings.show_command_folder_column) {
-    return {"name", "comment", "folder", "command", "last"};
+    available = {"name", "comment", "folder", "command", "last"};
   }
-  return {"name", "comment", "command", "last"};
+  auto it = config_.settings.column_order.find("commands");
+  if (it == config_.settings.column_order.end()) return available;
+  return prefer_order(available, it->second);
+}
+
+std::vector<std::string> AppFrame::server_column_ids() const {
+  std::vector<std::string> available{"name", "host"};
+  auto it = config_.settings.column_order.find("servers");
+  if (it == config_.settings.column_order.end()) return available;
+  return prefer_order(available, it->second);
 }
 
 std::string AppFrame::folder_display_name(const std::string& folder_id) const {
@@ -1146,22 +1195,49 @@ std::string AppFrame::folder_display_name(const std::string& folder_id) const {
   return "Общее";
 }
 
+void AppFrame::setup_server_columns() {
+  if (!servers_) return;
+  servers_->DeleteAllItems();
+  while (servers_->GetColumnCount() > 0) {
+    servers_->DeleteColumn(0);
+  }
+  const auto ids = server_column_ids();
+  for (const auto& id : ids) {
+    if (id == "host") {
+      servers_->AppendColumn(L"Адрес", wxLIST_FORMAT_LEFT, FromDIP(220));
+    } else {
+      servers_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(160));
+    }
+  }
+  auto it = config_.settings.column_widths.find("servers");
+  if (it != config_.settings.column_widths.end()) {
+    apply_list_columns(servers_, it->second, ids);
+  }
+}
+
 void AppFrame::setup_command_columns() {
   if (!commands_) return;
   commands_->DeleteAllItems();
   while (commands_->GetColumnCount() > 0) {
     commands_->DeleteColumn(0);
   }
-  commands_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(160));
-  commands_->AppendColumn(L"Комментарий", wxLIST_FORMAT_LEFT, FromDIP(180));
-  if (config_.settings.show_command_folder_column) {
-    commands_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(110));
+  const auto ids = command_column_ids();
+  for (const auto& id : ids) {
+    if (id == "comment") {
+      commands_->AppendColumn(L"Комментарий", wxLIST_FORMAT_LEFT, FromDIP(180));
+    } else if (id == "folder") {
+      commands_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(110));
+    } else if (id == "command") {
+      commands_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(320));
+    } else if (id == "last") {
+      commands_->AppendColumn(L"Последний раз", wxLIST_FORMAT_LEFT, FromDIP(140));
+    } else {
+      commands_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(160));
+    }
   }
-  commands_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(320));
-  commands_->AppendColumn(L"Последний раз", wxLIST_FORMAT_LEFT, FromDIP(140));
   auto it = config_.settings.column_widths.find("commands");
   if (it != config_.settings.column_widths.end()) {
-    apply_list_columns(commands_, it->second, command_column_ids());
+    apply_list_columns(commands_, it->second, ids);
   }
 }
 

@@ -43,7 +43,9 @@ class AppFrame : public wxFrame {
   void refresh_commands();
   void rebuild_folder_tabs();
   void setup_command_columns();
+  void setup_server_columns();
   std::vector<std::string> command_column_ids() const;
+  std::vector<std::string> server_column_ids() const;
   std::string folder_display_name(const std::string& folder_id) const;
   void attach_commands_page(int index);
   std::string current_folder_id() const;

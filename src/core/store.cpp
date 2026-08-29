@@ -293,6 +293,24 @@ std::map<std::string, std::map<std::string, int>> parse_column_widths(const json
   return result;
 }
 
+std::map<std::string, std::vector<std::string>> parse_column_order(const json& raw) {
+  std::map<std::string, std::vector<std::string>> result;
+  if (!raw.is_object()) {
+    return result;
+  }
+  for (auto it = raw.begin(); it != raw.end(); ++it) {
+    if (!it.value().is_array()) continue;
+    std::vector<std::string> ids;
+    for (const auto& item : it.value()) {
+      if (!item.is_string()) continue;
+      auto id = trim(item.get<std::string>());
+      if (!id.empty()) ids.push_back(std::move(id));
+    }
+    if (!ids.empty()) result[it.key()] = std::move(ids);
+  }
+  return result;
+}
+
 }  // namespace
 
 Config load_config() {
@@ -379,6 +397,7 @@ Config load_config() {
     }
   }
   st.column_widths = parse_column_widths(settings_raw.value("column_widths", json::object()));
+  st.column_order = parse_column_order(settings_raw.value("column_order", json::object()));
   st.putty_path = settings_raw.value("putty_path", "");
   st.ssh_path = settings_raw.value("ssh_path", "");
   st.default_command_timeout = json_int(settings_raw, "default_command_timeout", 180, 1, 86400);
@@ -479,6 +498,7 @@ void save_config(Config& config, SessionVault& vault) {
       {"last_command_id", config.settings.last_command_id},
       {"dialog_geometry", config.settings.dialog_geometry},
       {"column_widths", config.settings.column_widths},
+      {"column_order", config.settings.column_order},
       {"putty_path", config.settings.putty_path},
       {"ssh_path", config.settings.ssh_path},
       {"default_command_timeout", config.settings.default_command_timeout},

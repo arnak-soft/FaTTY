@@ -57,6 +57,7 @@ struct AppSettings {
   std::string last_command_id;
   std::map<std::string, std::string> dialog_geometry;
   std::map<std::string, std::map<std::string, int>> column_widths;
+  std::map<std::string, std::vector<std::string>> column_order;
   std::string putty_path;
   std::string ssh_path;
   int default_command_timeout = 180;

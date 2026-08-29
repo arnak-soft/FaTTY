@@ -126,6 +126,7 @@ void store_list_columns(StripedListCtrl* list, AppSettings& settings, const std:
     int w = list->GetColumnWidth(i);
     if (w > 0) cols[ids[static_cast<std::size_t>(i)]] = w;
   }
+  if (!ids.empty()) settings.column_order[key] = ids;
 }
 
 PositionedDialog::PositionedDialog(wxWindow* parent, const wxString& title, const wxSize& size)

@@ -278,6 +278,25 @@ std::vector<unsigned char> b64_decode(std::string_view text) {
   return out;
 }
 
+std::vector<std::string> prefer_order(const std::vector<std::string>& available,
+                                      const std::vector<std::string>& preferred) {
+  std::vector<std::string> out;
+  std::vector<char> used(available.size(), 0);
+  for (const auto& id : preferred) {
+    for (std::size_t i = 0; i < available.size(); ++i) {
+      if (!used[i] && available[i] == id) {
+        out.push_back(id);
+        used[i] = 1;
+        break;
+      }
+    }
+  }
+  for (std::size_t i = 0; i < available.size(); ++i) {
+    if (!used[i]) out.push_back(available[i]);
+  }
+  return out;
+}
+
 void secure_clear(std::string& s) {
   if (!s.empty()) {
     OPENSSL_cleanse(s.data(), s.size());
