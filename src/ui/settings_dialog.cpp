@@ -39,6 +39,8 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   confirm_->SetValue(st.confirm_before_run);
   clear_output_ = new wxCheckBox(general, wxID_ANY, L"Очищать панель вывода перед новым запуском");
   clear_output_->SetValue(st.clear_output_before_run);
+  show_folder_col_ = new wxCheckBox(general, wxID_ANY, L"Показывать столбец «Папка» в списке команд");
+  show_folder_col_->SetValue(st.show_command_folder_column);
   updates_ = new wxCheckBox(general, wxID_ANY, L"Проверять обновления при запуске (не чаще раза в сутки)");
   updates_->SetValue(st.check_updates_on_start);
   auto* theme_row = new wxBoxSizer(wxHORIZONTAL);
@@ -60,6 +62,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* check_now = make_button(general, L"Проверить сейчас…");
   gsz->Add(confirm_, 0, wxALL, 8);
   gsz->Add(clear_output_, 0, wxALL, 8);
+  gsz->Add(show_folder_col_, 0, wxALL, 8);
   gsz->Add(theme_row, 0, wxALL, 8);
   gsz->Add(trow, 0, wxALL, 8);
   gsz->Add(updates_, 0, wxALL, 8);
@@ -199,6 +202,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.confirm_before_run = confirm_->GetValue();
   config_.settings.check_updates_on_start = updates_->GetValue();
   config_.settings.clear_output_before_run = clear_output_->GetValue();
+  config_.settings.show_command_folder_column = show_folder_col_->GetValue();
   const std::string old_theme = config_.settings.theme;
   config_.settings.theme = theme_->GetSelection() == 1 ? "light" : "dark";
   if (config_.settings.theme != old_theme) {

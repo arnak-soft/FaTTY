@@ -189,11 +189,7 @@ void JournalWindow::reload() {
     list_->SetItem(row, 2, wxString::FromUTF8(e.command_preview(80)));
     list_->SetItem(row, 3, wxString::FromUTF8(e.status_display()));
     list_->SetItem(row, 4, wxString::FromUTF8(e.duration_display()));
-    wxColour c = Theme::text();
-    if (e.status == "ok") c = Theme::ok();
-    else if (e.status == "timeout") c = Theme::warn();
-    else if (e.status == "cancelled") c = Theme::cancel();
-    else c = Theme::err();
+    wxColour c = Theme::run_status(e.status);
     list_->SetItemTextColour(row, c);
   }
 }

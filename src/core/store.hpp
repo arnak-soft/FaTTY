@@ -47,6 +47,7 @@ struct AppSettings {
   bool confirm_before_run = true;
   bool check_updates_on_start = true;
   double last_update_check = 0.0;
+  std::string skipped_update_version;
   std::string window_geometry;
   std::string window_state = "normal";
   int sash_pos = 0;
@@ -64,6 +65,7 @@ struct AppSettings {
   int master_password_max_attempts = 5;
   int master_password_lockout_minutes = 20;
   std::string theme = "dark";
+  bool show_command_folder_column = true;
   std::map<std::string, std::string> last_folder_by_server;
 };
 

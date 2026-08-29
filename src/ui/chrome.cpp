@@ -359,7 +359,7 @@ void TabStrip::on_paint(wxPaintEvent&) {
       const int sx = r.GetRight() - FromDIP(kTabRadiusDip) / 2;
       const int sy = r.y + r.height / 4;
       const int sh = r.height / 2;
-      gc.SetPen(wxPen(Theme::blend(strip_bg, Theme::border(), 0.55f), 1));
+      gc.SetPen(wxPen(Theme::blend(strip_bg, Theme::border(), 0.75f), 1));
       gc.DrawLine(sx, sy, sx, sy + sh);
     }
   }
@@ -367,10 +367,9 @@ void TabStrip::on_paint(wxPaintEvent&) {
   for (std::size_t i = 0; i < rects_.size(); ++i) {
     if (static_cast<int>(i) == sel) continue;
     const float hov = i < hover_.size() ? hover_[i] : 0.f;
-    if (hov < 0.02f) continue;
     const wxRect r = rects_[i];
-    const int inset = FromDIP(4);
-    wxColour fill = Theme::blend(strip_bg, Theme::hover(), hov);
+    const int inset = FromDIP(5);
+    wxColour fill = Theme::blend(strip_bg, Theme::chrome(), 0.55f + 0.45f * hov);
     gc.SetPen(*wxTRANSPARENT_PEN);
     gc.SetBrush(wxBrush(fill));
     gc.DrawRoundedRectangle(r.x + inset + 0.5, r.y + inset + 0.5, r.width - inset * 2 - 1.0,
@@ -383,18 +382,27 @@ void TabStrip::on_paint(wxPaintEvent&) {
       r.height = strip_h - r.y;
     }
     const float hov = static_cast<std::size_t>(sel) < hover_.size() ? hover_[static_cast<std::size_t>(sel)] : 0.f;
-    wxColour fill = Theme::blend(Theme::elevated(), Theme::hover(), hov * 0.15f);
+    wxColour fill = Theme::blend(Theme::elevated(), Theme::text_bright(), theme_is_dark() ? 0.10f : 0.0f);
+    fill = Theme::blend(fill, Theme::hover(), hov * 0.12f);
     gfx->SetPen(wxNullPen);
     gfx->SetBrush(wxBrush(fill));
     gfx->FillPath(chrome_tab_path(gfx, r, radius));
+    const int bar_h = std::max(2, FromDIP(3));
+    gc.SetPen(*wxTRANSPARENT_PEN);
+    gc.SetBrush(wxBrush(Theme::accent()));
+    gc.DrawRectangle(static_cast<int>(r.x + radius * 0.35), r.y + 1,
+                     static_cast<int>(r.width - radius * 0.7), bar_h);
   }
 
   for (std::size_t i = 0; i < rects_.size(); ++i) {
     const wxRect r = rects_[i];
     const float hov = i < hover_.size() ? hover_[i] : 0.f;
     const bool selected = static_cast<int>(i) == sel;
+    wxFont font = Theme::ui();
+    if (selected) font.SetWeight(wxFONTWEIGHT_SEMIBOLD);
+    gc.SetFont(font);
     gc.SetTextForeground(selected ? Theme::text_bright()
-                                  : Theme::blend(Theme::muted(), Theme::text(), 0.4f + 0.6f * hov));
+                                  : Theme::blend(Theme::muted(), Theme::text(), 0.15f + 0.35f * hov));
     const wxString title = owner_->GetPageText(i);
     const wxSize text = gc.GetTextExtent(title);
     const int tx = r.x + hpad;

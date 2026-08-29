@@ -363,6 +363,7 @@ Config load_config() {
   } catch (...) {
     st.last_update_check = 0.0;
   }
+  st.skipped_update_version = settings_raw.value("skipped_update_version", "");
   st.window_geometry = settings_raw.value("window_geometry", "");
   st.window_state = settings_raw.value("window_state", "normal");
   if (st.window_state != "normal" && st.window_state != "zoomed") {
@@ -395,6 +396,7 @@ Config load_config() {
   if (st.theme != "light" && st.theme != "dark") {
     st.theme = "dark";
   }
+  st.show_command_folder_column = settings_raw.value("show_command_folder_column", true);
   if (settings_raw.contains("last_folder_by_server") && settings_raw["last_folder_by_server"].is_object()) {
     for (auto it = settings_raw["last_folder_by_server"].begin();
          it != settings_raw["last_folder_by_server"].end(); ++it) {
@@ -466,6 +468,7 @@ void save_config(Config& config, SessionVault& vault) {
       {"confirm_before_run", config.settings.confirm_before_run},
       {"check_updates_on_start", config.settings.check_updates_on_start},
       {"last_update_check", config.settings.last_update_check},
+      {"skipped_update_version", config.settings.skipped_update_version},
       {"window_geometry", config.settings.window_geometry},
       {"window_state", config.settings.window_state},
       {"sash_pos", config.settings.sash_pos},
@@ -483,6 +486,7 @@ void save_config(Config& config, SessionVault& vault) {
       {"master_password_max_attempts", config.settings.master_password_max_attempts},
       {"master_password_lockout_minutes", config.settings.master_password_lockout_minutes},
       {"theme", config.settings.theme},
+      {"show_command_folder_column", config.settings.show_command_folder_column},
       {"last_folder_by_server", config.settings.last_folder_by_server},
   };
   payload["settings"] = settings;

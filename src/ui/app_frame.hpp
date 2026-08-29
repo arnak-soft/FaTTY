@@ -41,10 +41,14 @@ class AppFrame : public wxFrame {
   void refresh_servers(const std::string& keep_id = {});
   void refresh_commands();
   void rebuild_folder_tabs();
+  void setup_command_columns();
+  std::vector<std::string> command_column_ids() const;
+  std::string folder_display_name(const std::string& folder_id) const;
   void attach_commands_page(int index);
   std::string current_folder_id() const;
   Server* selected_server();
   Command* selected_command();
+  std::vector<Command*> selected_commands();
   void run_command(const Server& server, const std::string& command, int timeout, bool login_shell,
                    const std::string& title, const std::string& command_id, const std::string& kind);
   void append_output(const std::string& text, const wxColour* colour = nullptr);

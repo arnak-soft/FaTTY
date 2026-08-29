@@ -8,6 +8,7 @@
 
 #include <wx/checkbox.h>
 #include <wx/combobox.h>
+#include <wx/dialog.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 
@@ -108,6 +109,15 @@ class ChangeMasterDialog : public PositionedDialog {
   wxTextCtrl* neu_{};
   wxTextCtrl* neu2_{};
   wxStaticText* error_{};
+};
+
+class UpdateAvailableDialog : public wxDialog {
+ public:
+  UpdateAvailableDialog(wxWindow* parent, const std::string& current, const std::string& latest);
+  bool dont_remind() const;
+
+ private:
+  wxCheckBox* skip_{};
 };
 
 }  // namespace fatty

@@ -28,6 +28,7 @@ struct Theme {
   static wxColour border();
   static wxColour hover();
   static wxColour blend(const wxColour& a, const wxColour& b, float t);
+  static wxColour run_status(const std::string& status);
   static wxFont ui();
   static wxFont ui_small();
   static wxFont ui_section();

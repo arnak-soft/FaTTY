@@ -21,6 +21,7 @@
 #include <wx/app.h>
 #include <wx/bookctrl.h>
 #include <wx/button.h>
+#include <wx/choicdlg.h>
 #include <wx/dialog.h>
 #include <wx/filedlg.h>
 #include <wx/menu.h>
@@ -281,10 +282,8 @@ void AppFrame::build_ui() {
   first_page->SetForegroundColour(Theme::text());
   auto* page_sz = new wxBoxSizer(wxVERTICAL);
   commands_ = new wxListCtrl(first_page, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                             wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
-  commands_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(180));
-  commands_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(320));
-  commands_->AppendColumn(L"Последний раз", wxLIST_FORMAT_LEFT, FromDIP(140));
+                             wxLC_REPORT | wxBORDER_NONE);
+  setup_command_columns();
   page_sz->Add(commands_, 1, wxEXPAND);
   first_page->SetSizer(page_sz);
   folders_nb_->AddPage(first_page, L"Общее");
@@ -307,6 +306,7 @@ void AppFrame::build_ui() {
   auto* cedit = make_button(right, L"Изменить  (F2)");
   auto* cdup = make_button(right, L"Дублировать");
   auto* cdel = make_button(right, L"Удалить");
+  auto* cmove = make_button(right, L"Переместить в папку");
   auto* presets = make_button(right, L"Пресеты…");
   stop_btn_ = make_button(right, L"Стоп");
   run_btn_ = accent_button(right, L"Запустить  (F5)");
@@ -315,6 +315,7 @@ void AppFrame::build_ui() {
   cbtns->Add(cedit, 0, wxRIGHT, gap);
   cbtns->Add(cdup, 0, wxRIGHT, gap);
   cbtns->Add(cdel, 0, wxRIGHT, gap);
+  cbtns->Add(cmove, 0, wxRIGHT, gap);
   cbtns->Add(presets, 0, wxRIGHT, pad);
   cbtns->AddStretchSpacer();
   cbtns->Add(run_btn_, 0, wxRIGHT, gap);
@@ -332,7 +333,7 @@ void AppFrame::build_ui() {
   rs->Add(cbtns, 0, wxTOP, gap);
   rs->Add(qrow, 0, wxEXPAND | wxTOP, pad);
   right->SetSizer(rs);
-  for (wxWindow* b : {cadd, cedit, cdup, cdel, presets, up, down, byname, fadd, frename, fdel, qrun}) {
+  for (wxWindow* b : {cadd, cedit, cdup, cdel, cmove, presets, up, down, byname, fadd, frename, fdel, qrun}) {
     busy_disable_.push_back(b);
   }
   busy_disable_.push_back(quick_);
@@ -414,8 +415,15 @@ void AppFrame::build_ui() {
   });
   commands_->Bind(wxEVT_LIST_COL_CLICK, [this](wxListEvent& e) {
     auto* s = selected_server();
-    if (!s || e.GetColumn() > 1) return;
-    config_.sort_commands_for(s->id, current_folder_id(), e.GetColumn() == 1 ? "command" : "name");
+    if (!s) return;
+    const bool folder_col = config_.settings.show_command_folder_column;
+    const int col = e.GetColumn();
+    std::string by;
+    if (col == 0) by = "name";
+    else if (folder_col && col == 2) by = "command";
+    else if (!folder_col && col == 1) by = "command";
+    else return;
+    config_.sort_commands_for(s->id, current_folder_id(), by);
     persist();
     refresh_commands();
   });
@@ -665,16 +673,61 @@ void AppFrame::build_ui() {
     refresh_commands();
   });
   cdel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* c = selected_command();
-    if (!c) return;
-    if (wxMessageBox(L"Удалить «" + wxString::FromUTF8(c->name) + L"»?", L"Удалить команду", wxYES_NO, this) != wxYES)
-      return;
-    auto id = c->id;
+    auto sel = selected_commands();
+    if (sel.empty()) return;
+    wxString msg;
+    if (sel.size() == 1) {
+      msg = L"Удалить «" + wxString::FromUTF8(sel[0]->name) + L"»?";
+    } else {
+      msg = wxString::Format(L"Удалить выбранные команды (%d)?", static_cast<int>(sel.size()));
+    }
+    if (wxMessageBox(msg, L"Удалить команду", wxYES_NO, this) != wxYES) return;
+    std::vector<std::string> ids;
+    ids.reserve(sel.size());
+    for (auto* c : sel) ids.push_back(c->id);
     config_.commands.erase(std::remove_if(config_.commands.begin(), config_.commands.end(),
-                                          [&](const Command& x) { return x.id == id; }),
+                                          [&](const Command& x) {
+                                            return std::find(ids.begin(), ids.end(), x.id) != ids.end();
+                                          }),
                            config_.commands.end());
     persist();
     refresh_commands();
+  });
+  cmove->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    auto sel = selected_commands();
+    if (sel.empty()) {
+      wxMessageBox(L"Выберите одну или несколько команд.", L"Переместить в папку");
+      return;
+    }
+    auto* s = selected_server();
+    if (!s) return;
+    wxArrayString labels;
+    std::vector<std::string> ids;
+    labels.Add(L"Общее");
+    ids.push_back("");
+    for (const auto& f : config_.folders_for(s->id)) {
+      labels.Add(wxString::FromUTF8(f.name));
+      ids.push_back(f.id);
+    }
+    const int n = wxGetSingleChoiceIndex(L"Куда переместить выбранные команды?", L"Переместить в папку", labels, this);
+    if (n < 0 || n >= static_cast<int>(ids.size())) return;
+    const std::string dest = ids[static_cast<std::size_t>(n)];
+    int moved = 0;
+    for (auto* c : sel) {
+      if (c->server_id != s->id) continue;
+      if (c->folder_id == dest) continue;
+      c->folder_id = dest;
+      ++moved;
+    }
+    if (moved == 0) {
+      wxMessageBox(L"Выбранные команды уже в этой папке.", L"Переместить в папку");
+      return;
+    }
+    config_.settings.last_folder_by_server[s->id] = dest;
+    persist();
+    rebuild_folder_tabs();
+    refresh_commands();
+    status_->SetLabel(wxString::Format(L"Перемещено команд: %d", moved));
   });
   presets->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* s = selected_server();
@@ -807,12 +860,29 @@ void AppFrame::check_updates_async(bool interactive) {
         else status_->SetLabel(L"Готово");
         return;
       }
+      bool persist_needed = false;
       if (r.status == "update") {
-        status_->SetLabel(wxString::FromUTF8("Доступна версия " + (r.latest ? *r.latest : "?")));
-        std::string url = r.page_url.value_or(r.download_url.value_or(""));
-        if (wxMessageBox(L"Доступна новая версия. Открыть страницу загрузки?", L"Обновления", wxYES_NO, this) == wxYES &&
-            !url.empty()) {
-          open_url(url);
+        std::string latest = r.latest.value_or("");
+        const bool already_skipped =
+            !interactive && !latest.empty() && latest == config_.settings.skipped_update_version;
+        if (already_skipped) {
+          status_->SetLabel(L"Готово");
+        } else {
+          status_->SetLabel(wxString::FromUTF8("Доступна версия " + (latest.empty() ? "?" : latest)));
+          UpdateAvailableDialog dlg(this, r.current, latest);
+          int ans = dlg.ShowModal();
+          if (ans == wxID_YES) {
+            std::string url = r.page_url.value_or(r.download_url.value_or(""));
+            if (!url.empty()) open_url(url);
+          } else if (dlg.dont_remind() && !latest.empty()) {
+            if (config_.settings.skipped_update_version != latest) {
+              config_.settings.skipped_update_version = latest;
+              persist_needed = true;
+            }
+          } else if (config_.settings.skipped_update_version == latest) {
+            config_.settings.skipped_update_version.clear();
+            persist_needed = true;
+          }
         }
       } else if (interactive && r.status == "current") {
         wxMessageBox(L"У вас актуальная версия.", L"Обновления", wxOK | wxICON_INFORMATION, this);
@@ -824,8 +894,9 @@ void AppFrame::check_updates_async(bool interactive) {
       if (!interactive) {
         config_.settings.last_update_check =
             std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
-        persist();
+        persist_needed = true;
       }
+      if (persist_needed) persist();
     });
   }).detach();
 }
@@ -834,8 +905,8 @@ void AppFrame::open_settings() {
   SettingsDialog dlg(this, config_, vault_,
                      [this] {
                        journal_->max_entries = config_.settings.journal_max_entries;
-                       persist();
                        apply_ui_theme();
+                       persist();
                      },
                      [this] {
                        ChangeMasterDialog d(this, vault_, config_.settings.allow_short_master_password);
@@ -872,7 +943,7 @@ void AppFrame::persist() {
   if (hsplit_) config_.settings.sash_pos = hsplit_->GetSashPosition();
   if (vsplit_) config_.settings.vsash_pos = vsplit_->GetSashPosition();
   store_list_columns(servers_, config_.settings, "servers", {"name", "host"});
-  store_list_columns(commands_, config_.settings, "commands", {"name", "command", "last"});
+  store_list_columns(commands_, config_.settings, "commands", command_column_ids());
   if (auto* s = selected_server()) {
     config_.settings.last_server_id = s->id;
     config_.settings.last_folder_by_server[s->id] = current_folder_id();
@@ -918,9 +989,7 @@ void AppFrame::restore_columns() {
   auto it_s = config_.settings.column_widths.find("servers");
   if (it_s != config_.settings.column_widths.end())
     apply_list_columns(servers_, it_s->second, {"name", "host"});
-  auto it_c = config_.settings.column_widths.find("commands");
-  if (it_c != config_.settings.column_widths.end())
-    apply_list_columns(commands_, it_c->second, {"name", "command", "last"});
+  setup_command_columns();
 }
 
 void AppFrame::apply_ui_theme() {
@@ -931,6 +1000,7 @@ void AppFrame::apply_ui_theme() {
   for (auto& [id, win] : files_windows_) {
     if (win) apply_theme(win);
   }
+  setup_command_columns();
   refresh_commands();
 }
 
@@ -999,6 +1069,7 @@ void AppFrame::refresh_commands() {
     update_cwd_label();
     return;
   }
+  const bool folder_col = config_.settings.show_command_folder_column;
   auto cmds = config_.commands_for(s->id, current_folder_id());
   long sel = -1;
   for (std::size_t i = 0; i < cmds.size(); ++i) {
@@ -1006,23 +1077,58 @@ void AppFrame::refresh_commands() {
     auto preview = c.command;
     if (preview.size() > 90) preview = preview.substr(0, 87) + "…";
     long row = commands_->InsertItem(static_cast<long>(i), wxString::FromUTF8(c.name));
-    commands_->SetItem(row, 1, wxString::FromUTF8(preview));
-    auto it = last_runs_.find(c.id);
-    if (it == last_runs_.end()) {
-      commands_->SetItem(row, 2, L"—");
-    } else {
-      commands_->SetItem(row, 2, wxString::FromUTF8(it->second.last_run_label()));
-      wxColour col = Theme::text();
-      if (it->second.status == "ok") col = Theme::ok();
-      else if (it->second.status == "timeout") col = Theme::warn();
-      else if (it->second.status == "cancelled") col = Theme::cancel();
-      else col = Theme::err();
-      commands_->SetItemTextColour(row, col);
+    int col = 1;
+    if (folder_col) {
+      commands_->SetItem(row, col++, wxString::FromUTF8(folder_display_name(c.folder_id)));
     }
+    commands_->SetItem(row, col++, wxString::FromUTF8(preview));
+    auto it = last_runs_.find(c.id);
+    wxColour colour = Theme::text();
+    if (it == last_runs_.end()) {
+      commands_->SetItem(row, col, L"—");
+    } else {
+      commands_->SetItem(row, col, wxString::FromUTF8(it->second.last_run_label()));
+      colour = Theme::run_status(it->second.status);
+    }
+    commands_->SetItemTextColour(row, colour);
     if (c.id == config_.settings.last_command_id) sel = row;
   }
-  if (sel >= 0) commands_->SetItemState(sel, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
+  if (sel >= 0) {
+    commands_->SetItemState(sel, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
+                            wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+  }
   update_cwd_label();
+}
+
+std::vector<std::string> AppFrame::command_column_ids() const {
+  if (config_.settings.show_command_folder_column) {
+    return {"name", "folder", "command", "last"};
+  }
+  return {"name", "command", "last"};
+}
+
+std::string AppFrame::folder_display_name(const std::string& folder_id) const {
+  if (folder_id.empty()) return "Общее";
+  if (auto* f = config_.folder_by_id(folder_id)) return f->name;
+  return "Общее";
+}
+
+void AppFrame::setup_command_columns() {
+  if (!commands_) return;
+  commands_->DeleteAllItems();
+  while (commands_->GetColumnCount() > 0) {
+    commands_->DeleteColumn(0);
+  }
+  commands_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(180));
+  if (config_.settings.show_command_folder_column) {
+    commands_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(120));
+  }
+  commands_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(320));
+  commands_->AppendColumn(L"Последний раз", wxLIST_FORMAT_LEFT, FromDIP(140));
+  auto it = config_.settings.column_widths.find("commands");
+  if (it != config_.settings.column_widths.end()) {
+    apply_list_columns(commands_, it->second, command_column_ids());
+  }
 }
 
 Server* AppFrame::selected_server() {
@@ -1033,13 +1139,24 @@ Server* AppFrame::selected_server() {
   return &config_.servers[idx];
 }
 
-Command* AppFrame::selected_command() {
+std::vector<Command*> AppFrame::selected_commands() {
+  std::vector<Command*> out;
   auto* s = selected_server();
-  if (!s) return nullptr;
-  long i = commands_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (!s || !commands_) return out;
   auto cmds = config_.commands_for(s->id, current_folder_id());
-  if (i < 0 || i >= static_cast<long>(cmds.size())) return nullptr;
-  return config_.command_by_id(cmds[static_cast<std::size_t>(i)].id);
+  long i = -1;
+  while ((i = commands_->GetNextItem(i, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED)) != wxNOT_FOUND) {
+    if (i < 0 || i >= static_cast<long>(cmds.size())) continue;
+    if (auto* c = config_.command_by_id(cmds[static_cast<std::size_t>(i)].id)) {
+      out.push_back(c);
+    }
+  }
+  return out;
+}
+
+Command* AppFrame::selected_command() {
+  auto sel = selected_commands();
+  return sel.empty() ? nullptr : sel.front();
 }
 
 void AppFrame::append_output(const std::string& text, const wxColour* colour) {

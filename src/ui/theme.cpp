@@ -106,6 +106,12 @@ wxColour Theme::blend(const wxColour& a, const wxColour& b, float t) {
   };
   return {mix(a.Red(), b.Red()), mix(a.Green(), b.Green()), mix(a.Blue(), b.Blue()), mix(a.Alpha(), b.Alpha())};
 }
+
+wxColour Theme::run_status(const std::string& status) {
+  if (status == "ok") return ok();
+  if (status == "failed" || status == "error") return err();
+  return warn();
+}
 wxFont Theme::ui() { return wxFont(10, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
 wxFont Theme::ui_small() { return wxFont(9, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
 wxFont Theme::ui_section() { return wxFont(8, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_SEMIBOLD, false, L"Segoe UI"); }
@@ -159,7 +165,8 @@ void apply_theme(wxWindow* window) {
     style_text(tc, name == L"terminal");
   } else if (dynamic_cast<wxListCtrl*>(window) || dynamic_cast<wxNotebook*>(window)) {
     window->SetBackgroundColour(Theme::elevated());
-    window->SetForegroundColour(Theme::text());
+    // Не задаём цвет текста контролу: иначе Windows затирает цвет строк
+    // (успех/ошибка последнего запуска).
   } else if (dynamic_cast<wxButton*>(window)) {
     window->SetBackgroundColour(Theme::btn());
     window->SetForegroundColour(Theme::text_bright());
