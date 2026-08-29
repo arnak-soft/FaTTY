@@ -73,7 +73,7 @@ class AppFrame : public wxFrame {
   std::shared_ptr<Journal> journal_;
   std::shared_ptr<SSHSession> session_;
   std::map<std::string, std::string> remote_cwd_;
-  std::map<std::string, JournalEntry> last_runs_;
+  std::map<std::string, CommandRunStats> command_stats_;
   bool busy_ = false;
   bool closing_for_install_ = false;
   bool restoring_ = true;

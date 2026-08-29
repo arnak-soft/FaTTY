@@ -91,6 +91,52 @@ void test_journal() {
     expect(concurrent.load().size() == 50, "all concurrent appends stored");
   }
 
+  {
+    Journal timed(dir / "avg.jsonl", 100);
+    JournalEntry timed_a;
+    timed_a.command_id = "avg-cmd";
+    timed_a.command = "sleep";
+    timed_a.status = "ok";
+    timed_a.duration_sec = 2.0;
+    timed.append(timed_a);
+    JournalEntry timed_b = timed_a;
+    timed_b.duration_sec = 6.0;
+    timed.append(timed_b);
+    JournalEntry timed_other;
+    timed_other.command_id = "other";
+    timed_other.command = "ls";
+    timed_other.status = "ok";
+    timed_other.duration_sec = 10.0;
+    timed.append(timed_other);
+    JournalEntry no_id;
+    no_id.command = "quick";
+    no_id.status = "ok";
+    no_id.duration_sec = 99.0;
+    timed.append(no_id);
+    auto stats = timed.stats_by_command_id();
+    expect(stats.count("avg-cmd") == 1, "avg command present");
+    expect(stats["avg-cmd"].run_count == 2, "avg run count");
+    expect(stats["avg-cmd"].average_sec > 3.9 && stats["avg-cmd"].average_sec < 4.1, "avg duration");
+    expect(stats["other"].average_sec > 9.9 && stats["other"].average_sec < 10.1, "other avg isolated");
+    expect(stats.count("") == 0, "empty command_id skipped");
+    expect(format_duration(4.0) == "4.0 с", "format duration seconds");
+
+    std::vector<JournalEntry> in_memory;
+    JournalEntry newest;
+    newest.command_id = "x";
+    newest.duration_sec = 1;
+    newest.status = "ok";
+    JournalEntry older = newest;
+    older.duration_sec = 5;
+    older.status = "failed";
+    in_memory.push_back(newest);
+    in_memory.push_back(older);
+    auto mem = command_run_stats(in_memory);
+    expect(mem["x"].run_count == 2, "in-memory run count");
+    expect(mem["x"].average_sec > 2.9 && mem["x"].average_sec < 3.1, "in-memory average");
+    expect(mem["x"].latest.status == "ok", "newest-first is latest");
+  }
+
   std::error_code ec;
   std::filesystem::remove_all(dir, ec);
 }

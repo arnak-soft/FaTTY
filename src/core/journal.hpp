@@ -43,11 +43,18 @@ struct JournalEntry {
   std::string as_text() const;
 };
 
+struct CommandRunStats {
+  JournalEntry latest;
+  double average_sec = 0;
+  int run_count = 0;
+};
+
 std::string now_iso();
 std::string format_duration(double seconds);
 std::string status_from_exit(int code);
 std::string status_label(const std::string& status);
 std::string kind_label(const std::string& kind);
+std::map<std::string, CommandRunStats> command_run_stats(const std::vector<JournalEntry>& entries);
 
 inline constexpr std::size_t kJournalOutputMax = 256 * 1024;
 
@@ -61,6 +68,7 @@ class Journal {
   void append(JournalEntry entry);
   std::vector<JournalEntry> load(int limit = 5000) const;
   std::map<std::string, JournalEntry> latest_by_command_id() const;
+  std::map<std::string, CommandRunStats> stats_by_command_id() const;
   bool remove(const std::string& id);
   void clear();
   std::string export_text(const std::vector<JournalEntry>* entries = nullptr) const;

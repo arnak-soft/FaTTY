@@ -175,6 +175,25 @@ std::string status_from_exit(int code) {
   return "failed";
 }
 
+std::map<std::string, CommandRunStats> command_run_stats(const std::vector<JournalEntry>& entries) {
+  std::map<std::string, CommandRunStats> stats;
+  for (const auto& item : entries) {
+    auto cid = trim(item.command_id);
+    if (cid.empty()) continue;
+    auto& s = stats[cid];
+    if (s.run_count == 0) {
+      s.latest = item;
+    }
+    s.average_sec += item.duration_sec;
+    s.run_count += 1;
+  }
+  for (auto& [cid, s] : stats) {
+    (void)cid;
+    if (s.run_count > 0) s.average_sec /= static_cast<double>(s.run_count);
+  }
+  return stats;
+}
+
 std::string JournalEntry::target() const {
   return username + "@" + host + ":" + std::to_string(port);
 }
@@ -385,13 +404,14 @@ std::vector<JournalEntry> Journal::load(int limit) const {
 
 std::map<std::string, JournalEntry> Journal::latest_by_command_id() const {
   std::map<std::string, JournalEntry> latest;
-  for (const auto& item : load()) {
-    auto cid = trim(item.command_id);
-    if (!cid.empty() && !latest.count(cid)) {
-      latest.emplace(cid, item);
-    }
+  for (auto& [cid, s] : stats_by_command_id()) {
+    latest.emplace(cid, std::move(s.latest));
   }
   return latest;
+}
+
+std::map<std::string, CommandRunStats> Journal::stats_by_command_id() const {
+  return command_run_stats(load());
 }
 
 bool Journal::remove(const std::string& id) {

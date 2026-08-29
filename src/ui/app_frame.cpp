@@ -91,14 +91,14 @@ AppFrame::AppFrame(Config config, SessionVault vault)
   SetMinSize(FromDIP(wxSize(860, 560)));
   SetSize(FromDIP(wxSize(1100, 720)));
   Centre();
-  last_runs_ = journal_->latest_by_command_id();
+  command_stats_ = journal_->stats_by_command_id();
   // Слушателя может дёрнуть фоновый поток команды, поэтому на главный поток
   // возвращаемся через wxTheApp и проверяем живой-токен.
   journal_->add_listener([this, alive = alive_, journal = journal_] {
     if (!alive->load()) return;
     wxTheApp->CallAfter([this, alive, journal] {
       if (!alive->load()) return;
-      last_runs_ = journal->latest_by_command_id();
+      command_stats_ = journal->stats_by_command_id();
       refresh_commands();
     });
   });
@@ -472,8 +472,31 @@ void AppFrame::build_ui() {
     const int col = e.GetColumn();
     if (col < 0 || col >= static_cast<int>(ids.size())) return;
     const auto& by = ids[static_cast<std::size_t>(col)];
-    if (by != "name" && by != "command" && by != "comment") return;
-    config_.sort_commands_for(s->id, current_folder_id(), by);
+    if (by == "avg") {
+      auto group = config_.commands_for(s->id, current_folder_id());
+      auto avg_of = [this](const std::string& id) -> double {
+        auto it = command_stats_.find(id);
+        if (it == command_stats_.end() || it->second.run_count <= 0) return -1;
+        return it->second.average_sec;
+      };
+      std::sort(group.begin(), group.end(), [&](const Command& a, const Command& b) {
+        const double da = avg_of(a.id);
+        const double db = avg_of(b.id);
+        const bool a_missing = da < 0;
+        const bool b_missing = db < 0;
+        if (a_missing != b_missing) return !a_missing;
+        if (da != db) return da < db;
+        auto na = to_lower(trim(a.name));
+        auto nb = to_lower(trim(b.name));
+        if (na != nb) return na < nb;
+        return a.id < b.id;
+      });
+      config_.set_commands_for(s->id, current_folder_id(), group);
+    } else if (by == "name" || by == "command" || by == "comment") {
+      config_.sort_commands_for(s->id, current_folder_id(), by);
+    } else {
+      return;
+    }
     persist();
     refresh_commands();
   });
@@ -1241,18 +1264,23 @@ void AppFrame::refresh_commands() {
     if (comment.size() > 60) comment = comment.substr(0, 57) + "…";
     long row = commands_->InsertItem(static_cast<long>(i), L"");
     wxString last = L"—";
+    wxString avg = L"—";
     wxColour colour = Theme::text();
-    auto it = last_runs_.find(c.id);
-    if (it != last_runs_.end()) {
-      last = wxString::FromUTF8(it->second.last_run_label());
-      colour = Theme::run_status(it->second.status);
+    auto it = command_stats_.find(c.id);
+    if (it != command_stats_.end()) {
+      last = wxString::FromUTF8(it->second.latest.last_run_label());
+      colour = Theme::run_status(it->second.latest.status);
+      if (it->second.run_count > 0) {
+        avg = wxString::FromUTF8(format_duration(it->second.average_sec));
+      }
     }
     fill_row(commands_, row, command_column_ids(),
              {{"name", wxString::FromUTF8(c.name)},
               {"comment", wxString::FromUTF8(comment)},
               {"folder", wxString::FromUTF8(folder_display_name(c.folder_id))},
               {"command", wxString::FromUTF8(preview)},
-              {"last", last}});
+              {"last", last},
+              {"avg", avg}});
     style_list_row(commands_, row, colour);
     if (c.id == config_.settings.last_command_id) sel = row;
   }
@@ -1264,9 +1292,9 @@ void AppFrame::refresh_commands() {
 }
 
 std::vector<std::string> AppFrame::command_column_ids() const {
-  std::vector<std::string> available{"name", "command", "comment", "last"};
+  std::vector<std::string> available{"name", "command", "comment", "last", "avg"};
   if (config_.settings.show_command_folder_column) {
-    available = {"folder", "name", "command", "comment", "last"};
+    available = {"folder", "name", "command", "comment", "last", "avg"};
   }
   auto it = config_.settings.column_order.find("commands");
   if (it == config_.settings.column_order.end()) return available;
@@ -1326,6 +1354,8 @@ void AppFrame::setup_command_columns() {
       commands_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(320));
     } else if (id == "last") {
       commands_->AppendColumn(L"Последний раз", wxLIST_FORMAT_LEFT, FromDIP(140));
+    } else if (id == "avg") {
+      commands_->AppendColumn(L"Ср. время", wxLIST_FORMAT_LEFT, FromDIP(100));
     } else {
       commands_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(160));
     }
