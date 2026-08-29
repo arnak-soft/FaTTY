@@ -36,7 +36,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* general = new wxPanel(nb);
   general->SetName(L"card-page");
   auto* gsz = new wxBoxSizer(wxVERTICAL);
-  confirm_ = new wxCheckBox(general, wxID_ANY, L"Спрашивать подтверждение перед запуском");
+  confirm_ = new wxCheckBox(general, wxID_ANY, L"Спрашивать подтверждение перед разовой командой");
   confirm_->SetValue(st.confirm_before_run);
   clear_output_ = new wxCheckBox(general, wxID_ANY, L"Очищать панель вывода перед новым запуском");
   clear_output_->SetValue(st.clear_output_before_run);

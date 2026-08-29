@@ -54,6 +54,11 @@ wxString run_confirm_message(const Command& cmd, const std::string& server_name 
   return msg;
 }
 
+bool confirm_saved_run(wxWindow* parent, const Command& cmd, const std::string& server_name = {}) {
+  if (!cmd.confirm_before_run) return true;
+  return wxMessageBox(run_confirm_message(cmd, server_name), L"Запуск", wxYES_NO, parent) == wxYES;
+}
+
 std::vector<std::string> moved_ids(std::vector<std::string> ids, int from, int to_before) {
   if (from < 0 || from >= static_cast<int>(ids.size())) return ids;
   to_before = std::clamp(to_before, 0, static_cast<int>(ids.size()));
@@ -135,9 +140,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       if (auto* c = selected_command()) {
         auto* s = selected_server();
         if (s) {
-          if (config_.settings.confirm_before_run &&
-              wxMessageBox(run_confirm_message(*c), L"Запуск", wxYES_NO, this) != wxYES)
-            return;
+          if (!confirm_saved_run(this, *c)) return;
           run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
         }
       }
@@ -447,7 +450,9 @@ void AppFrame::build_ui() {
   commands_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) {
     auto* c = selected_command();
     auto* s = selected_server();
-    if (c && s) run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
+    if (!c || !s) return;
+    if (!confirm_saved_run(this, *c, s->name)) return;
+    run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
   });
   commands_->Bind(wxEVT_LIST_COL_CLICK, [this](wxListEvent& e) {
     auto* s = selected_server();
@@ -811,9 +816,7 @@ void AppFrame::build_ui() {
       wxMessageBox(L"Выберите VPS и команду.", L"Запуск");
       return;
     }
-    if (config_.settings.confirm_before_run &&
-        wxMessageBox(run_confirm_message(*c, s->name), L"Запуск", wxYES_NO, this) != wxYES)
-      return;
+    if (!confirm_saved_run(this, *c, s->name)) return;
     run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
   });
   stop_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
@@ -854,6 +857,11 @@ void AppFrame::show_journal() {
       if (!s) {
         wxMessageBox(L"VPS из этой записи больше нет в списке.", L"Журнал", wxOK | wxICON_ERROR, this);
         return;
+      }
+      if (auto* c = config_.command_by_id(e.command_id)) {
+        if (!confirm_saved_run(this, *c, s->name)) return;
+      } else if (config_.settings.confirm_before_run) {
+        if (wxMessageBox(L"Повторить команду из журнала?", L"Запуск", wxYES_NO, this) != wxYES) return;
       }
       run_command(*s, e.command, e.timeout_sec, e.login_shell, e.title.empty() ? "журнал" : e.title, e.command_id,
                   e.kind);
@@ -1173,13 +1181,17 @@ void AppFrame::refresh_commands() {
 }
 
 std::vector<std::string> AppFrame::command_column_ids() const {
-  std::vector<std::string> available{"name", "comment", "command", "last"};
+  std::vector<std::string> available{"name", "command", "comment", "last"};
   if (config_.settings.show_command_folder_column) {
-    available = {"name", "comment", "folder", "command", "last"};
+    available = {"folder", "name", "command", "comment", "last"};
   }
   auto it = config_.settings.column_order.find("commands");
   if (it == config_.settings.column_order.end()) return available;
-  return prefer_order(available, it->second);
+  const auto& saved = it->second;
+  static const std::vector<std::string> old_default_with_folder{"name", "comment", "folder", "command", "last"};
+  static const std::vector<std::string> old_default_no_folder{"name", "comment", "command", "last"};
+  if (saved == old_default_with_folder || saved == old_default_no_folder) return available;
+  return prefer_order(available, saved);
 }
 
 std::vector<std::string> AppFrame::server_column_ids() const {

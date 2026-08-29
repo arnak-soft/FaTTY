@@ -93,6 +93,7 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
         {"command", cmd.command},
         {"timeout_sec", cmd.timeout_sec},
         {"login_shell", cmd.login_shell},
+        {"confirm_before_run", cmd.confirm_before_run},
         {"folder", folder_name},
     });
   }
@@ -192,6 +193,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       item.cmd.timeout_sec = raw.value("timeout_sec", 180);
       if (item.cmd.timeout_sec < 1) item.cmd.timeout_sec = 180;
       item.cmd.login_shell = raw.value("login_shell", true);
+      item.cmd.confirm_before_run = raw.value("confirm_before_run", true);
       if (item.server_name.empty() || item.server_host.empty() || item.cmd.name.empty() ||
           item.cmd.command.empty()) {
         continue;

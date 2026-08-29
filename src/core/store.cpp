@@ -357,6 +357,7 @@ Config load_config() {
     c.folder_id = raw.value("folder_id", "");
     c.timeout_sec = raw.value("timeout_sec", 180);
     c.login_shell = raw.value("login_shell", true);
+    c.confirm_before_run = raw.value("confirm_before_run", true);
     cfg.commands.push_back(std::move(c));
   }
   for (const auto& raw : data.value("folders", json::array())) {
@@ -475,6 +476,7 @@ void save_config(Config& config, SessionVault& vault) {
         {"folder_id", c.folder_id},
         {"timeout_sec", c.timeout_sec},
         {"login_shell", c.login_shell},
+        {"confirm_before_run", c.confirm_before_run},
     });
   }
   payload["folders"] = json::array();

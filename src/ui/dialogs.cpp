@@ -264,9 +264,9 @@ void PresetDialog::on_ok(wxCommandEvent&) {
 
 CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std::vector<Server>& servers,
                              const std::vector<Folder>& folders, const wxString& title)
-    : PositionedDialog(parent, title, wxSize(640, 560)), command_(command), servers_(servers), folders_(folders) {
+    : PositionedDialog(parent, title, wxSize(640, 580)), command_(command), servers_(servers), folders_(folders) {
   auto* body = new wxPanel(this);
-  auto* form = new wxFlexGridSizer(7, 2, 6, 8);
+  auto* form = new wxFlexGridSizer(8, 2, 6, 8);
   form->AddGrowableCol(1);
   name_ = labeled_entry(body, form, L"Название", wxString::FromUTF8(command.name));
   comment_ = labeled_entry(body, form, L"Комментарий", wxString::FromUTF8(command.comment));
@@ -289,6 +289,10 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   login_ = new wxCheckBox(body, wxID_ANY, L"Login-shell (bash -lc) — подхватывает PATH из .bashrc");
   login_->SetValue(command.login_shell);
   form->Add(login_, 1);
+  form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
+  confirm_ = new wxCheckBox(body, wxID_ANY, L"Предупреждать перед запуском");
+  confirm_->SetValue(command.confirm_before_run);
+  form->Add(confirm_, 1);
   form->Add(new wxStaticText(body, wxID_ANY, L"Пресет"), 0, wxALIGN_CENTER_VERTICAL);
   presets_ = all_presets();
   wxArrayString pname;
@@ -390,6 +394,7 @@ void CommandDialog::on_ok(wxCommandEvent&) {
   result.command = cmd;
   result.timeout_sec = timeout;
   result.login_shell = login_->GetValue();
+  result.confirm_before_run = confirm_->GetValue();
   int fsel = folder_->GetSelection();
   if (fsel >= 0 && fsel < static_cast<int>(folder_ids_.size())) {
     result.folder_id = folder_ids_[static_cast<std::size_t>(fsel)];

@@ -24,6 +24,7 @@ void test_store() {
   auto c2 = Command::make_new(s.id);
   c2.name = "a";
   c2.command = "echo a";
+  expect(c1.confirm_before_run, "new command warns by default");
   cfg.commands.push_back(c1);
   cfg.commands.push_back(c2);
   expect(cfg.commands_for(s.id).size() == 2, "commands_for");
@@ -57,6 +58,9 @@ void test_store() {
   auto clone = s.duplicate(copy_name(s.name, {"alpha"}));
   expect(clone.name == "alpha (копия)", "copy name");
   expect(clone.id != s.id, "new id");
+  cfg.commands[0].confirm_before_run = false;
+  auto cmd_copy = cfg.commands[0].duplicate("copy");
+  expect(!cmd_copy.confirm_before_run, "duplicate keeps confirm off");
 
   SessionVault vault;
   vault.create("correct-horse");
@@ -75,6 +79,15 @@ void test_store() {
     if (cmd.name == "restart" && cmd.comment == "осторожно") found_comment = true;
   }
   expect(found_comment, "imported comment kept");
+
+  auto no_warn = nlohmann::json::parse(
+      R"({"fatty_export":1,"app":"FaTTY","servers":[{"name":"delta","host":"8.8.8.8","username":"u"}],"commands":[{"server_name":"delta","server_host":"8.8.8.8","name":"uptime","command":"uptime","confirm_before_run":false}]})");
+  result = import_into_config(cfg, no_warn, "merge", false);
+  bool found_no_warn = false;
+  for (const auto& cmd : cfg.commands) {
+    if (cmd.name == "uptime" && !cmd.confirm_before_run) found_no_warn = true;
+  }
+  expect(found_no_warn, "imported confirm_before_run false");
 }
 
 }  // namespace fatty::test

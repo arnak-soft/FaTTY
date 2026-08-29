@@ -31,6 +31,7 @@ struct Command {
   std::string command;
   int timeout_sec = 180;
   bool login_shell = true;
+  bool confirm_before_run = true;
 
   static Command make_new(const std::string& server_id);
   Command duplicate(const std::string& new_name = "", const std::string& new_server_id = "") const;
