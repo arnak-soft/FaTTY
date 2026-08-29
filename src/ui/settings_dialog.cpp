@@ -60,7 +60,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   jrow->Add(new wxStaticText(general, wxID_ANY, L"Максимум записей журнала"), 0, wxALIGN_CENTER_VERTICAL);
   journal_ = new wxTextCtrl(general, wxID_ANY, std::to_wstring(st.journal_max_entries));
   jrow->Add(journal_, 0, wxLEFT, 8);
-  auto* check_now = make_button(general, L"Проверить сейчас…");
+  auto* check_now = make_button(general, L"Проверить сейчас…", BtnIcon::Refresh);
   gsz->Add(confirm_, 0, wxALL, 8);
   gsz->Add(clear_output_, 0, wxALL, 8);
   gsz->Add(show_folder_col_, 0, wxALL, 8);
@@ -79,12 +79,12 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   psz->Add(new wxStaticText(programs, wxID_ANY, L"PuTTY"), 0, wxALIGN_CENTER_VERTICAL);
   putty_ = new wxTextCtrl(programs, wxID_ANY, wxString::FromUTF8(st.putty_path));
   psz->Add(putty_, 1, wxEXPAND);
-  auto* pbrowse = make_button(programs, L"Обзор…");
+  auto* pbrowse = make_button(programs, L"Обзор…", BtnIcon::Folder);
   psz->Add(pbrowse);
   psz->Add(new wxStaticText(programs, wxID_ANY, L"ssh.exe"), 0, wxALIGN_CENTER_VERTICAL);
   ssh_ = new wxTextCtrl(programs, wxID_ANY, wxString::FromUTF8(st.ssh_path));
   psz->Add(ssh_, 1, wxEXPAND);
-  auto* sbrowse = make_button(programs, L"Обзор…");
+  auto* sbrowse = make_button(programs, L"Обзор…", BtnIcon::Folder);
   psz->Add(sbrowse);
   auto* proot = new wxBoxSizer(wxVERTICAL);
   proot->Add(psz, 0, wxEXPAND | wxALL, 12);
@@ -94,21 +94,21 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* data = new wxPanel(nb);
   data->SetName(L"card-page");
   auto* dsz = new wxBoxSizer(wxVERTICAL);
-  auto* open_dir = make_button(data, L"Открыть папку конфига");
+  auto* open_dir = make_button(data, L"Открыть папку конфига", BtnIcon::Folder);
   backup_ = new wxCheckBox(data, wxID_ANY, L"Автоматические резервные копии конфига (раз в сутки)");
   backup_->SetValue(st.backup_enabled);
   auto* backup_note = new wxStaticText(data, wxID_ANY, L"Папка backups рядом с конфигом, хранятся последние 14 копий.");
   backup_note->SetName(L"muted");
   backup_note->SetForegroundColour(Theme::muted());
   backup_note->Wrap(FromDIP(480));
-  auto* open_backups = make_button(data, L"Открыть папку копий");
+  auto* open_backups = make_button(data, L"Открыть папку копий", BtnIcon::Folder);
   export_secrets_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить пароли");
   export_settings_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить настройки");
   export_settings_->SetValue(true);
   import_settings_ = new wxCheckBox(data, wxID_ANY, L"Импорт: применять настройки");
   import_settings_->SetValue(true);
-  auto* exp = make_button(data, L"Экспорт…");
-  auto* imp = make_button(data, L"Импорт…");
+  auto* exp = make_button(data, L"Экспорт…", BtnIcon::Export);
+  auto* imp = make_button(data, L"Импорт…", BtnIcon::Import);
   dsz->Add(open_dir, 0, wxALL, 8);
   dsz->Add(backup_, 0, wxALL, 8);
   dsz->Add(backup_note, 0, wxLEFT | wxRIGHT | wxBOTTOM, 8);
@@ -134,7 +134,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   mrow->Add(new wxStaticText(sec, wxID_ANY, L"Минут блокировки"), 0, wxALIGN_CENTER_VERTICAL);
   lockout_minutes_ = new wxTextCtrl(sec, wxID_ANY, std::to_wstring(st.master_password_lockout_minutes));
   mrow->Add(lockout_minutes_, 0, wxLEFT, 8);
-  auto* chpw = make_button(sec, L"Сменить мастер-пароль…");
+  auto* chpw = make_button(sec, L"Сменить мастер-пароль…", BtnIcon::Key);
   ssz->Add(short_pw_, 0, wxALL, 8);
   ssz->Add(arow, 0, wxALL, 8);
   ssz->Add(mrow, 0, wxALL, 8);
@@ -144,9 +144,9 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
 
   auto* btns = new wxBoxSizer(wxHORIZONTAL);
   btns->AddStretchSpacer();
-  auto* save = accent_button(this, L"Сохранить");
+  auto* save = accent_button(this, L"Сохранить", BtnIcon::Save);
   btns->Add(save, 0, wxRIGHT, 8);
-  btns->Add(make_button(this, L"Отмена", wxID_CANCEL));
+  btns->Add(make_button(this, L"Отмена", BtnIcon::Cancel, wxID_CANCEL));
   save->SetDefault();
 
   auto* root = new wxBoxSizer(wxVERTICAL);

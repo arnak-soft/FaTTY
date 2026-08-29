@@ -68,6 +68,240 @@ wxColour shift(const wxColour& c, int d) {
   return {ch(c.Red()), ch(c.Green()), ch(c.Blue())};
 }
 
+void draw_btn_icon(wxGraphicsContext* gfx, BtnIcon icon, double x, double y, double size, const wxColour& color) {
+  if (!gfx || icon == BtnIcon::None || size < 4.0) return;
+  const double u = size / 16.0;
+  auto X = [x, u](double v) { return x + v * u; };
+  auto Y = [y, u](double v) { return y + v * u; };
+  wxGraphicsPenInfo info(color, std::max(1.15, size * 0.12));
+  info.Cap(wxCAP_ROUND).Join(wxJOIN_ROUND);
+  gfx->SetPen(gfx->CreatePen(info));
+  gfx->SetBrush(gfx->CreateBrush(*wxTRANSPARENT_BRUSH));
+  auto line = [&](double x1, double y1, double x2, double y2) {
+    gfx->StrokeLine(X(x1), Y(y1), X(x2), Y(y2));
+  };
+  auto stroke_path = [&](const wxGraphicsPath& p) { gfx->StrokePath(p); };
+  auto fill_path = [&](const wxGraphicsPath& p) {
+    gfx->SetPen(wxNullGraphicsPen);
+    gfx->SetBrush(gfx->CreateBrush(wxBrush(color)));
+    gfx->FillPath(p);
+    gfx->SetPen(gfx->CreatePen(info));
+    gfx->SetBrush(gfx->CreateBrush(*wxTRANSPARENT_BRUSH));
+  };
+  auto rrect = [&](double x1, double y1, double w, double h, double r) {
+    auto p = gfx->CreatePath();
+    p.AddRoundedRectangle(X(x1), Y(y1), w * u, h * u, r * u);
+    stroke_path(p);
+  };
+
+  switch (icon) {
+    case BtnIcon::Plus:
+      line(8, 3, 8, 13);
+      line(3, 8, 13, 8);
+      break;
+    case BtnIcon::Pencil: {
+      auto p = gfx->CreatePath();
+      p.MoveToPoint(X(3.2), Y(12.8));
+      p.AddLineToPoint(X(11.2), Y(4.8));
+      p.AddLineToPoint(X(13.2), Y(6.8));
+      p.AddLineToPoint(X(5.2), Y(14.8));
+      p.CloseSubpath();
+      stroke_path(p);
+      line(10.2, 3.8, 12.2, 5.8);
+      break;
+    }
+    case BtnIcon::Copy:
+      rrect(5.2, 2.4, 8.4, 8.4, 1.4);
+      rrect(2.4, 5.4, 8.4, 8.4, 1.4);
+      break;
+    case BtnIcon::Trash:
+      line(3, 5, 13, 5);
+      line(6.2, 3.2, 9.8, 3.2);
+      line(6.2, 3.2, 6.2, 5);
+      line(9.8, 3.2, 9.8, 5);
+      {
+        auto p = gfx->CreatePath();
+        p.MoveToPoint(X(4.6), Y(5));
+        p.AddLineToPoint(X(5.4), Y(13.6));
+        p.AddLineToPoint(X(10.6), Y(13.6));
+        p.AddLineToPoint(X(11.4), Y(5));
+        stroke_path(p);
+      }
+      line(7.2, 7.2, 7.4, 11.6);
+      line(8.8, 7.2, 8.6, 11.6);
+      break;
+    case BtnIcon::Folder:
+    case BtnIcon::FolderPlus:
+    case BtnIcon::FolderMove: {
+      auto p = gfx->CreatePath();
+      p.MoveToPoint(X(2.2), Y(13.4));
+      p.AddLineToPoint(X(2.2), Y(4.8));
+      p.AddLineToPoint(X(6.2), Y(4.8));
+      p.AddLineToPoint(X(7.6), Y(3.4));
+      p.AddLineToPoint(X(13.8), Y(3.4));
+      p.AddLineToPoint(X(13.8), Y(13.4));
+      p.CloseSubpath();
+      stroke_path(p);
+      if (icon == BtnIcon::FolderPlus) {
+        line(8, 7.2, 8, 11.6);
+        line(5.8, 9.4, 10.2, 9.4);
+      } else if (icon == BtnIcon::FolderMove) {
+        line(5.2, 9.2, 11.2, 9.2);
+        line(8.6, 6.8, 11.4, 9.2);
+        line(8.6, 11.6, 11.4, 9.2);
+      }
+      break;
+    }
+    case BtnIcon::Terminal:
+    case BtnIcon::Putty:
+      rrect(2.2, 3.2, 11.6, 9.8, 1.6);
+      if (icon == BtnIcon::Putty) {
+        line(2.2, 6.2, 13.8, 6.2);
+        line(4.2, 4.6, 5.6, 4.6);
+      } else {
+        line(4.4, 6.2, 6.4, 8.0);
+        line(6.4, 8.0, 4.4, 9.8);
+        line(7.8, 10.2, 11.2, 10.2);
+      }
+      break;
+    case BtnIcon::Network:
+      rrect(2.4, 5.6, 4.6, 4.6, 1.4);
+      rrect(9.0, 5.6, 4.6, 4.6, 1.4);
+      line(7.0, 8.0, 9.0, 8.0);
+      break;
+    case BtnIcon::ArrowUp:
+      line(8, 12.8, 8, 3.6);
+      line(4.4, 7.4, 8, 3.4);
+      line(11.6, 7.4, 8, 3.4);
+      break;
+    case BtnIcon::ArrowDown:
+      line(8, 3.2, 8, 12.4);
+      line(4.4, 8.6, 8, 12.6);
+      line(11.6, 8.6, 8, 12.6);
+      break;
+    case BtnIcon::Sort:
+      line(8, 2.8, 4.2, 7.0);
+      line(8, 2.8, 11.8, 7.0);
+      line(8, 13.2, 4.2, 9.0);
+      line(8, 13.2, 11.8, 9.0);
+      break;
+    case BtnIcon::List:
+      line(5.8, 4.6, 13.0, 4.6);
+      line(5.8, 8.0, 13.0, 8.0);
+      line(5.8, 11.4, 13.0, 11.4);
+      {
+        auto d = gfx->CreatePath();
+        d.AddCircle(X(3.2), Y(4.6), 0.9 * u);
+        d.AddCircle(X(3.2), Y(8.0), 0.9 * u);
+        d.AddCircle(X(3.2), Y(11.4), 0.9 * u);
+        fill_path(d);
+      }
+      break;
+    case BtnIcon::Play: {
+      auto p = gfx->CreatePath();
+      p.MoveToPoint(X(5.0), Y(3.4));
+      p.AddLineToPoint(X(13.0), Y(8.0));
+      p.AddLineToPoint(X(5.0), Y(12.6));
+      p.CloseSubpath();
+      fill_path(p);
+      break;
+    }
+    case BtnIcon::Stop: {
+      auto p = gfx->CreatePath();
+      p.AddRoundedRectangle(X(4.2), Y(4.2), 7.6 * u, 7.6 * u, 1.4 * u);
+      fill_path(p);
+      break;
+    }
+    case BtnIcon::Home: {
+      auto p = gfx->CreatePath();
+      p.MoveToPoint(X(2.4), Y(8.2));
+      p.AddLineToPoint(X(8.0), Y(3.0));
+      p.AddLineToPoint(X(13.6), Y(8.2));
+      stroke_path(p);
+      rrect(4.6, 8.0, 6.8, 5.4, 0.6);
+      line(7.2, 13.4, 7.2, 10.2);
+      line(8.8, 13.4, 8.8, 10.2);
+      line(7.2, 10.2, 8.8, 10.2);
+      break;
+    }
+    case BtnIcon::Clear: {
+      auto p = gfx->CreatePath();
+      p.AddCircle(X(8), Y(8), 5.6 * u);
+      stroke_path(p);
+      line(5.6, 5.6, 10.4, 10.4);
+      line(10.4, 5.6, 5.6, 10.4);
+      break;
+    }
+    case BtnIcon::Upload:
+      line(3.2, 9.4, 3.2, 13.2);
+      line(3.2, 13.2, 12.8, 13.2);
+      line(12.8, 13.2, 12.8, 9.4);
+      line(8, 11.0, 8, 3.2);
+      line(4.8, 6.4, 8, 3.2);
+      line(11.2, 6.4, 8, 3.2);
+      break;
+    case BtnIcon::Download:
+      line(3.2, 9.4, 3.2, 13.2);
+      line(3.2, 13.2, 12.8, 13.2);
+      line(12.8, 13.2, 12.8, 9.4);
+      line(8, 3.2, 8, 10.0);
+      line(4.8, 6.8, 8, 10.2);
+      line(11.2, 6.8, 8, 10.2);
+      break;
+    case BtnIcon::Save:
+      rrect(3.0, 2.8, 10.0, 10.6, 1.2);
+      rrect(5.2, 2.8, 5.6, 4.0, 0.4);
+      line(5.4, 11.4, 10.6, 11.4);
+      break;
+    case BtnIcon::Cancel:
+      line(4.2, 4.2, 11.8, 11.8);
+      line(11.8, 4.2, 4.2, 11.8);
+      break;
+    case BtnIcon::Refresh:
+    case BtnIcon::Repeat: {
+      auto p = gfx->CreatePath();
+      p.AddArc(X(8), Y(8), 5.2 * u, 0.55, 5.4, true);
+      stroke_path(p);
+      line(11.6, 3.6, 13.4, 6.4);
+      line(11.6, 3.6, 8.8, 4.6);
+      break;
+    }
+    case BtnIcon::Export:
+      rrect(2.6, 5.4, 8.0, 8.0, 1.2);
+      line(9.0, 7.0, 13.4, 2.8);
+      line(10.6, 2.8, 13.4, 2.8);
+      line(13.4, 2.8, 13.4, 5.6);
+      break;
+    case BtnIcon::Import:
+      rrect(2.6, 5.4, 8.0, 8.0, 1.2);
+      line(13.4, 2.8, 9.0, 7.0);
+      line(9.0, 4.2, 9.0, 7.0);
+      line(9.0, 7.0, 11.8, 7.0);
+      break;
+    case BtnIcon::Key: {
+      auto p = gfx->CreatePath();
+      p.AddCircle(X(5.4), Y(8.0), 3.0 * u);
+      stroke_path(p);
+      line(8.2, 8.0, 14.0, 8.0);
+      line(12.2, 8.0, 12.2, 10.4);
+      line(13.8, 8.0, 13.8, 9.6);
+      break;
+    }
+    case BtnIcon::Check:
+      line(3.4, 8.4, 6.6, 11.6);
+      line(6.6, 11.6, 12.8, 4.6);
+      break;
+    case BtnIcon::Insert:
+      line(3.0, 8.0, 10.2, 8.0);
+      line(7.2, 5.2, 10.4, 8.0);
+      line(7.2, 10.8, 10.4, 8.0);
+      line(12.4, 4.2, 12.4, 11.8);
+      break;
+    case BtnIcon::None:
+      break;
+  }
+}
+
 }  // namespace
 
 void apply_rounded_region(wxWindow* window, int radius_px) {
@@ -107,8 +341,8 @@ void RoundedCard::on_size(wxSizeEvent& e) {
   e.Skip();
 }
 
-RoundButton::RoundButton(wxWindow* parent, wxWindowID id, const wxString& label)
-    : wxControl(parent, id, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxTAB_TRAVERSAL) {
+RoundButton::RoundButton(wxWindow* parent, wxWindowID id, const wxString& label, BtnIcon icon)
+    : wxControl(parent, id, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxTAB_TRAVERSAL), icon_(icon) {
   SetLabel(label);
   SetFont(Theme::ui());
   SetCanFocus(true);
@@ -165,6 +399,12 @@ void RoundButton::SetLabel(const wxString& label) {
   Refresh();
 }
 
+void RoundButton::SetIcon(BtnIcon icon) {
+  icon_ = icon;
+  InvalidateBestSize();
+  Refresh();
+}
+
 void RoundButton::SetDefault() {
   default_ = true;
   auto* top = wxGetTopLevelParent(this);
@@ -192,7 +432,11 @@ void RoundButton::SetDefault() {
 
 wxSize RoundButton::DoGetBestSize() const {
   const wxSize text = GetTextExtent(GetLabel());
-  return {text.x + FromDIP(28), std::max(FromDIP(28), text.y + FromDIP(10))};
+  const int hpad = FromDIP(14);
+  const int vpad = FromDIP(8);
+  const int icon = (icon_ != BtnIcon::None) ? FromDIP(14) : 0;
+  const int igap = icon ? FromDIP(6) : 0;
+  return {hpad + icon + igap + text.x + hpad, std::max(FromDIP(32), text.y + vpad * 2)};
 }
 
 void RoundButton::fire() {
@@ -231,16 +475,35 @@ void RoundButton::on_paint(wxPaintEvent&) {
   gc.DrawRoundedRectangle(0.5, 0.5, sz.x - 1.0, sz.y - 1.0, radius);
   gc.SetFont(GetFont().IsOk() ? GetFont() : Theme::ui());
   gc.SetTextForeground(fg);
-  const wxSize text = gc.GetTextExtent(GetLabel());
-  gc.DrawText(GetLabel(), (sz.x - text.x) / 2, (sz.y - text.y) / 2);
+  const wxString label = GetLabel();
+  const wxSize text = gc.GetTextExtent(label);
+  const int icon_sz = (icon_ != BtnIcon::None) ? FromDIP(14) : 0;
+  const int igap = icon_sz ? FromDIP(6) : 0;
+  const int total = icon_sz + igap + text.x;
+  int tx = (sz.x - total) / 2;
+  if (icon_sz) {
+    if (wxGraphicsContext* igfx = gc.GetGraphicsContext()) {
+      draw_btn_icon(igfx, icon_, tx, (sz.y - icon_sz) / 2.0, icon_sz, fg);
+    }
+    tx += icon_sz + igap;
+  }
+  gc.DrawText(label, tx, (sz.y - text.y) / 2);
 }
 
 RoundButton* make_button(wxWindow* parent, const wxString& label, wxWindowID id) {
   return new RoundButton(parent, id, label);
 }
 
+RoundButton* make_button(wxWindow* parent, const wxString& label, BtnIcon icon, wxWindowID id) {
+  return new RoundButton(parent, id, label, icon);
+}
+
 RoundButton* accent_button(wxWindow* parent, const wxString& label, wxWindowID id) {
-  auto* btn = make_button(parent, label, id);
+  return accent_button(parent, label, BtnIcon::None, id);
+}
+
+RoundButton* accent_button(wxWindow* parent, const wxString& label, BtnIcon icon, wxWindowID id) {
+  auto* btn = make_button(parent, label, icon, id);
   btn->SetName(L"accent");
   return btn;
 }

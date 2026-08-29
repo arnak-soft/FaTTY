@@ -12,6 +12,7 @@
 #include <wx/stattext.h>
 #include <wx/textdlg.h>
 #include <wx/textctrl.h>
+#include <wx/wrapsizer.h>
 #include <wx/imaglist.h>
 #include <wx/artprov.h>
 #include <wx/app.h>
@@ -36,12 +37,12 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
   SetSize(FromDIP(wxSize(780, 520)));
   auto* panel = new wxPanel(this);
   path_ = new wxTextCtrl(panel, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
-  auto* up = make_button(panel, L"Вверх");
-  auto* mkdir = make_button(panel, L"Новая папка");
-  auto* upload_btn = make_button(panel, L"Загрузить");
-  auto* download_btn = make_button(panel, L"Скачать");
-  auto* del = make_button(panel, L"Удалить");
-  auto* stop = make_button(panel, L"Стоп");
+  auto* up = make_button(panel, L"Вверх", BtnIcon::ArrowUp);
+  auto* mkdir = make_button(panel, L"Новая папка", BtnIcon::FolderPlus);
+  auto* upload_btn = make_button(panel, L"Загрузить", BtnIcon::Upload);
+  auto* download_btn = make_button(panel, L"Скачать", BtnIcon::Download);
+  auto* del = make_button(panel, L"Удалить", BtnIcon::Trash);
+  auto* stop = make_button(panel, L"Стоп", BtnIcon::Stop);
   stop_btn_ = stop;
   busy_disable_ = {up, mkdir, upload_btn, download_btn, del, path_};
   auto* list_card = new RoundedCard(panel);
@@ -57,14 +58,15 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
   status_ = new wxStaticText(panel, wxID_ANY, L"Подключение…");
   status_->SetName(L"muted");
   auto* top = new wxBoxSizer(wxHORIZONTAL);
-  top->Add(path_, 1, wxEXPAND | wxRIGHT, 8);
-  top->Add(up);
-  auto* acts = new wxBoxSizer(wxHORIZONTAL);
-  acts->Add(mkdir, 0, wxRIGHT, 4);
-  acts->Add(upload_btn, 0, wxRIGHT, 4);
-  acts->Add(download_btn, 0, wxRIGHT, 4);
-  acts->Add(del, 0, wxRIGHT, 4);
-  acts->Add(stop);
+  top->Add(path_, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
+  path_->SetMinSize(wxSize(-1, up->GetBestSize().GetHeight()));
+  top->Add(up, 0, wxALIGN_CENTER_VERTICAL);
+  auto* acts = new wxWrapSizer(wxHORIZONTAL);
+  acts->Add(mkdir, 0, wxRIGHT | wxBOTTOM, 8);
+  acts->Add(upload_btn, 0, wxRIGHT | wxBOTTOM, 8);
+  acts->Add(download_btn, 0, wxRIGHT | wxBOTTOM, 8);
+  acts->Add(del, 0, wxRIGHT | wxBOTTOM, 8);
+  acts->Add(stop, 0, wxBOTTOM, 8);
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(top, 0, wxEXPAND | wxALL, 8);
   root->Add(acts, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);

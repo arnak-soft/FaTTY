@@ -120,8 +120,8 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
     list->SetItem(row, 2, wxString::FromUTF8(c.tip));
     list->SetItem(row, 3, wxString::FromUTF8(c.command));
   }
-  auto* copy = make_button(p2, L"Копировать");
-  auto* insert = make_button(p2, L"В разовую");
+  auto* copy = make_button(p2, L"Копировать", BtnIcon::Copy);
+  auto* insert = make_button(p2, L"В разовую", BtnIcon::Insert);
   auto* row = new wxBoxSizer(wxHORIZONTAL);
   row->Add(copy, 0, wxRIGHT, 8);
   row->Add(insert);

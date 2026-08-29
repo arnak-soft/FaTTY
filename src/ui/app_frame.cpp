@@ -34,6 +34,7 @@
 #include <wx/statbox.h>
 #include <wx/stattext.h>
 #include <wx/textdlg.h>
+#include <wx/wrapsizer.h>
 #include <algorithm>
 #include <chrono>
 #include <map>
@@ -269,7 +270,10 @@ void AppFrame::build_menu() {
 
 void AppFrame::build_ui() {
   const int pad = FromDIP(10);
-  const int gap = FromDIP(6);
+  const int gap = FromDIP(8);
+  auto add_btn = [gap](wxSizer* sz, wxWindow* btn) {
+    sz->Add(btn, 0, wxRIGHT | wxBOTTOM, gap);
+  };
   auto* panel = new wxPanel(this);
   vsplit_ = new wxSplitterWindow(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
   auto* top = new wxPanel(vsplit_);
@@ -287,30 +291,30 @@ void AppFrame::build_ui() {
   auto* servers_sz = new wxBoxSizer(wxVERTICAL);
   servers_sz->Add(servers_, 1, wxEXPAND);
   servers_card->SetSizer(servers_sz);
-  auto* sbtns = new wxBoxSizer(wxHORIZONTAL);
-  auto* sadd = make_button(left, L"Добавить");
-  auto* sedit = make_button(left, L"Изменить");
-  auto* sdup = make_button(left, L"Дублировать");
-  auto* sdel = make_button(left, L"Удалить");
-  sbtns->Add(sadd, 0, wxRIGHT, gap);
-  sbtns->Add(sedit, 0, wxRIGHT, gap);
-  sbtns->Add(sdup, 0, wxRIGHT, gap);
-  sbtns->Add(sdel);
-  auto* sact = new wxBoxSizer(wxHORIZONTAL);
-  auto* files = make_button(left, L"Файлы");
-  auto* cons = make_button(left, L"Открыть консоль");
-  auto* putty = make_button(left, L"PuTTY");
-  auto* test = make_button(left, L"Проверить связь");
-  sact->Add(files, 0, wxRIGHT, gap);
-  sact->Add(cons, 0, wxRIGHT, gap);
-  sact->Add(putty, 0, wxRIGHT, gap);
-  sact->Add(test);
+  auto* sbtns = new wxWrapSizer(wxHORIZONTAL);
+  auto* sadd = make_button(left, L"Добавить", BtnIcon::Plus);
+  auto* sedit = make_button(left, L"Изменить", BtnIcon::Pencil);
+  auto* sdup = make_button(left, L"Дублировать", BtnIcon::Copy);
+  auto* sdel = make_button(left, L"Удалить", BtnIcon::Trash);
+  add_btn(sbtns, sadd);
+  add_btn(sbtns, sedit);
+  add_btn(sbtns, sdup);
+  add_btn(sbtns, sdel);
+  auto* sact = new wxWrapSizer(wxHORIZONTAL);
+  auto* files = make_button(left, L"Файлы", BtnIcon::Folder);
+  auto* cons = make_button(left, L"Открыть консоль", BtnIcon::Terminal);
+  auto* putty = make_button(left, L"PuTTY", BtnIcon::Putty);
+  auto* test = make_button(left, L"Проверить связь", BtnIcon::Network);
+  add_btn(sact, files);
+  add_btn(sact, cons);
+  add_btn(sact, putty);
+  add_btn(sact, test);
   auto* ls = new wxBoxSizer(wxVERTICAL);
   ls->Add(section_label(left, L"VPS-серверы"), 0, wxBOTTOM, gap);
   ls->Add(server_search_, 0, wxEXPAND | wxBOTTOM, gap);
   ls->Add(servers_card, 1, wxEXPAND);
   ls->Add(sbtns, 0, wxTOP, pad);
-  ls->Add(sact, 0, wxTOP, gap);
+  ls->Add(sact, 0);
   left->SetSizer(ls);
   // Кнопки редактирования VPS/команд гасятся на время выполнения команды.
   busy_disable_ = {sedit, sdup, sdel, cons, putty, test, files};
@@ -327,28 +331,28 @@ void AppFrame::build_ui() {
   first_page->SetSizer(page_sz);
   folders_nb_->AddPage(first_page, L"Общее");
   folder_tab_ids_.push_back("");
-  auto* corder = new wxBoxSizer(wxHORIZONTAL);
-  auto* up = make_button(right, L"Вверх");
-  auto* down = make_button(right, L"Вниз");
-  auto* byname = make_button(right, L"По имени");
-  auto* fadd = make_button(right, L"Папка+");
-  auto* frename = make_button(right, L"Переименовать");
-  auto* fdel = make_button(right, L"Удалить папку");
-  corder->Add(up, 0, wxRIGHT, gap);
-  corder->Add(down, 0, wxRIGHT, gap);
-  corder->Add(byname, 0, wxRIGHT, FromDIP(16));
-  corder->Add(fadd, 0, wxRIGHT, gap);
-  corder->Add(frename, 0, wxRIGHT, gap);
-  corder->Add(fdel);
+  auto* corder = new wxWrapSizer(wxHORIZONTAL);
+  auto* up = make_button(right, L"Вверх", BtnIcon::ArrowUp);
+  auto* down = make_button(right, L"Вниз", BtnIcon::ArrowDown);
+  auto* byname = make_button(right, L"По имени", BtnIcon::Sort);
+  auto* fadd = make_button(right, L"Папка+", BtnIcon::FolderPlus);
+  auto* frename = make_button(right, L"Переименовать", BtnIcon::Pencil);
+  auto* fdel = make_button(right, L"Удалить папку", BtnIcon::Trash);
+  add_btn(corder, up);
+  add_btn(corder, down);
+  corder->Add(byname, 0, wxRIGHT | wxBOTTOM, FromDIP(16));
+  add_btn(corder, fadd);
+  add_btn(corder, frename);
+  add_btn(corder, fdel);
   auto* cbtns = new wxBoxSizer(wxHORIZONTAL);
-  auto* cadd = make_button(right, L"Добавить");
-  auto* cedit = make_button(right, L"Изменить  (F2)");
-  auto* cdup = make_button(right, L"Дублировать");
-  auto* cdel = make_button(right, L"Удалить");
-  auto* cmove = make_button(right, L"Переместить в папку");
-  auto* presets = make_button(right, L"Пресеты…");
-  stop_btn_ = make_button(right, L"Стоп");
-  run_btn_ = accent_button(right, L"Запустить  (F5)");
+  auto* cadd = make_button(right, L"Добавить", BtnIcon::Plus);
+  auto* cedit = make_button(right, L"Изменить  (F2)", BtnIcon::Pencil);
+  auto* cdup = make_button(right, L"Дублировать", BtnIcon::Copy);
+  auto* cdel = make_button(right, L"Удалить", BtnIcon::Trash);
+  auto* cmove = make_button(right, L"Переместить в папку", BtnIcon::FolderMove);
+  auto* presets = make_button(right, L"Пресеты…", BtnIcon::List);
+  stop_btn_ = make_button(right, L"Стоп", BtnIcon::Stop);
+  run_btn_ = accent_button(right, L"Запустить  (F5)", BtnIcon::Play);
   stop_btn_->Enable(false);
   cbtns->Add(cadd, 0, wxRIGHT, gap);
   cbtns->Add(cedit, 0, wxRIGHT, gap);
@@ -362,21 +366,22 @@ void AppFrame::build_ui() {
   auto* qrow = new wxBoxSizer(wxHORIZONTAL);
   qrow->Add(new wxStaticText(right, wxID_ANY, L"Разовая команда:"), 0, wxALIGN_CENTER_VERTICAL);
   quick_ = new wxTextCtrl(right, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
-  auto* qrun = make_button(right, L"Выполнить");
-  qrow->Add(quick_, 1, wxEXPAND | wxLEFT | wxRIGHT, pad);
-  qrow->Add(qrun);
+  auto* qrun = make_button(right, L"Выполнить", BtnIcon::Play);
+  quick_->SetMinSize(wxSize(-1, qrun->GetBestSize().GetHeight()));
+  qrow->Add(quick_, 1, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, pad);
+  qrow->Add(qrun, 0, wxALIGN_CENTER_VERTICAL);
   auto* rs = new wxBoxSizer(wxVERTICAL);
   rs->Add(section_label(right, L"Команды"), 0, wxBOTTOM, gap);
   rs->Add(folders_nb_, 1, wxEXPAND);
   rs->Add(corder, 0, wxTOP, pad);
-  rs->Add(cbtns, 0, wxTOP, gap);
+  rs->Add(cbtns, 0);
   rs->Add(qrow, 0, wxEXPAND | wxTOP, pad);
   right->SetSizer(rs);
   for (wxWindow* b : {cadd, cedit, cdup, cdel, cmove, presets, up, down, byname, fadd, frename, fdel, qrun}) {
     busy_disable_.push_back(b);
   }
   busy_disable_.push_back(quick_);
-  hsplit_->SplitVertically(left, right, FromDIP(360));
+  hsplit_->SplitVertically(left, right, FromDIP(400));
   auto* ts = new wxBoxSizer(wxVERTICAL);
   ts->Add(hsplit_, 1, wxEXPAND);
   top->SetSizer(ts);
@@ -384,10 +389,10 @@ void AppFrame::build_ui() {
   auto* outp = new wxPanel(vsplit_);
   cwd_label_ = new wxStaticText(outp, wxID_ANY, L"Папка: ~");
   cwd_label_->SetName(L"muted");
-  cwd_reset_ = make_button(outp, L"Сбросить в ~");
+  cwd_reset_ = make_button(outp, L"Сбросить в ~", BtnIcon::Home);
   cwd_reset_->Enable(false);
-  auto* clear = make_button(outp, L"Очистить");
-  auto* jbtn = make_button(outp, L"Журнал");
+  auto* clear = make_button(outp, L"Очистить", BtnIcon::Clear);
+  auto* jbtn = make_button(outp, L"Журнал", BtnIcon::List);
   auto* out_card = new RoundedCard(outp);
   output_ = new wxTextCtrl(out_card, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize,
                            wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2 | wxTE_WORDWRAP | wxBORDER_NONE);
@@ -401,10 +406,10 @@ void AppFrame::build_ui() {
   auto* ot = new wxBoxSizer(wxHORIZONTAL);
   ot->Add(section_label(outp, L"Вывод"), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, pad);
   ot->Add(cwd_label_, 1, wxALIGN_CENTER_VERTICAL);
-  ot->Add(cwd_reset_, 0, wxLEFT, pad);
+  ot->Add(cwd_reset_, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, pad);
   ot->AddStretchSpacer();
-  ot->Add(jbtn, 0, wxRIGHT, gap);
-  ot->Add(clear);
+  ot->Add(jbtn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
+  ot->Add(clear, 0, wxALIGN_CENTER_VERTICAL);
   auto* os = new wxBoxSizer(wxVERTICAL);
   os->Add(ot, 0, wxEXPAND);
   os->Add(out_card, 1, wxEXPAND | wxTOP, gap);

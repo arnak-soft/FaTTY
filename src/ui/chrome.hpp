@@ -24,11 +24,45 @@ class RoundedCard : public wxPanel {
   int radius_dip_;
 };
 
+enum class BtnIcon {
+  None = 0,
+  Plus,
+  Pencil,
+  Copy,
+  Trash,
+  Folder,
+  FolderPlus,
+  FolderMove,
+  Terminal,
+  Putty,
+  Network,
+  ArrowUp,
+  ArrowDown,
+  Sort,
+  List,
+  Play,
+  Stop,
+  Home,
+  Clear,
+  Upload,
+  Download,
+  Save,
+  Cancel,
+  Refresh,
+  Repeat,
+  Export,
+  Import,
+  Key,
+  Check,
+  Insert,
+};
+
 class RoundButton : public wxControl {
  public:
-  RoundButton(wxWindow* parent, wxWindowID id, const wxString& label);
+  RoundButton(wxWindow* parent, wxWindowID id, const wxString& label, BtnIcon icon = BtnIcon::None);
   bool Enable(bool enable = true) override;
   void SetLabel(const wxString& label) override;
+  void SetIcon(BtnIcon icon);
   void SetDefault();
   bool AcceptsFocus() const override { return IsShown() && IsEnabled(); }
 
@@ -39,13 +73,16 @@ class RoundButton : public wxControl {
   void on_paint(wxPaintEvent&);
   void on_size(wxSizeEvent&);
   void fire();
+  BtnIcon icon_ = BtnIcon::None;
   bool hovered_ = false;
   bool pressed_ = false;
   bool default_ = false;
 };
 
 RoundButton* make_button(wxWindow* parent, const wxString& label, wxWindowID id = wxID_ANY);
+RoundButton* make_button(wxWindow* parent, const wxString& label, BtnIcon icon, wxWindowID id = wxID_ANY);
 RoundButton* accent_button(wxWindow* parent, const wxString& label, wxWindowID id = wxID_ANY);
+RoundButton* accent_button(wxWindow* parent, const wxString& label, BtnIcon icon, wxWindowID id = wxID_ANY);
 
 class RoundedNotebook : public wxPanel {
  public:
