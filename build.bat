@@ -91,13 +91,9 @@ echo Ready:
 echo   dist\FaTTY %VER% OneFile.exe
 echo   %PORTABLE%\FaTTY.exe
 
-set "ISCC="
-if defined ISCC goto :has_iscc
-if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" set "ISCC=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
-if exist "%ProgramFiles%\Inno Setup 6\ISCC.exe" set "ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe"
-:has_iscc
+call :find_iscc
 if "%ISCC%"=="" (
-  echo WARNING: Setup.exe not built — install Inno Setup 6 or set ISCC.
+  echo WARNING: Setup.exe not built — install Inno Setup 6 or set ISCC to ISCC.exe.
   exit /b 0
 )
 
@@ -130,6 +126,23 @@ echo Building installer...
 "%ISCC%" "/DMyAppVersion=%VER%" "/DMyVersionInfo=%VERINFO%" "/DPortableDirName=FaTTY %VER% Portable" fatty.iss
 if errorlevel 1 exit /b 1
 echo   dist\FaTTY %VER% Setup.exe
+exit /b 0
+
+:find_iscc
+if defined ISCC if exist "%ISCC%" exit /b 0
+set "PF86=%ProgramFiles(x86)%"
+if exist "%PF86%\Inno Setup 6\ISCC.exe" (
+  set "ISCC=%PF86%\Inno Setup 6\ISCC.exe"
+  exit /b 0
+)
+if exist "%ProgramFiles%\Inno Setup 6\ISCC.exe" (
+  set "ISCC=%ProgramFiles%\Inno Setup 6\ISCC.exe"
+  exit /b 0
+)
+where ISCC >nul 2>nul
+if not errorlevel 1 (
+  for /f "delims=" %%I in ('where ISCC') do set "ISCC=%%I"
+)
 exit /b 0
 
 :ensure_msvc

@@ -6,6 +6,7 @@
 #include <wx/dcbuffer.h>
 #include <wx/dcclient.h>
 #include <wx/dcgraph.h>
+#include <wx/graphics.h>
 #include <wx/notebook.h>
 #include <wx/sizer.h>
 #include <wx/textctrl.h>
@@ -25,11 +26,39 @@
 namespace fatty {
 namespace {
 
-void fill_round(wxDC& dc, const wxRect& r, int radius, const wxColour& fill, const wxColour& border) {
+constexpr int kButtonRadiusDip = 4;
+constexpr int kTabRadiusDip = 8;
+constexpr int kTabHeightDip = 32;
+constexpr int kTabTopGapDip = 6;
+
+wxGraphicsPath chrome_tab_path(wxGraphicsContext* gfx, const wxRect& body, double radius) {
+  const double x = body.x;
+  const double y = body.y;
+  const double w = body.width;
+  const double h = body.height;
+  const double r = std::min(radius, std::min(w, h) / 2.0);
+  auto path = gfx->CreatePath();
+  // Силуэт Chrome: выпуклый верх и вогнутые нижние «ушки».
+  path.MoveToPoint(x - r, y + h);
+  path.AddArcToPoint(x, y + h, x, y, r);
+  path.AddArcToPoint(x, y, x + w, y, r);
+  path.AddArcToPoint(x + w, y, x + w, y + h, r);
+  path.AddArcToPoint(x + w, y + h, x + w + r, y + h, r);
+  path.CloseSubpath();
+  return path;
+}
+
+void fill_round(wxAutoBufferedPaintDC& dc, const wxRect& r, int radius, const wxColour& fill,
+                const wxColour& border, const wxColour& bg) {
   wxGCDC gc(dc);
+  gc.SetBackground(wxBrush(bg));
+  gc.Clear();
+  if (wxGraphicsContext* gfx = gc.GetGraphicsContext()) {
+    gfx->SetAntialiasMode(wxANTIALIAS_DEFAULT);
+  }
   gc.SetPen(wxPen(border, 1));
   gc.SetBrush(wxBrush(fill));
-  gc.DrawRoundedRectangle(r.x + 0.5, r.y + 0.5, r.width - 1, r.height - 1, radius);
+  gc.DrawRoundedRectangle(r.x + 1.0, r.y + 1.0, r.width - 2.0, r.height - 2.0, radius);
 }
 
 wxColour shift(const wxColour& c, int d) {
@@ -67,10 +96,9 @@ RoundedCard::RoundedCard(wxWindow* parent, int radius_dip)
 
 void RoundedCard::on_paint(wxPaintEvent&) {
   wxAutoBufferedPaintDC dc(this);
-  dc.SetBackground(wxBrush(GetParent() ? GetParent()->GetBackgroundColour() : Theme::bg()));
-  dc.Clear();
+  const wxColour bg = GetParent() ? GetParent()->GetBackgroundColour() : Theme::bg();
   const int r = FromDIP(radius_dip_);
-  fill_round(dc, GetClientRect(), r, Theme::elevated(), Theme::border());
+  fill_round(dc, GetClientRect(), r, Theme::elevated(), Theme::border(), bg);
 }
 
 void RoundedCard::on_size(wxSizeEvent& e) {
@@ -121,7 +149,6 @@ RoundButton::RoundButton(wxWindow* parent, wxWindowID id, const wxString& label)
 }
 
 void RoundButton::on_size(wxSizeEvent& e) {
-  apply_rounded_region(this, FromDIP(8));
   Refresh();
   e.Skip();
 }
@@ -177,32 +204,33 @@ void RoundButton::fire() {
 void RoundButton::on_paint(wxPaintEvent&) {
   wxAutoBufferedPaintDC dc(this);
   const wxColour parent_bg = GetParent() ? GetParent()->GetBackgroundColour() : Theme::bg();
-  dc.SetBackground(wxBrush(parent_bg));
-  dc.Clear();
+  SetBackgroundColour(parent_bg);
   const bool accent = GetName() == L"accent";
   wxColour fill = accent ? Theme::accent() : Theme::btn();
   wxColour fg = accent ? *wxWHITE : Theme::text_bright();
-  wxColour border = accent ? shift(Theme::accent(), theme_is_dark() ? 18 : -18) : Theme::border();
   if (!IsEnabled()) {
     fill = Theme::chrome();
     fg = Theme::muted();
-    border = Theme::border();
   } else if (pressed_) {
     fill = shift(fill, theme_is_dark() ? -18 : -22);
   } else if (hovered_) {
     fill = accent ? shift(fill, 16) : Theme::hover();
-  } else if (default_ && !accent) {
-    border = Theme::accent();
   }
-  const int r = FromDIP(8);
   wxGCDC gc(dc);
-  gc.SetPen(wxPen(border, 1));
+  gc.SetBackground(wxBrush(parent_bg));
+  gc.Clear();
+  if (wxGraphicsContext* gfx = gc.GetGraphicsContext()) {
+    gfx->SetAntialiasMode(wxANTIALIAS_DEFAULT);
+  }
+  const wxSize sz = GetClientSize();
+  const double radius = FromDIP(kButtonRadiusDip);
+  // Без обводки и без SetWindowRgn: иначе GDI+ сглаживает к чёрному, а регион
+  // обрезает пиксели ступенькой — на синем это особенно заметно.
+  gc.SetPen(*wxTRANSPARENT_PEN);
   gc.SetBrush(wxBrush(fill));
-  const wxRect rect = GetClientRect();
-  gc.DrawRoundedRectangle(rect.x, rect.y, rect.width, rect.height, r);
+  gc.DrawRoundedRectangle(0.5, 0.5, sz.x - 1.0, sz.y - 1.0, radius);
   gc.SetFont(GetFont().IsOk() ? GetFont() : Theme::ui());
   gc.SetTextForeground(fg);
-  const wxSize sz = GetClientSize();
   const wxSize text = gc.GetTextExtent(GetLabel());
   gc.DrawText(GetLabel(), (sz.x - text.x) / 2, (sz.y - text.y) / 2);
 }
@@ -220,7 +248,8 @@ RoundButton* accent_button(wxWindow* parent, const wxString& label, wxWindowID i
 TabStrip::TabStrip(RoundedNotebook* owner)
     : wxPanel(owner, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE), owner_(owner) {
   SetBackgroundStyle(wxBG_STYLE_PAINT);
-  SetMinSize(wxSize(-1, FromDIP(36)));
+  SetBackgroundColour(Theme::bg());
+  SetMinSize(wxSize(-1, FromDIP(kTabTopGapDip + kTabHeightDip)));
   timer_.SetOwner(this);
   Bind(wxEVT_PAINT, &TabStrip::on_paint, this);
   Bind(wxEVT_SIZE, &TabStrip::on_size, this);
@@ -253,77 +282,124 @@ void TabStrip::rebuild_layout(int width) {
   const std::size_t n = owner_->GetPageCount();
   if (!n || width <= 0) return;
   SetFont(Theme::ui());
-  const int pad = FromDIP(4);
-  const int gap = FromDIP(6);
-  const int hpad = FromDIP(12);
-  const int th = FromDIP(28);
-  int x = pad;
-  int y = pad;
+  const int ear = FromDIP(kTabRadiusDip);
+  const int overlap = ear;
+  const int hpad = FromDIP(14);
+  const int th = FromDIP(kTabHeightDip);
+  const int top = FromDIP(kTabTopGapDip);
+  int x = ear;
+  int y = top;
   for (std::size_t i = 0; i < n; ++i) {
     const wxSize text = GetTextExtent(owner_->GetPageText(i));
-    const int tw = std::max(FromDIP(36), text.x + hpad * 2);
-    if (x + tw > width - pad && x > pad) {
-      x = pad;
-      y += th + FromDIP(4);
+    const int tw = std::clamp(text.x + hpad * 2, FromDIP(72), FromDIP(240));
+    if (x + tw + ear > width && x > ear) {
+      x = ear;
+      y += th;
     }
     rects_.push_back(wxRect(x, y, tw, th));
-    x += tw + gap;
+    x += tw - overlap;
   }
 }
 
 int TabStrip::layout_height(int width) const {
-  const int pad = FromDIP(4);
-  const int th = FromDIP(28);
-  if (owner_->GetPageCount() == 0) return th + pad * 2;
+  const int top = FromDIP(kTabTopGapDip);
+  const int th = FromDIP(kTabHeightDip);
+  if (owner_->GetPageCount() == 0) return top + th;
   TabStrip* self = const_cast<TabStrip*>(this);
   self->rebuild_layout(width > 0 ? width : FromDIP(400));
-  if (rects_.empty()) return th + pad * 2;
+  if (rects_.empty()) return top + th;
   int bottom = 0;
   for (const auto& r : rects_) bottom = std::max(bottom, r.GetBottom());
-  return bottom + pad + 2;
+  return bottom;
 }
 
 int TabStrip::hit_test(const wxPoint& pos) const {
-  for (int i = 0; i < static_cast<int>(rects_.size()); ++i) {
-    if (rects_[i].Contains(pos)) return i;
+  const int ear = FromDIP(kTabRadiusDip);
+  const int sel = owner_->GetSelection();
+  auto hits = [ear, pos](const wxRect& r) {
+    wxRect hit = r;
+    hit.x -= ear;
+    hit.width += ear * 2;
+    return hit.Contains(pos);
+  };
+  if (sel >= 0 && sel < static_cast<int>(rects_.size()) && hits(rects_[static_cast<std::size_t>(sel)])) {
+    return sel;
+  }
+  for (int i = static_cast<int>(rects_.size()) - 1; i >= 0; --i) {
+    if (i == sel) continue;
+    if (hits(rects_[static_cast<std::size_t>(i)])) return i;
   }
   return -1;
 }
 
 void TabStrip::on_paint(wxPaintEvent&) {
   wxAutoBufferedPaintDC dc(this);
-  dc.SetBackground(wxBrush(GetParent() ? GetParent()->GetBackgroundColour() : Theme::bg()));
-  dc.Clear();
+  const wxColour strip_bg = Theme::bg();
+  wxGCDC gc(dc);
+  gc.SetBackground(wxBrush(strip_bg));
+  gc.Clear();
+  wxGraphicsContext* gfx = gc.GetGraphicsContext();
+  if (gfx) gfx->SetAntialiasMode(wxANTIALIAS_DEFAULT);
   ensure_hover_size();
   if (rects_.size() != owner_->GetPageCount()) rebuild_layout(GetClientSize().GetWidth());
-  wxGCDC gc(dc);
   gc.SetFont(Theme::ui());
   const int sel = owner_->GetSelection();
+  const double radius = FromDIP(kTabRadiusDip);
+  const int hpad = FromDIP(14);
+  const int strip_h = GetClientSize().GetHeight();
+
+  for (std::size_t i = 0; i < rects_.size(); ++i) {
+    if (static_cast<int>(i) == sel) continue;
+    const float hov = i < hover_.size() ? hover_[i] : 0.f;
+    const std::size_t next = i + 1;
+    const bool next_sel = static_cast<int>(next) == sel;
+    const float next_hov = next < hover_.size() ? hover_[next] : 0.f;
+    if (hov < 0.2f && !next_sel && next_hov < 0.2f && next < rects_.size()) {
+      const wxRect r = rects_[i];
+      const int sx = r.GetRight() - FromDIP(kTabRadiusDip) / 2;
+      const int sy = r.y + r.height / 4;
+      const int sh = r.height / 2;
+      gc.SetPen(wxPen(Theme::blend(strip_bg, Theme::border(), 0.55f), 1));
+      gc.DrawLine(sx, sy, sx, sy + sh);
+    }
+  }
+
+  for (std::size_t i = 0; i < rects_.size(); ++i) {
+    if (static_cast<int>(i) == sel) continue;
+    const float hov = i < hover_.size() ? hover_[i] : 0.f;
+    if (hov < 0.02f) continue;
+    const wxRect r = rects_[i];
+    const int inset = FromDIP(4);
+    wxColour fill = Theme::blend(strip_bg, Theme::hover(), hov);
+    gc.SetPen(*wxTRANSPARENT_PEN);
+    gc.SetBrush(wxBrush(fill));
+    gc.DrawRoundedRectangle(r.x + inset + 0.5, r.y + inset + 0.5, r.width - inset * 2 - 1.0,
+                             r.height - inset * 2 - 1.0, FromDIP(6));
+  }
+
+  if (sel >= 0 && sel < static_cast<int>(rects_.size()) && gfx) {
+    wxRect r = rects_[static_cast<std::size_t>(sel)];
+    if (r.GetBottom() >= strip_h - FromDIP(2)) {
+      r.height = strip_h - r.y;
+    }
+    const float hov = static_cast<std::size_t>(sel) < hover_.size() ? hover_[static_cast<std::size_t>(sel)] : 0.f;
+    wxColour fill = Theme::blend(Theme::elevated(), Theme::hover(), hov * 0.15f);
+    gfx->SetPen(wxNullPen);
+    gfx->SetBrush(wxBrush(fill));
+    gfx->FillPath(chrome_tab_path(gfx, r, radius));
+  }
+
   for (std::size_t i = 0; i < rects_.size(); ++i) {
     const wxRect r = rects_[i];
     const float hov = i < hover_.size() ? hover_[i] : 0.f;
     const bool selected = static_cast<int>(i) == sel;
-    wxColour fill = Theme::bg();
-    if (selected) {
-      fill = Theme::blend(Theme::select(), Theme::hover(), hov * 0.25f);
-    } else {
-      fill = Theme::blend(Theme::bg(), Theme::hover(), hov);
-    }
-    const wxColour border = selected ? Theme::accent() : Theme::blend(Theme::bg(), Theme::border(), 0.45f + 0.55f * hov);
-    const int radius = r.height / 2;
-    gc.SetPen(wxPen(border, selected ? 1 : 1));
-    gc.SetBrush(wxBrush(fill));
-    gc.DrawRoundedRectangle(r.x + 0.5, r.y + 0.5, r.width - 1, r.height - 1, radius);
-    if (selected) {
-      gc.SetPen(*wxTRANSPARENT_PEN);
-      gc.SetBrush(wxBrush(Theme::accent()));
-      const int bar_h = FromDIP(3);
-      gc.DrawRoundedRectangle(r.x + FromDIP(10), r.GetBottom() - bar_h - 1, r.width - FromDIP(20), bar_h, bar_h / 2.0);
-    }
-    gc.SetTextForeground(selected ? Theme::text_bright() : Theme::blend(Theme::muted(), Theme::text(), 0.35f + 0.65f * hov));
+    gc.SetTextForeground(selected ? Theme::text_bright()
+                                  : Theme::blend(Theme::muted(), Theme::text(), 0.4f + 0.6f * hov));
     const wxString title = owner_->GetPageText(i);
     const wxSize text = gc.GetTextExtent(title);
-    gc.DrawText(title, r.x + (r.width - text.x) / 2, r.y + (r.height - text.y) / 2);
+    const int tx = r.x + hpad;
+    const int ty = r.y + (r.height - text.y) / 2;
+    gc.DrawText(title, tx, ty);
   }
 }
 
@@ -372,12 +448,15 @@ void TabStrip::on_timer(wxTimerEvent&) {
 
 RoundedNotebook::RoundedNotebook(wxWindow* parent, wxWindowID id)
     : wxPanel(parent, id, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxTAB_TRAVERSAL) {
+  SetBackgroundColour(Theme::bg());
   strip_ = new TabStrip(this);
-  body_ = new RoundedCard(this, 10);
+  body_ = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxTAB_TRAVERSAL);
+  body_->SetName(L"card-page");
+  body_->SetBackgroundColour(Theme::elevated());
   auto* inner = new wxBoxSizer(wxVERTICAL);
   body_->SetSizer(inner);
   auto* root = new wxBoxSizer(wxVERTICAL);
-  root->Add(strip_, 0, wxEXPAND | wxBOTTOM, FromDIP(6));
+  root->Add(strip_, 0, wxEXPAND);
   root->Add(body_, 1, wxEXPAND);
   SetSizer(root);
 }

@@ -16,7 +16,7 @@ void apply_rounded_region(wxWindow* window, int radius_px);
 
 class RoundedCard : public wxPanel {
  public:
-  explicit RoundedCard(wxWindow* parent, int radius_dip = 10);
+  explicit RoundedCard(wxWindow* parent, int radius_dip = 5);
 
  private:
   void on_paint(wxPaintEvent&);

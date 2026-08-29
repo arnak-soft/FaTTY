@@ -49,7 +49,7 @@ void show_splash() {
   outer->Add(body, 1, wxEXPAND);
   f->SetSizer(outer);
   f->Centre();
-  const int splash_r = f->FromDIP(16);
+  const int splash_r = f->FromDIP(8);
   auto round_splash = [f, splash_r] {
     apply_rounded_region(f, splash_r);
   };

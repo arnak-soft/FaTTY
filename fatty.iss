@@ -37,7 +37,6 @@ PrivilegesRequired=admin
 ; Сами закрываем FaTTY в [Code] (PrepareToInstall): иначе Inno показывает
 ; «Закройте приложение», а UIPI не даёт elevated Setup послать WM_CLOSE.
 CloseApplications=no
-UninstallCloseApplications=no
 RestartApplications=no
 
 [Languages]
