@@ -967,7 +967,7 @@ void AppFrame::check_updates_async(bool interactive) {
           UpdateAvailableDialog dlg(this, r.current, latest);
           int ans = dlg.ShowModal();
           if (ans == wxID_YES) {
-            std::string url = r.page_url.value_or(r.download_url.value_or(""));
+            std::string url = r.download_url.value_or(r.page_url.value_or(""));
             if (!url.empty()) open_url(url);
           } else if (dlg.dont_remind() && !latest.empty()) {
             if (config_.settings.skipped_update_version != latest) {

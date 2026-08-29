@@ -587,7 +587,7 @@ UpdateAvailableDialog::UpdateAvailableDialog(wxWindow* parent, const std::string
   auto current_s = wxString::FromUTF8(current.empty() ? "?" : current);
   auto* msg = new wxStaticText(
       body, wxID_ANY,
-      wxString::Format(L"Доступна версия %s (у вас %s).\nОткрыть страницу загрузки?", latest_s, current_s));
+      wxString::Format(L"Доступна версия %s (у вас %s).\nСкачать установщик?", latest_s, current_s));
   msg->Wrap(FromDIP(400));
   skip_ = new wxCheckBox(body, wxID_ANY, L"Больше не напоминать об этой версии");
   skip_->SetValue(true);
