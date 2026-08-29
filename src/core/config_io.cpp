@@ -14,12 +14,44 @@ using json = nlohmann::json;
 
 namespace {
 
+json extra_programs_json(const std::vector<ExtraProgram>& programs) {
+  json arr = json::array();
+  for (const auto& p : programs) {
+    arr.push_back({
+        {"id", p.id},
+        {"name", p.name},
+        {"path", p.path},
+        {"args", p.args},
+    });
+  }
+  return arr;
+}
+
+std::vector<ExtraProgram> parse_extra_programs(const json& raw) {
+  std::vector<ExtraProgram> out;
+  if (!raw.is_array()) return out;
+  for (const auto& item : raw) {
+    if (!item.is_object()) continue;
+    ExtraProgram p;
+    p.id = item.value("id", "");
+    p.name = trim(item.value("name", ""));
+    p.path = trim(item.value("path", ""));
+    p.args = item.value("args", "");
+    if (p.name.empty() || p.path.empty()) continue;
+    if (p.id.empty()) p.id = new_uuid();
+    out.push_back(std::move(p));
+  }
+  return out;
+}
+
 json portable_settings(const AppSettings& settings) {
   return {
       {"confirm_before_run", settings.confirm_before_run},
       {"check_updates_on_start", settings.check_updates_on_start},
       {"putty_path", settings.putty_path},
+      {"winscp_path", settings.winscp_path},
       {"ssh_path", settings.ssh_path},
+      {"extra_programs", extra_programs_json(settings.extra_programs)},
       {"default_command_timeout", settings.default_command_timeout},
       {"journal_max_entries", settings.journal_max_entries},
       {"clear_output_before_run", settings.clear_output_before_run},
@@ -37,7 +69,11 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   settings.confirm_before_run = raw.value("confirm_before_run", settings.confirm_before_run);
   settings.check_updates_on_start = raw.value("check_updates_on_start", settings.check_updates_on_start);
   settings.putty_path = raw.value("putty_path", settings.putty_path);
+  settings.winscp_path = raw.value("winscp_path", settings.winscp_path);
   settings.ssh_path = raw.value("ssh_path", settings.ssh_path);
+  if (raw.contains("extra_programs")) {
+    settings.extra_programs = parse_extra_programs(raw["extra_programs"]);
+  }
   settings.clear_output_before_run = raw.value("clear_output_before_run", settings.clear_output_before_run);
   settings.allow_short_master_password =
       raw.value("allow_short_master_password", settings.allow_short_master_password);

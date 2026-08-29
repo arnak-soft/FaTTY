@@ -1,6 +1,7 @@
 #include "putty/putty.hpp"
 
 #include "core/paths.hpp"
+#include "core/placeholders.hpp"
 #include "core/util.hpp"
 #include "putty/ppk.hpp"
 
@@ -32,6 +33,34 @@ std::string win_cmd_quote(const std::string& arg) {
   out += "\"";
   return out;
 }
+
+#ifdef _WIN32
+std::wstring utf8_to_wide(const std::string& text) {
+  if (text.empty()) return {};
+  int n = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+  if (n <= 0) return {};
+  std::wstring out(static_cast<std::size_t>(n), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), n);
+  return out;
+}
+
+void launch_detached(const std::filesystem::path& exe, const std::string& args_tail, const char* fail_message) {
+  std::wstring cmd = L"\"" + exe.wstring() + L"\"";
+  if (!args_tail.empty()) {
+    cmd += L" " + utf8_to_wide(args_tail);
+  }
+  STARTUPINFOW si{};
+  PROCESS_INFORMATION pi{};
+  si.cb = sizeof(si);
+  std::filesystem::path cwd = std::getenv("USERPROFILE") ? std::getenv("USERPROFILE") : ".";
+  std::wstring cwd_w = cwd.wstring();
+  if (!CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, 0, nullptr, cwd_w.c_str(), &si, &pi)) {
+    throw PuttyLaunchError(fail_message);
+  }
+  CloseHandle(pi.hProcess);
+  CloseHandle(pi.hThread);
+}
+#endif
 
 std::optional<std::filesystem::path> which_exe(const std::string& name) {
 #ifdef _WIN32
@@ -102,6 +131,17 @@ void schedule_unlink(const std::filesystem::path& path) {
   }).detach();
 }
 
+std::optional<std::filesystem::path> try_resolve_key(const Server& server) {
+  auto key_path = trim(server.key_path);
+  if (key_path.empty()) return std::nullopt;
+  try {
+    return resolve_putty_key(key_path);
+  } catch (const SSHError&) {
+    if (trim(server.password).empty()) throw;
+    return std::nullopt;
+  }
+}
+
 }  // namespace
 
 std::optional<std::filesystem::path> find_ssh_executable(const std::string& custom_path) {
@@ -144,6 +184,29 @@ std::optional<std::filesystem::path> find_putty_executable(const std::string& cu
   return std::nullopt;
 }
 
+std::optional<std::filesystem::path> find_winscp_executable(const std::string& custom_path) {
+  if (!custom_path.empty()) {
+    auto c = expand_user(custom_path);
+    if (std::filesystem::is_regular_file(c)) return c;
+  }
+  if (auto found = which_exe("WinSCP")) return found;
+  if (auto found = which_exe("winscp")) return found;
+#ifdef _WIN32
+  const char* pf = std::getenv("ProgramFiles");
+  const char* pf86 = std::getenv("ProgramFiles(x86)");
+  const char* local = std::getenv("LocalAppData");
+  std::vector<std::filesystem::path> dirs;
+  if (pf) dirs.push_back(std::filesystem::path(pf) / "WinSCP");
+  if (pf86) dirs.push_back(std::filesystem::path(pf86) / "WinSCP");
+  if (local) dirs.push_back(std::filesystem::path(local) / "Programs" / "WinSCP");
+  for (const auto& dir : dirs) {
+    auto c = dir / "WinSCP.exe";
+    if (std::filesystem::is_regular_file(c)) return c;
+  }
+#endif
+  return std::nullopt;
+}
+
 void open_putty_console(const Server& server, const std::string& putty_path) {
 #ifndef _WIN32
   throw SSHError("PuTTY доступен только на Windows.");
@@ -153,12 +216,8 @@ void open_putty_console(const Server& server, const std::string& putty_path) {
   auto key_path = trim(server.key_path);
   auto password = trim(server.password);
   std::filesystem::path pwfile;
-  std::wstring cmd = L"\"" + putty->wstring() + L"\" -ssh " + std::wstring(server.host.begin(), server.host.end()) +
-                     L" -P " + std::to_wstring(server.port ? server.port : 22) + L" -l " +
-                     std::wstring(server.username.begin(), server.username.end()) + L" -noagent";
-  // Use CreateProcessA with UTF-8-ish args via command line builder
-  std::string args = "\"" + putty->string() + "\" -ssh " + server.host + " -P " +
-                     std::to_string(server.port ? server.port : 22) + " -l " + server.username + " -noagent";
+  std::string args = "-ssh " + server.host + " -P " + std::to_string(server.port ? server.port : 22) + " -l " +
+                     server.username + " -noagent";
   if (!key_path.empty()) {
     std::filesystem::path ppk;
     try {
@@ -178,22 +237,60 @@ void open_putty_console(const Server& server, const std::string& putty_path) {
   } else {
     throw SSHError("Для PuTTY укажите пароль или SSH-ключ в карточке VPS.");
   }
-  STARTUPINFOA si{};
-  PROCESS_INFORMATION pi{};
-  si.cb = sizeof(si);
-  std::string mutable_args = args;
-  std::filesystem::path cwd = std::getenv("USERPROFILE") ? std::getenv("USERPROFILE") : ".";
-  if (!CreateProcessA(nullptr, mutable_args.data(), nullptr, nullptr, FALSE, 0, nullptr, cwd.string().c_str(), &si,
-                      &pi)) {
+  try {
+    launch_detached(*putty, args, "Не удалось запустить PuTTY");
+  } catch (...) {
     if (!pwfile.empty()) {
       std::error_code ec;
       std::filesystem::remove(pwfile, ec);
     }
-    throw PuttyLaunchError("Не удалось запустить PuTTY");
+    throw;
   }
-  CloseHandle(pi.hProcess);
-  CloseHandle(pi.hThread);
   if (!pwfile.empty()) schedule_unlink(pwfile);
+#endif
+}
+
+void open_winscp(const Server& server, const std::string& winscp_path) {
+#ifndef _WIN32
+  throw SSHError("WinSCP доступен только на Windows.");
+#else
+  auto winscp = find_winscp_executable(winscp_path);
+  if (!winscp) throw WinSCPNotFoundError("WinSCP не найден.");
+  auto password = trim(server.password);
+  auto ppk = try_resolve_key(server);
+  if (!ppk && password.empty() && trim(server.key_path).empty()) {
+    throw SSHError("Для WinSCP укажите пароль или SSH-ключ в карточке VPS.");
+  }
+  std::string url = make_sftp_url(server.username, ppk ? std::string{} : password, server.host,
+                                  server.port ? server.port : 22);
+  std::string session = server.name.empty() ? server.host : server.name;
+  for (char& ch : session) {
+    if (ch == '"') ch = '\'';
+  }
+  std::string args = url + " /sessionname=" + win_cmd_quote(session) + " /newinstance";
+  if (ppk) {
+    args += " /privatekey=" + win_cmd_quote(ppk->string());
+  }
+  launch_detached(*winscp, args, "Не удалось запустить WinSCP");
+#endif
+}
+
+void open_extra_program(const ExtraProgram& program, const Server& server) {
+#ifndef _WIN32
+  throw SSHError("Внешние программы доступны только на Windows.");
+#else
+  auto exe = expand_user(program.path);
+  if (!std::filesystem::is_regular_file(exe)) {
+    throw ExternalProgramNotFoundError("Программа не найдена: " + program.path);
+  }
+  std::string ppk;
+  if (program.args.find("{ppk}") != std::string::npos) {
+    if (auto resolved = try_resolve_key(server)) ppk = resolved->string();
+  }
+  auto vars = program_placeholders(server, ppk);
+  std::string args = expand_placeholders(program.args, vars);
+  std::string fail = "Не удалось запустить " + program.name;
+  launch_detached(exe, args, fail.c_str());
 #endif
 }
 

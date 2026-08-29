@@ -35,6 +35,8 @@ enum class BtnIcon {
   FolderMove,
   Terminal,
   Putty,
+  WinSCP,
+  App,
   Network,
   ArrowUp,
   ArrowDown,

@@ -15,6 +15,7 @@ inline constexpr const char* kGithubOwner = "arnak-soft";
 inline constexpr const char* kGithubRepo = "FaTTY";
 inline constexpr const char* kPuttyDownloadUrl =
     "https://www.chiark.greenend.org.uk/~sgtatham/putty/";
+inline constexpr const char* kWinscpDownloadUrl = "https://winscp.net/eng/download.php";
 
 std::string trim(std::string_view text);
 std::string to_lower(std::string_view text);

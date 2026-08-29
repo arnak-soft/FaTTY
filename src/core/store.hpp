@@ -45,6 +45,15 @@ struct Folder {
   static Folder make_new(const std::string& server_id, const std::string& name);
 };
 
+struct ExtraProgram {
+  std::string id;
+  std::string name;
+  std::string path;
+  std::string args;
+
+  static ExtraProgram make_new();
+};
+
 struct AppSettings {
   bool confirm_before_run = true;
   bool check_updates_on_start = true;
@@ -60,7 +69,9 @@ struct AppSettings {
   std::map<std::string, std::map<std::string, int>> column_widths;
   std::map<std::string, std::vector<std::string>> column_order;
   std::string putty_path;
+  std::string winscp_path;
   std::string ssh_path;
+  std::vector<ExtraProgram> extra_programs;
   int default_command_timeout = 180;
   int journal_max_entries = 5000;
   bool clear_output_before_run = false;

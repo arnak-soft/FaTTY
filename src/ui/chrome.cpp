@@ -154,15 +154,25 @@ void draw_btn_icon(wxGraphicsContext* gfx, BtnIcon icon, double x, double y, dou
     }
     case BtnIcon::Terminal:
     case BtnIcon::Putty:
+    case BtnIcon::App:
       rrect(2.2, 3.2, 11.6, 9.8, 1.6);
       if (icon == BtnIcon::Putty) {
         line(2.2, 6.2, 13.8, 6.2);
         line(4.2, 4.6, 5.6, 4.6);
+      } else if (icon == BtnIcon::App) {
+        line(2.2, 6.0, 13.8, 6.0);
+        line(4.2, 4.6, 5.2, 4.6);
+        line(6.0, 4.6, 7.0, 4.6);
       } else {
         line(4.4, 6.2, 6.4, 8.0);
         line(6.4, 8.0, 4.4, 9.8);
         line(7.8, 10.2, 11.2, 10.2);
       }
+      break;
+    case BtnIcon::WinSCP:
+      rrect(2.2, 3.4, 5.4, 9.4, 1.2);
+      rrect(8.4, 3.4, 5.4, 9.4, 1.2);
+      line(7.6, 8.0, 8.4, 8.0);
       break;
     case BtnIcon::Network:
       rrect(2.4, 5.6, 4.6, 4.6, 1.4);

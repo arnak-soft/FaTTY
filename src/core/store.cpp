@@ -39,6 +39,12 @@ Folder Folder::make_new(const std::string& server_id, const std::string& name) {
   return f;
 }
 
+ExtraProgram ExtraProgram::make_new() {
+  ExtraProgram p;
+  p.id = new_uuid();
+  return p;
+}
+
 Command Command::duplicate(const std::string& new_name, const std::string& new_server_id) const {
   Command c = *this;
   c.id = new_uuid();
@@ -267,6 +273,36 @@ VaultMeta parse_vault(const json& raw, bool& ok) {
   return meta;
 }
 
+std::vector<ExtraProgram> parse_extra_programs(const json& raw) {
+  std::vector<ExtraProgram> out;
+  if (!raw.is_array()) return out;
+  for (const auto& item : raw) {
+    if (!item.is_object()) continue;
+    ExtraProgram p;
+    p.id = item.value("id", "");
+    p.name = trim(item.value("name", ""));
+    p.path = trim(item.value("path", ""));
+    p.args = item.value("args", "");
+    if (p.name.empty() || p.path.empty()) continue;
+    if (p.id.empty()) p.id = new_uuid();
+    out.push_back(std::move(p));
+  }
+  return out;
+}
+
+json extra_programs_json(const std::vector<ExtraProgram>& programs) {
+  json arr = json::array();
+  for (const auto& p : programs) {
+    arr.push_back({
+        {"id", p.id},
+        {"name", p.name},
+        {"path", p.path},
+        {"args", p.args},
+    });
+  }
+  return arr;
+}
+
 std::map<std::string, std::map<std::string, int>> parse_column_widths(const json& raw) {
   std::map<std::string, std::map<std::string, int>> result;
   if (!raw.is_object()) {
@@ -400,7 +436,9 @@ Config load_config() {
   st.column_widths = parse_column_widths(settings_raw.value("column_widths", json::object()));
   st.column_order = parse_column_order(settings_raw.value("column_order", json::object()));
   st.putty_path = settings_raw.value("putty_path", "");
+  st.winscp_path = settings_raw.value("winscp_path", "");
   st.ssh_path = settings_raw.value("ssh_path", "");
+  st.extra_programs = parse_extra_programs(settings_raw.value("extra_programs", json::array()));
   st.default_command_timeout = json_int(settings_raw, "default_command_timeout", 180, 1, 86400);
   st.journal_max_entries = json_int(settings_raw, "journal_max_entries", 5000, 100, 50000);
   st.clear_output_before_run = settings_raw.value("clear_output_before_run", false);
@@ -502,7 +540,9 @@ void save_config(Config& config, SessionVault& vault) {
       {"column_widths", config.settings.column_widths},
       {"column_order", config.settings.column_order},
       {"putty_path", config.settings.putty_path},
+      {"winscp_path", config.settings.winscp_path},
       {"ssh_path", config.settings.ssh_path},
+      {"extra_programs", extra_programs_json(config.settings.extra_programs)},
       {"default_command_timeout", config.settings.default_command_timeout},
       {"journal_max_entries", config.settings.journal_max_entries},
       {"clear_output_before_run", config.settings.clear_output_before_run},

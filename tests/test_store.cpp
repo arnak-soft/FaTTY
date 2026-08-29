@@ -88,6 +88,21 @@ void test_store() {
     if (cmd.name == "uptime" && !cmd.confirm_before_run) found_no_warn = true;
   }
   expect(found_no_warn, "imported confirm_before_run false");
+
+  auto with_tools = nlohmann::json::parse(
+      R"({"fatty_export":1,"app":"FaTTY","servers":[],"commands":[],"settings":{"winscp_path":"C:\\WinSCP\\WinSCP.exe","extra_programs":[{"id":"1","name":"FileZilla","path":"C:\\fz.exe","args":"{sftp_url}"}]}})");
+  result = import_into_config(cfg, with_tools, "merge", true);
+  expect(result.settings_applied, "import settings with programs");
+  expect(cfg.settings.winscp_path.find("WinSCP") != std::string::npos, "winscp path imported");
+  expect(cfg.settings.extra_programs.size() == 1, "extra program imported");
+  expect(cfg.settings.extra_programs[0].name == "FileZilla", "extra name");
+  expect(cfg.settings.extra_programs[0].args == "{sftp_url}", "extra args");
+
+  auto without_tools = nlohmann::json::parse(
+      R"({"fatty_export":1,"app":"FaTTY","servers":[],"commands":[],"settings":{"theme":"light"}})");
+  result = import_into_config(cfg, without_tools, "merge", true);
+  expect(cfg.settings.extra_programs.size() == 1, "extra programs kept if omitted");
+  expect(cfg.settings.theme == "light", "other settings still applied");
 }
 
 }  // namespace fatty::test

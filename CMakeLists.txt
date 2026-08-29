@@ -50,6 +50,7 @@ set(FATTY_CORE_SOURCES
   src/core/backup.cpp
   src/core/presets.cpp
   src/core/quote.cpp
+  src/core/placeholders.cpp
   src/app/version.cpp
 )
 
@@ -166,6 +167,7 @@ add_executable(fatty_tests
   tests/test_quote.cpp
   tests/test_journal.cpp
   tests/test_backup.cpp
+  tests/test_placeholders.cpp
 )
 target_include_directories(fatty_tests PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/src" "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(fatty_tests PRIVATE fatty_core)

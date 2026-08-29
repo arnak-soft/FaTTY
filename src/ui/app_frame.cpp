@@ -304,20 +304,26 @@ void AppFrame::build_ui() {
   auto* files = make_button(left, L"Файлы", BtnIcon::Folder);
   auto* cons = make_button(left, L"Открыть консоль", BtnIcon::Terminal);
   auto* putty = make_button(left, L"PuTTY", BtnIcon::Putty);
+  auto* winscp = make_button(left, L"WinSCP", BtnIcon::WinSCP);
   auto* test = make_button(left, L"Проверить связь", BtnIcon::Network);
   add_btn(sact, files);
   add_btn(sact, cons);
   add_btn(sact, putty);
+  add_btn(sact, winscp);
   add_btn(sact, test);
+  extra_tools_parent_ = left;
+  extra_tools_sizer_ = new wxWrapSizer(wxHORIZONTAL);
   auto* ls = new wxBoxSizer(wxVERTICAL);
   ls->Add(section_label(left, L"VPS-серверы"), 0, wxBOTTOM, gap);
   ls->Add(server_search_, 0, wxEXPAND | wxBOTTOM, gap);
   ls->Add(servers_card, 1, wxEXPAND);
   ls->Add(sbtns, 0, wxTOP, pad);
   ls->Add(sact, 0);
+  ls->Add(extra_tools_sizer_, 0);
   left->SetSizer(ls);
   // Кнопки редактирования VPS/команд гасятся на время выполнения команды.
-  busy_disable_ = {sedit, sdup, sdel, cons, putty, test, files};
+  busy_disable_ = {sedit, sdup, sdel, cons, putty, winscp, test, files};
+  rebuild_extra_tools();
 
   folders_nb_ = new RoundedNotebook(right);
   auto* first_page = new wxPanel(folders_nb_);
@@ -599,6 +605,28 @@ void AppFrame::build_ui() {
       }
     } catch (const std::exception& exc) {
       wxMessageBox(wxString::FromUTF8(exc.what()), L"PuTTY", wxOK | wxICON_ERROR, this);
+    }
+  });
+  winscp->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    auto* s = selected_server();
+    if (!s) return;
+    try {
+      open_winscp(*s, config_.settings.winscp_path);
+      status_->SetLabel(wxString::FromUTF8("WinSCP открыт → " + s->name));
+    } catch (const WinSCPNotFoundError&) {
+      int c = wxMessageBox(L"WinSCP не найден.\nДа — скачать\nНет — указать WinSCP.exe", L"WinSCP",
+                           wxYES_NO | wxCANCEL, this);
+      if (c == wxYES) open_url(kWinscpDownloadUrl);
+      else if (c == wxNO) {
+        wxFileDialog dlg(this, L"WinSCP.exe", L"", L"WinSCP.exe", L"WinSCP|WinSCP.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+        if (dlg.ShowModal() == wxID_OK) {
+          config_.settings.winscp_path = std::string(dlg.GetPath().utf8_string());
+          persist();
+          open_winscp(*s, config_.settings.winscp_path);
+        }
+      }
+    } catch (const std::exception& exc) {
+      wxMessageBox(wxString::FromUTF8(exc.what()), L"WinSCP", wxOK | wxICON_ERROR, this);
     }
   });
   test->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
@@ -973,6 +1001,7 @@ void AppFrame::open_settings() {
                      [this] {
                        journal_->max_entries = config_.settings.journal_max_entries;
                        apply_ui_theme();
+                       rebuild_extra_tools();
                        persist();
                      },
                      [this] {
@@ -1021,6 +1050,55 @@ void AppFrame::persist() {
     maybe_run_backup();
   } catch (...) {
   }
+}
+
+void AppFrame::rebuild_extra_tools() {
+  if (!extra_tools_sizer_ || !extra_tools_parent_) return;
+  const int gap = extra_tools_parent_->FromDIP(8);
+  for (auto* w : extra_tool_btns_) {
+    extra_tools_sizer_->Detach(w);
+    w->Destroy();
+  }
+  extra_tool_btns_.clear();
+  for (const auto& prog : config_.settings.extra_programs) {
+    auto* btn = make_button(extra_tools_parent_, wxString::FromUTF8(prog.name), BtnIcon::App);
+    extra_tools_sizer_->Add(btn, 0, wxRIGHT | wxBOTTOM, gap);
+    extra_tool_btns_.push_back(btn);
+    btn->Enable(!busy_);
+    const std::string id = prog.id;
+    btn->Bind(wxEVT_BUTTON, [this, id](wxCommandEvent&) {
+      auto* s = selected_server();
+      if (!s) return;
+      ExtraProgram* prog = nullptr;
+      for (auto& p : config_.settings.extra_programs) {
+        if (p.id == id) {
+          prog = &p;
+          break;
+        }
+      }
+      if (!prog) return;
+      try {
+        open_extra_program(*prog, *s);
+        status_->SetLabel(wxString::FromUTF8(prog->name + " открыт → " + s->name));
+      } catch (const ExternalProgramNotFoundError&) {
+        wxFileDialog dlg(this, wxString::FromUTF8(prog->name), L"", L"", L"EXE|*.exe|Все|*.*",
+                         wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+        if (dlg.ShowModal() == wxID_OK) {
+          prog->path = std::string(dlg.GetPath().utf8_string());
+          persist();
+          try {
+            open_extra_program(*prog, *s);
+          } catch (const std::exception& exc) {
+            wxMessageBox(wxString::FromUTF8(exc.what()), wxString::FromUTF8(prog->name), wxOK | wxICON_ERROR, this);
+          }
+        }
+      } catch (const std::exception& exc) {
+        wxMessageBox(wxString::FromUTF8(exc.what()), wxString::FromUTF8(prog->name), wxOK | wxICON_ERROR, this);
+      }
+    });
+  }
+  extra_tools_parent_->Layout();
+  if (auto* parent = extra_tools_parent_->GetParent()) parent->Layout();
 }
 
 void AppFrame::maybe_run_backup() {
@@ -1296,6 +1374,9 @@ void AppFrame::set_busy(bool busy) {
   run_btn_->Enable(!busy);
   stop_btn_->Enable(busy);
   for (wxWindow* w : busy_disable_) {
+    if (w) w->Enable(!busy);
+  }
+  for (wxWindow* w : extra_tool_btns_) {
     if (w) w->Enable(!busy);
   }
   if (busy) {

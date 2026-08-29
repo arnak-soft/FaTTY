@@ -4,13 +4,17 @@
 #include "core/config_io.hpp"
 #include "core/paths.hpp"
 #include "core/util.hpp"
-#include "putty/putty.hpp"
+#include "ui/chrome.hpp"
+#include "ui/striped_list.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
 #include <wx/checkbox.h>
 #include <wx/choice.h>
+#include <wx/dialog.h>
 #include <wx/filedlg.h>
+#include <wx/filename.h>
+#include <wx/listctrl.h>
 #include <wx/msgdlg.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
@@ -19,11 +23,102 @@
 #include <wx/textctrl.h>
 
 namespace fatty {
+namespace {
+
+class ExtraProgramDialog : public wxDialog {
+ public:
+  ExtraProgram extra;
+  bool accepted = false;
+
+  ExtraProgramDialog(wxWindow* parent, ExtraProgram program)
+      : wxDialog(parent, wxID_ANY, L"Программа", wxDefaultPosition, wxSize(520, 360)), extra(std::move(program)) {
+    auto* body = new wxPanel(this);
+    auto* grid = new wxFlexGridSizer(3, 2, 8, 8);
+    grid->AddGrowableCol(1);
+    grid->Add(new wxStaticText(body, wxID_ANY, L"Название"), 0, wxALIGN_CENTER_VERTICAL);
+    name_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(extra.name));
+    style_text(name_);
+    grid->Add(name_, 1, wxEXPAND);
+    grid->Add(new wxStaticText(body, wxID_ANY, L"Файл"), 0, wxALIGN_CENTER_VERTICAL);
+    auto* path_row = new wxBoxSizer(wxHORIZONTAL);
+    path_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(extra.path));
+    style_text(path_);
+    auto* browse = make_button(body, L"Обзор…", BtnIcon::Folder);
+    path_row->Add(path_, 1, wxEXPAND);
+    path_row->Add(browse, 0, wxLEFT, 8);
+    grid->Add(path_row, 1, wxEXPAND);
+    grid->Add(new wxStaticText(body, wxID_ANY, L"Аргументы"), 0, wxALIGN_CENTER_VERTICAL);
+    args_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(extra.args));
+    style_text(args_);
+    grid->Add(args_, 1, wxEXPAND);
+
+    auto* hint = new wxStaticText(
+        body, wxID_ANY,
+        L"Подстановки в аргументах: {host} {port} {user} {password} {key} {ppk} {name} {sftp_url} {ssh_target}.\n"
+        L"Пути с пробелами заключайте в кавычки, например \"{ppk}\".");
+    hint->SetName(L"muted");
+    hint->SetForegroundColour(Theme::muted());
+    hint->Wrap(FromDIP(460));
+
+    error_ = new wxStaticText(body, wxID_ANY, L"");
+    error_->SetName(L"error");
+    error_->SetForegroundColour(Theme::err());
+
+    auto* btns = new wxBoxSizer(wxHORIZONTAL);
+    btns->AddStretchSpacer();
+    auto* save = accent_button(body, L"Сохранить", BtnIcon::Save);
+    btns->Add(save, 0, wxRIGHT, 8);
+    btns->Add(make_button(body, L"Отмена", BtnIcon::Cancel, wxID_CANCEL));
+    save->SetDefault();
+
+    auto* root = new wxBoxSizer(wxVERTICAL);
+    root->Add(grid, 0, wxEXPAND | wxALL, 12);
+    root->Add(hint, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    root->Add(error_, 0, wxEXPAND | wxLEFT | wxRIGHT, 12);
+    root->Add(btns, 0, wxEXPAND | wxALL, 12);
+    body->SetSizer(root);
+    auto* outer = new wxBoxSizer(wxVERTICAL);
+    outer->Add(body, 1, wxEXPAND);
+    SetSizer(outer);
+    apply_dark(this);
+    bind_escape_close(this);
+
+    browse->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+      wxFileDialog dlg(this, L"Программа", L"", L"", L"EXE|*.exe|Все|*.*", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+      if (dlg.ShowModal() != wxID_OK) return;
+      path_->SetValue(dlg.GetPath());
+      if (name_->GetValue().IsEmpty()) {
+        wxFileName fn(dlg.GetPath());
+        name_->SetValue(fn.GetName());
+      }
+    });
+    save->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+      extra.name = trim(std::string(name_->GetValue().utf8_string()));
+      extra.path = trim(std::string(path_->GetValue().utf8_string()));
+      extra.args = std::string(args_->GetValue().utf8_string());
+      if (extra.name.empty() || extra.path.empty()) {
+        error_->SetLabel(L"Укажите название и путь к файлу.");
+        return;
+      }
+      if (extra.id.empty()) extra.id = ExtraProgram::make_new().id;
+      accepted = true;
+      EndModal(wxID_OK);
+    });
+  }
+
+ private:
+  wxTextCtrl* name_{};
+  wxTextCtrl* path_{};
+  wxTextCtrl* args_{};
+  wxStaticText* error_{};
+};
+
+}  // namespace
 
 SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& vault, std::function<void()> on_apply,
                                std::function<void()> on_change_master, std::function<void()> on_check_updates,
                                std::function<void()> on_import_done)
-    : PositionedDialog(parent, L"Настройки", wxSize(560, 540)),
+    : PositionedDialog(parent, L"Настройки", wxSize(600, 640)),
       config_(config),
       vault_(vault),
       on_apply_(std::move(on_apply)),
@@ -72,24 +167,59 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   general->SetSizer(gsz);
   nb->AddPage(general, L"Общие");
 
+  extra_programs_ = st.extra_programs;
   auto* programs = new wxPanel(nb);
   programs->SetName(L"card-page");
-  auto* psz = new wxFlexGridSizer(2, 3, 8, 8);
+  auto* psz = new wxFlexGridSizer(3, 3, 8, 8);
   psz->AddGrowableCol(1);
   psz->Add(new wxStaticText(programs, wxID_ANY, L"PuTTY"), 0, wxALIGN_CENTER_VERTICAL);
   putty_ = new wxTextCtrl(programs, wxID_ANY, wxString::FromUTF8(st.putty_path));
   psz->Add(putty_, 1, wxEXPAND);
   auto* pbrowse = make_button(programs, L"Обзор…", BtnIcon::Folder);
   psz->Add(pbrowse);
+  psz->Add(new wxStaticText(programs, wxID_ANY, L"WinSCP"), 0, wxALIGN_CENTER_VERTICAL);
+  winscp_ = new wxTextCtrl(programs, wxID_ANY, wxString::FromUTF8(st.winscp_path));
+  psz->Add(winscp_, 1, wxEXPAND);
+  auto* wbrowse = make_button(programs, L"Обзор…", BtnIcon::Folder);
+  psz->Add(wbrowse);
   psz->Add(new wxStaticText(programs, wxID_ANY, L"ssh.exe"), 0, wxALIGN_CENTER_VERTICAL);
   ssh_ = new wxTextCtrl(programs, wxID_ANY, wxString::FromUTF8(st.ssh_path));
   psz->Add(ssh_, 1, wxEXPAND);
   auto* sbrowse = make_button(programs, L"Обзор…", BtnIcon::Folder);
   psz->Add(sbrowse);
+  auto* extra_label = new wxStaticText(programs, wxID_ANY, L"Другие программы");
+  extra_label->SetName(L"section");
+  auto* extra_card = new RoundedCard(programs);
+  extra_list_ = new StripedListCtrl(extra_card, wxID_ANY, wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
+  extra_list_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(120));
+  extra_list_->AppendColumn(L"Файл", wxLIST_FORMAT_LEFT, FromDIP(180));
+  extra_list_->AppendColumn(L"Аргументы", wxLIST_FORMAT_LEFT, FromDIP(180));
+  style_list(extra_list_);
+  extra_list_->SetMinSize(FromDIP(wxSize(-1, 140)));
+  auto* extra_sz = new wxBoxSizer(wxVERTICAL);
+  extra_sz->Add(extra_list_, 1, wxEXPAND);
+  extra_card->SetSizer(extra_sz);
+  auto* extra_btns = new wxBoxSizer(wxHORIZONTAL);
+  auto* extra_add = make_button(programs, L"Добавить", BtnIcon::Plus);
+  auto* extra_edit = make_button(programs, L"Изменить", BtnIcon::Pencil);
+  auto* extra_del = make_button(programs, L"Удалить", BtnIcon::Trash);
+  extra_btns->Add(extra_add, 0, wxRIGHT, 8);
+  extra_btns->Add(extra_edit, 0, wxRIGHT, 8);
+  extra_btns->Add(extra_del);
+  auto* extra_hint = new wxStaticText(
+      programs, wxID_ANY, L"Кнопки появятся на главном окне. Аргументы подставляются из карточки выбранного VPS.");
+  extra_hint->SetName(L"muted");
+  extra_hint->SetForegroundColour(Theme::muted());
+  extra_hint->Wrap(FromDIP(520));
   auto* proot = new wxBoxSizer(wxVERTICAL);
   proot->Add(psz, 0, wxEXPAND | wxALL, 12);
+  proot->Add(extra_label, 0, wxLEFT | wxRIGHT, 12);
+  proot->Add(extra_card, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 12);
+  proot->Add(extra_btns, 0, wxALL, 12);
+  proot->Add(extra_hint, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
   programs->SetSizer(proot);
   nb->AddPage(programs, L"Программы");
+  refresh_extra_list();
 
   auto* data = new wxPanel(nb);
   data->SetName(L"card-page");
@@ -162,10 +292,32 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
     wxFileDialog dlg(this, L"putty.exe", L"", L"putty.exe", L"PuTTY|putty.exe|EXE|*.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dlg.ShowModal() == wxID_OK) putty_->SetValue(dlg.GetPath());
   });
+  wbrowse->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    wxFileDialog dlg(this, L"WinSCP.exe", L"", L"WinSCP.exe", L"WinSCP|WinSCP.exe|EXE|*.exe",
+                     wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+    if (dlg.ShowModal() == wxID_OK) winscp_->SetValue(dlg.GetPath());
+  });
   sbrowse->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     wxFileDialog dlg(this, L"ssh.exe", L"", L"ssh.exe", L"ssh|ssh.exe|EXE|*.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dlg.ShowModal() == wxID_OK) ssh_->SetValue(dlg.GetPath());
   });
+  extra_add->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { edit_extra(-1); });
+  extra_edit->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    long i = extra_list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+    if (i >= 0) edit_extra(i);
+  });
+  extra_del->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    long i = extra_list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+    if (i < 0 || i >= static_cast<long>(extra_programs_.size())) return;
+    if (wxMessageBox(L"Удалить программу «" + wxString::FromUTF8(extra_programs_[static_cast<std::size_t>(i)].name) +
+                         L"»?",
+                     L"Удалить", wxYES_NO | wxICON_QUESTION, this) != wxYES) {
+      return;
+    }
+    extra_programs_.erase(extra_programs_.begin() + i);
+    refresh_extra_list();
+  });
+  extra_list_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent& e) { edit_extra(e.GetIndex()); });
   open_dir->Bind(wxEVT_BUTTON, [](wxCommandEvent&) { open_directory(app_dir()); });
   open_backups->Bind(wxEVT_BUTTON, [](wxCommandEvent&) { open_directory(backups_dir()); });
   exp->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
@@ -189,6 +341,11 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
     try {
       auto data = read_export(std::filesystem::path(dlg.GetPath().utf8_string()));
       auto result = import_into_config(config_, data, mode, import_settings_->GetValue());
+      extra_programs_ = config_.settings.extra_programs;
+      refresh_extra_list();
+      putty_->SetValue(wxString::FromUTF8(config_.settings.putty_path));
+      winscp_->SetValue(wxString::FromUTF8(config_.settings.winscp_path));
+      ssh_->SetValue(wxString::FromUTF8(config_.settings.ssh_path));
       if (on_apply_) on_apply_();
       if (on_import_done_) on_import_done_();
       wxMessageBox(wxString::FromUTF8(format_import_summary(result, mode)), L"Импорт", wxOK | wxICON_INFORMATION, this);
@@ -226,12 +383,39 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.default_command_timeout = clamp_int(timeout, 1, 86400);
   config_.settings.journal_max_entries = clamp_int(journal, 100, 50000);
   config_.settings.putty_path = std::string(putty_->GetValue().utf8_string());
+  config_.settings.winscp_path = std::string(winscp_->GetValue().utf8_string());
   config_.settings.ssh_path = std::string(ssh_->GetValue().utf8_string());
+  config_.settings.extra_programs = extra_programs_;
   config_.settings.allow_short_master_password = short_pw_->GetValue();
   config_.settings.master_password_max_attempts = clamp_int(attempts, 0, 100);
   config_.settings.master_password_lockout_minutes = clamp_int(minutes, 1, 24 * 60);
   if (on_apply_) on_apply_();
   EndModal(wxID_OK);
+}
+
+void SettingsDialog::refresh_extra_list() {
+  if (!extra_list_) return;
+  extra_list_->DeleteAllItems();
+  for (std::size_t i = 0; i < extra_programs_.size(); ++i) {
+    const auto& p = extra_programs_[i];
+    long row = extra_list_->InsertItem(static_cast<long>(i), wxString::FromUTF8(p.name));
+    extra_list_->SetItem(row, 1, wxString::FromUTF8(p.path));
+    extra_list_->SetItem(row, 2, wxString::FromUTF8(p.args));
+  }
+}
+
+void SettingsDialog::edit_extra(long index) {
+  ExtraProgram program = index >= 0 && index < static_cast<long>(extra_programs_.size())
+                             ? extra_programs_[static_cast<std::size_t>(index)]
+                             : ExtraProgram::make_new();
+  ExtraProgramDialog dlg(this, program);
+  if (dlg.ShowModal() != wxID_OK || !dlg.accepted) return;
+  if (index >= 0 && index < static_cast<long>(extra_programs_.size())) {
+    extra_programs_[static_cast<std::size_t>(index)] = dlg.extra;
+  } else {
+    extra_programs_.push_back(dlg.extra);
+  }
+  refresh_extra_list();
 }
 
 }  // namespace fatty

@@ -64,6 +64,7 @@ class AppFrame : public wxFrame {
   void check_updates_async(bool interactive);
   void open_settings();
   void restore_columns();
+  void rebuild_extra_tools();
 
   Config config_;
   SessionVault vault_;
@@ -104,6 +105,9 @@ class AppFrame : public wxFrame {
   wxGauge* busy_gauge_{};
   wxTimer busy_timer_;
   std::vector<wxWindow*> busy_disable_;
+  std::vector<wxWindow*> extra_tool_btns_;
+  wxWindow* extra_tools_parent_{};
+  wxSizer* extra_tools_sizer_{};
   wxStaticText* status_{};
   std::map<std::string, FilesWindow*> files_windows_;
   JournalWindow* journal_window_ = nullptr;
