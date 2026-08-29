@@ -68,7 +68,8 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
       L"• Не запускайте через F5 интерактивное: top, less, vim, pm2 logs без --nostream.\n"
       L"• Для sudo нужен NOPASSWD, иначе команда зависнет на Password:.\n"
       L"• Мастер-пароль нельзя восстановить.\n"
-      L"• Журнал не хранит пароли, но сохраняет вывод команды.\n\n"
+      L"• Журнал не хранит пароли, но сохраняет вывод команды.\n"
+      L"• Конфиг копируется раз в сутки в backups (Настройки → Данные; можно выключить).\n\n"
       L"Конфиг: %APPDATA%\\FaTTY\\config.json");
 
   auto* p0 = new wxPanel(nb_);

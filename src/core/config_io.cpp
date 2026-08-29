@@ -28,6 +28,7 @@ json portable_settings(const AppSettings& settings) {
       {"master_password_lockout_minutes", settings.master_password_lockout_minutes},
       {"theme", settings.theme},
       {"show_command_folder_column", settings.show_command_folder_column},
+      {"backup_enabled", settings.backup_enabled},
   };
 }
 
@@ -52,6 +53,7 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   if (theme == "light" || theme == "dark") settings.theme = theme;
   settings.show_command_folder_column =
       raw.value("show_command_folder_column", settings.show_command_folder_column);
+  settings.backup_enabled = raw.value("backup_enabled", settings.backup_enabled);
 }
 
 std::pair<std::string, std::string> server_key(const std::string& name, const std::string& host) {

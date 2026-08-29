@@ -8,6 +8,7 @@ void test_vault();
 void test_store();
 void test_quote();
 void test_journal();
+void test_backup();
 }  // namespace fatty::test
 
 int main() {
@@ -17,6 +18,7 @@ int main() {
     test_store();
     test_quote();
     test_journal();
+    test_backup();
   } catch (const std::exception& exc) {
     std::fprintf(stderr, "exception: %s\n", exc.what());
     return 1;

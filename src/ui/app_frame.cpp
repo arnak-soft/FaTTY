@@ -3,6 +3,7 @@
 #include "app/single_instance.hpp"
 #include "app/version.hpp"
 #include "core/config_io.hpp"
+#include "core/backup.hpp"
 #include "core/paths.hpp"
 #include "core/presets.hpp"
 #include "core/util.hpp"
@@ -163,6 +164,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       check_updates_async(false);
     }
   }
+  maybe_run_backup();
 }
 
 void AppFrame::build_menu() {
@@ -964,6 +966,17 @@ void AppFrame::persist() {
   if (auto* c = selected_command()) config_.settings.last_command_id = c->id;
   try {
     save_config(config_, vault_);
+    maybe_run_backup();
+  } catch (...) {
+  }
+}
+
+void AppFrame::maybe_run_backup() {
+  try {
+    auto result = maybe_backup_config(config_.settings);
+    if (result.made) {
+      save_config(config_, vault_);
+    }
   } catch (...) {
   }
 }

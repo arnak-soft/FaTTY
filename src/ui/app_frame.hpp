@@ -37,6 +37,7 @@ class AppFrame : public wxFrame {
   void build_menu();
   void build_ui();
   void persist();
+  void maybe_run_backup();
   void apply_ui_theme();
   void refresh_servers(const std::string& keep_id = {});
   void refresh_commands();

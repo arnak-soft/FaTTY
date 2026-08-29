@@ -47,6 +47,7 @@ set(FATTY_CORE_SOURCES
   src/core/lockout.cpp
   src/core/journal.cpp
   src/core/config_io.cpp
+  src/core/backup.cpp
   src/core/presets.cpp
   src/core/quote.cpp
   src/app/version.cpp
@@ -164,6 +165,7 @@ add_executable(fatty_tests
   tests/test_store.cpp
   tests/test_quote.cpp
   tests/test_journal.cpp
+  tests/test_backup.cpp
 )
 target_include_directories(fatty_tests PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/src" "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(fatty_tests PRIVATE fatty_core)

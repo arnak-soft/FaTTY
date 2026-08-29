@@ -67,6 +67,8 @@ struct AppSettings {
   int master_password_lockout_minutes = 20;
   std::string theme = "dark";
   bool show_command_folder_column = true;
+  bool backup_enabled = true;
+  double last_backup = 0.0;
   std::map<std::string, std::string> last_folder_by_server;
 };
 

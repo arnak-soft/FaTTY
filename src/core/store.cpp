@@ -392,6 +392,12 @@ Config load_config() {
     st.theme = "dark";
   }
   st.show_command_folder_column = settings_raw.value("show_command_folder_column", true);
+  st.backup_enabled = settings_raw.value("backup_enabled", true);
+  try {
+    st.last_backup = std::max(0.0, settings_raw.value("last_backup", 0.0));
+  } catch (...) {
+    st.last_backup = 0.0;
+  }
   if (settings_raw.contains("last_folder_by_server") && settings_raw["last_folder_by_server"].is_object()) {
     for (auto it = settings_raw["last_folder_by_server"].begin();
          it != settings_raw["last_folder_by_server"].end(); ++it) {
@@ -483,6 +489,8 @@ void save_config(Config& config, SessionVault& vault) {
       {"master_password_lockout_minutes", config.settings.master_password_lockout_minutes},
       {"theme", config.settings.theme},
       {"show_command_folder_column", config.settings.show_command_folder_column},
+      {"backup_enabled", config.settings.backup_enabled},
+      {"last_backup", config.settings.last_backup},
       {"last_folder_by_server", config.settings.last_folder_by_server},
   };
   payload["settings"] = settings;

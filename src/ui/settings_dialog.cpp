@@ -1,5 +1,6 @@
 #include "ui/settings_dialog.hpp"
 
+#include "core/backup.hpp"
 #include "core/config_io.hpp"
 #include "core/paths.hpp"
 #include "core/util.hpp"
@@ -22,7 +23,7 @@ namespace fatty {
 SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& vault, std::function<void()> on_apply,
                                std::function<void()> on_change_master, std::function<void()> on_check_updates,
                                std::function<void()> on_import_done)
-    : PositionedDialog(parent, L"Настройки", wxSize(560, 500)),
+    : PositionedDialog(parent, L"Настройки", wxSize(560, 540)),
       config_(config),
       vault_(vault),
       on_apply_(std::move(on_apply)),
@@ -94,6 +95,13 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   data->SetName(L"card-page");
   auto* dsz = new wxBoxSizer(wxVERTICAL);
   auto* open_dir = make_button(data, L"Открыть папку конфига");
+  backup_ = new wxCheckBox(data, wxID_ANY, L"Автоматические резервные копии конфига (раз в сутки)");
+  backup_->SetValue(st.backup_enabled);
+  auto* backup_note = new wxStaticText(data, wxID_ANY, L"Папка backups рядом с конфигом, хранятся последние 14 копий.");
+  backup_note->SetName(L"muted");
+  backup_note->SetForegroundColour(Theme::muted());
+  backup_note->Wrap(FromDIP(480));
+  auto* open_backups = make_button(data, L"Открыть папку копий");
   export_secrets_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить пароли");
   export_settings_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить настройки");
   export_settings_->SetValue(true);
@@ -102,6 +110,9 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* exp = make_button(data, L"Экспорт…");
   auto* imp = make_button(data, L"Импорт…");
   dsz->Add(open_dir, 0, wxALL, 8);
+  dsz->Add(backup_, 0, wxALL, 8);
+  dsz->Add(backup_note, 0, wxLEFT | wxRIGHT | wxBOTTOM, 8);
+  dsz->Add(open_backups, 0, wxALL, 8);
   dsz->Add(export_secrets_, 0, wxALL, 8);
   dsz->Add(export_settings_, 0, wxALL, 8);
   dsz->Add(exp, 0, wxALL, 8);
@@ -156,6 +167,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
     if (dlg.ShowModal() == wxID_OK) ssh_->SetValue(dlg.GetPath());
   });
   open_dir->Bind(wxEVT_BUTTON, [](wxCommandEvent&) { open_directory(app_dir()); });
+  open_backups->Bind(wxEVT_BUTTON, [](wxCommandEvent&) { open_directory(backups_dir()); });
   exp->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     wxFileDialog dlg(this, L"Экспорт FaTTY", L"", L"fatty-backup.json", L"JSON|*.json", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
     if (dlg.ShowModal() != wxID_OK) return;
@@ -203,6 +215,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.check_updates_on_start = updates_->GetValue();
   config_.settings.clear_output_before_run = clear_output_->GetValue();
   config_.settings.show_command_folder_column = show_folder_col_->GetValue();
+  config_.settings.backup_enabled = backup_->GetValue();
   const std::string old_theme = config_.settings.theme;
   config_.settings.theme = theme_->GetSelection() == 1 ? "light" : "dark";
   if (config_.settings.theme != old_theme) {
