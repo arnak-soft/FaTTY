@@ -62,6 +62,7 @@ set(FATTY_NET_SOURCES
 
 set(FATTY_UI_SOURCES
   src/ui/theme.cpp
+  src/ui/striped_list.cpp
   src/ui/chrome.cpp
   src/ui/layout.cpp
   src/ui/widgets.cpp
@@ -110,7 +111,7 @@ target_link_libraries(fatty PRIVATE
   wx::base
 )
 if(WIN32)
-  target_link_libraries(fatty PRIVATE dwmapi user32 gdi32 comctl32 ole32 uuid advapi32)
+  target_link_libraries(fatty PRIVATE dwmapi uxtheme user32 gdi32 comctl32 ole32 uuid advapi32)
 endif()
 
 if(MSVC)

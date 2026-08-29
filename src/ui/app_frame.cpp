@@ -15,6 +15,7 @@
 #include "ui/journal_window.hpp"
 #include "ui/layout.hpp"
 #include "ui/settings_dialog.hpp"
+#include "ui/striped_list.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
@@ -240,8 +241,8 @@ void AppFrame::build_ui() {
   server_search_->SetHint(L"Поиск VPS…");
 #endif
   auto* servers_card = new RoundedCard(left);
-  servers_ = new wxListCtrl(servers_card, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                            wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
+  servers_ = new StripedListCtrl(servers_card, wxID_ANY,
+                                 wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
   servers_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(160));
   servers_->AppendColumn(L"Адрес", wxLIST_FORMAT_LEFT, FromDIP(220));
   auto* servers_sz = new wxBoxSizer(wxVERTICAL);
@@ -281,8 +282,7 @@ void AppFrame::build_ui() {
   first_page->SetBackgroundColour(Theme::elevated());
   first_page->SetForegroundColour(Theme::text());
   auto* page_sz = new wxBoxSizer(wxVERTICAL);
-  commands_ = new wxListCtrl(first_page, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                             wxLC_REPORT | wxBORDER_NONE);
+  commands_ = new StripedListCtrl(first_page, wxID_ANY, wxLC_REPORT | wxBORDER_NONE);
   setup_command_columns();
   page_sz->Add(commands_, 1, wxEXPAND);
   first_page->SetSizer(page_sz);
@@ -976,6 +976,7 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
     servers_->InsertItem(row, wxString::FromUTF8(s.name));
     servers_->SetItem(row, 1, wxString::FromUTF8(s.username + "@" + s.host + ":" + std::to_string(s.port)));
     servers_->SetItemPtrData(row, static_cast<wxUIntPtr>(i));
+    style_list_row(servers_, row, Theme::text());
     if (s.id == keep) sel = row;
     ++row;
   }
@@ -995,13 +996,15 @@ void AppFrame::restore_columns() {
 void AppFrame::apply_ui_theme() {
   set_theme(config_.settings.theme);
   apply_theme(this);
+  style_list(servers_);
+  style_list(commands_);
   if (journal_window_) apply_theme(journal_window_);
   if (help_window_) apply_theme(help_window_);
   for (auto& [id, win] : files_windows_) {
     if (win) apply_theme(win);
   }
   setup_command_columns();
-  refresh_commands();
+  refresh_servers();
 }
 
 std::string AppFrame::current_folder_id() const {
@@ -1016,6 +1019,7 @@ void AppFrame::attach_commands_page(int index) {
   auto* page = folders_nb_->GetPage(static_cast<std::size_t>(index));
   if (!page) return;
   commands_->Reparent(page);
+  style_list(commands_);
   if (!page->GetSizer()) {
     page->SetSizer(new wxBoxSizer(wxVERTICAL));
   }
@@ -1090,7 +1094,7 @@ void AppFrame::refresh_commands() {
       commands_->SetItem(row, col, wxString::FromUTF8(it->second.last_run_label()));
       colour = Theme::run_status(it->second.status);
     }
-    commands_->SetItemTextColour(row, colour);
+    style_list_row(commands_, row, colour);
     if (c.id == config_.settings.last_command_id) sel = row;
   }
   if (sel >= 0) {

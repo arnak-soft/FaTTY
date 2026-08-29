@@ -1,6 +1,7 @@
 #include "ui/layout.hpp"
 
 #include "core/util.hpp"
+#include "ui/striped_list.hpp"
 #include "ui/widgets.hpp"
 
 #include <algorithm>
@@ -100,6 +101,25 @@ void apply_list_columns(wxListCtrl* list, const std::map<std::string, int>& widt
 }
 
 void store_list_columns(wxListCtrl* list, AppSettings& settings, const std::string& key,
+                        const std::vector<std::string>& ids) {
+  auto& cols = settings.column_widths[key];
+  for (int i = 0; i < static_cast<int>(ids.size()); ++i) {
+    int w = list->GetColumnWidth(i);
+    if (w > 0) cols[ids[static_cast<std::size_t>(i)]] = w;
+  }
+}
+
+void apply_list_columns(StripedListCtrl* list, const std::map<std::string, int>& widths,
+                        const std::vector<std::string>& ids) {
+  for (int i = 0; i < static_cast<int>(ids.size()); ++i) {
+    auto it = widths.find(ids[static_cast<std::size_t>(i)]);
+    if (it != widths.end() && it->second > 0) {
+      list->SetColumnWidth(i, it->second);
+    }
+  }
+}
+
+void store_list_columns(StripedListCtrl* list, AppSettings& settings, const std::string& key,
                         const std::vector<std::string>& ids) {
   auto& cols = settings.column_widths[key];
   for (int i = 0; i < static_cast<int>(ids.size()); ++i) {

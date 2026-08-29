@@ -9,6 +9,8 @@ class wxTextCtrl;
 
 namespace fatty {
 
+class StripedListCtrl;
+
 struct Theme {
   static wxColour bg();
   static wxColour chrome();
@@ -28,6 +30,7 @@ struct Theme {
   static wxColour border();
   static wxColour hover();
   static wxColour blend(const wxColour& a, const wxColour& b, float t);
+  static wxColour stripe(int row);
   static wxColour run_status(const std::string& status);
   static wxFont ui();
   static wxFont ui_small();
@@ -42,6 +45,8 @@ std::string theme_name();
 void apply_theme(wxWindow* window);
 void apply_dark(wxWindow* window);
 void apply_dark_titlebar(wxWindow* window);
+void style_list(StripedListCtrl* list);
+void style_list_row(StripedListCtrl* list, long row, const wxColour& text);
 void style_text(wxTextCtrl* ctrl, bool terminal = false);
 
 }  // namespace fatty

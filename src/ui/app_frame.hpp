@@ -5,11 +5,11 @@
 #include "core/vault.hpp"
 #include "net/ssh_session.hpp"
 #include "ui/chrome.hpp"
+#include "ui/striped_list.hpp"
 
 #include <wx/button.h>
 #include <wx/frame.h>
 #include <wx/gauge.h>
-#include <wx/listctrl.h>
 #include <wx/splitter.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
@@ -88,9 +88,9 @@ class AppFrame : public wxFrame {
   wxSplitterWindow* vsplit_{};
   wxSplitterWindow* hsplit_{};
   wxTextCtrl* server_search_{};
-  wxListCtrl* servers_{};
+  StripedListCtrl* servers_{};
   RoundedNotebook* folders_nb_{};
-  wxListCtrl* commands_{};
+  StripedListCtrl* commands_{};
   std::vector<std::string> folder_tab_ids_;
   wxTextCtrl* output_{};
   wxTextCtrl* quick_{};

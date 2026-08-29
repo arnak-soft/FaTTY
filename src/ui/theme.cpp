@@ -1,6 +1,7 @@
 #include "ui/theme.hpp"
 
 #include "ui/chrome.hpp"
+#include "ui/striped_list.hpp"
 
 #include <wx/button.h>
 #include <wx/checkbox.h>
@@ -107,6 +108,12 @@ wxColour Theme::blend(const wxColour& a, const wxColour& b, float t) {
   return {mix(a.Red(), b.Red()), mix(a.Green(), b.Green()), mix(a.Blue(), b.Blue()), mix(a.Alpha(), b.Alpha())};
 }
 
+wxColour Theme::stripe(int row) {
+  if (row % 2 == 0) return elevated();
+  return blend(elevated(), theme_is_dark() ? wxColour(255, 255, 255) : wxColour(0, 0, 0),
+               theme_is_dark() ? 0.11f : 0.07f);
+}
+
 wxColour Theme::run_status(const std::string& status) {
   if (status == "ok") return ok();
   if (status == "failed" || status == "error") return err();
@@ -163,10 +170,15 @@ void apply_theme(wxWindow* window) {
     window->SetForegroundColour(Theme::meta());
   } else if (auto* tc = dynamic_cast<wxTextCtrl*>(window)) {
     style_text(tc, name == L"terminal");
-  } else if (dynamic_cast<wxListCtrl*>(window) || dynamic_cast<wxNotebook*>(window)) {
+  } else if (auto* list = dynamic_cast<StripedListCtrl*>(window)) {
+    list->restyle();
+  } else if (dynamic_cast<wxListCtrl*>(window)) {
     window->SetBackgroundColour(Theme::elevated());
-    // Не задаём цвет текста контролу: иначе Windows затирает цвет строк
-    // (успех/ошибка последнего запуска).
+    // Не задаём цвет текста контролу и не трогаем системную тему здесь:
+    // иначе Windows затирает цвет строк. Списки с полосами вызывают style_list().
+  } else if (dynamic_cast<wxNotebook*>(window)) {
+    window->SetBackgroundColour(Theme::elevated());
+    window->SetForegroundColour(Theme::text());
   } else if (dynamic_cast<wxButton*>(window)) {
     window->SetBackgroundColour(Theme::btn());
     window->SetForegroundColour(Theme::text_bright());
@@ -188,6 +200,14 @@ void apply_theme(wxWindow* window) {
 }
 
 void apply_dark(wxWindow* window) { apply_theme(window); }
+
+void style_list(StripedListCtrl* list) {
+  if (list) list->restyle();
+}
+
+void style_list_row(StripedListCtrl* list, long row, const wxColour& text) {
+  if (list) list->set_row_text(row, text);
+}
 
 void style_text(wxTextCtrl* ctrl, bool terminal) {
   if (terminal) ctrl->SetName(L"terminal");

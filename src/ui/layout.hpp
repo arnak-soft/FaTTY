@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/store.hpp"
+#include "ui/striped_list.hpp"
 
 #include <wx/dialog.h>
 #include <wx/listctrl.h>
@@ -21,6 +22,10 @@ void restore_dialog_geometry(wxWindow* window, AppSettings& settings, const std:
 void store_dialog_geometry(wxWindow* window, AppSettings& settings, const std::string& key, bool remember_size);
 void apply_list_columns(wxListCtrl* list, const std::map<std::string, int>& widths, const std::vector<std::string>& ids);
 void store_list_columns(wxListCtrl* list, AppSettings& settings, const std::string& key,
+                        const std::vector<std::string>& ids);
+void apply_list_columns(StripedListCtrl* list, const std::map<std::string, int>& widths,
+                        const std::vector<std::string>& ids);
+void store_list_columns(StripedListCtrl* list, AppSettings& settings, const std::string& key,
                         const std::vector<std::string>& ids);
 
 class PositionedDialog : public wxDialog {
