@@ -1,8 +1,11 @@
 #pragma once
 
+#include <filesystem>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace fatty {
 
@@ -20,5 +23,11 @@ struct UpdateCheckResult {
 };
 
 UpdateCheckResult check_for_updates(const std::string& current = {});
+
+std::optional<std::string> pick_github_setup_url(std::string_view assets_json);
+std::vector<std::string> installer_download_urls(const std::string& version,
+                                                 const std::optional<std::string>& preferred = {});
+void download_installer(const std::string& version, const std::optional<std::string>& preferred_url,
+                       const std::filesystem::path& dest);
 
 }  // namespace fatty

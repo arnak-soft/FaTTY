@@ -169,9 +169,13 @@ add_executable(fatty_tests
   tests/test_journal.cpp
   tests/test_backup.cpp
   tests/test_placeholders.cpp
+  tests/test_updates.cpp
 )
 target_include_directories(fatty_tests PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/src" "${CMAKE_BINARY_DIR}/generated")
-target_link_libraries(fatty_tests PRIVATE fatty_core)
+target_link_libraries(fatty_tests PRIVATE fatty_core fatty_net)
+if(MSVC)
+  set_property(TARGET fatty_tests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 add_test(NAME fatty_tests COMMAND fatty_tests)
 
 install(TARGETS fatty RUNTIME DESTINATION .)

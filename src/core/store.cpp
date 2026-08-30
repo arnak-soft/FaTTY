@@ -215,7 +215,7 @@ void Config::sort_commands_for(const std::string& server_id, const std::string& 
 
 void Config::sort_commands_for(const std::string& server_id, const std::string& folder_id, const std::string& by) {
   auto group = commands_for(server_id, folder_id);
-  auto primary = [&](const Command& c) {
+  auto primary = [&](const Command& c) -> std::string {
     if (by == "command") return to_lower(trim(c.command));
     if (by == "comment") return to_lower(trim(c.comment));
     if (by == "folder") {

@@ -123,6 +123,12 @@ void open_directory(const std::filesystem::path& path) {
 #endif
 }
 
+void open_path(const std::filesystem::path& path) {
+#ifdef _WIN32
+  ShellExecuteW(nullptr, L"open", path.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+#endif
+}
+
 void open_url(const std::string& url) {
 #ifdef _WIN32
   ShellExecuteA(nullptr, "open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);

@@ -4,7 +4,11 @@
 #include "core/util.hpp"
 
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <regex>
+#include <vector>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -171,13 +175,29 @@ std::string winhttp_get(const std::wstring& host, const std::wstring& path) {
 }
 #endif
 
+bool looks_like_asset_url(const std::string& url) {
+  auto u = to_lower(url);
+  return u.find("/releases/download/") != std::string::npos ||
+         u.find("/latest/download/") != std::string::npos;
+}
+
+std::string setup_asset_url(const std::string& version) {
+  auto ver = normalize_version(version);
+  if (ver.empty()) return {};
+  return github_repo_url("/releases/download/v" + ver + "/FaTTY." + ver + ".Setup.exe");
+}
+
 std::optional<std::string> pick_asset_url(const json& assets) {
   if (!assets.is_array()) return std::nullopt;
   std::vector<std::pair<std::string, std::string>> names;
   for (const auto& item : assets) {
-    auto name = to_lower(item.value("name", ""));
     auto url = item.value("browser_download_url", "");
-    if (!name.empty() && !url.empty()) names.emplace_back(name, url);
+    if (url.empty()) continue;
+    // GitHub подменяет пробелы в name на точки («FaTTY.1.6.6.Setup.exe»),
+    // исходное имя остаётся в label («FaTTY 1.6.6 Setup.exe»).
+    auto hay = to_lower(item.value("name", "")) + " " + to_lower(item.value("label", ""));
+    if (hay.find_first_not_of(' ') == std::string::npos) continue;
+    names.emplace_back(hay, url);
   }
   for (const char* needle : {"setup.exe", "setup", "onefile.exe", "onefile", ".exe"}) {
     for (const auto& [name, url] : names) {
@@ -194,8 +214,9 @@ UpdateCheckResult from_release(const json& data, const std::string& current) {
   std::string page = data.value("html_url", "");
   if (page.empty()) page = github_repo_url("/releases/tag/v" + tag);
   auto download = pick_asset_url(data.value("assets", json::array()));
+  if (!download) download = setup_asset_url(tag);
   if (is_newer(tag, current)) {
-    return {"update", current, tag, page, download ? download : page};
+    return {"update", current, tag, page, download};
   }
   return {"current", current, tag, page, std::nullopt};
 }
@@ -211,9 +232,106 @@ UpdateCheckResult from_tags(const json& data, const std::string& current) {
   }
   if (best.empty()) return {"none", current, std::nullopt, page, std::nullopt};
   page = github_repo_url("/releases/tag/v" + best);
-  if (is_newer(best, current)) return {"update", current, best, page, page};
+  auto download = setup_asset_url(best);
+  if (is_newer(best, current)) return {"update", current, best, page, download};
   return {"current", current, best, page, std::nullopt};
 }
+
+#ifdef _WIN32
+std::wstring utf8_wide(const std::string& text) {
+  if (text.empty()) return {};
+  int n = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+  if (n <= 0) return {};
+  std::wstring out(static_cast<std::size_t>(n), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), out.data(), n);
+  return out;
+}
+
+void winhttp_download_once(DWORD access_type, const std::string& url, const std::filesystem::path& dest) {
+  auto wurl = utf8_wide(url);
+  URL_COMPONENTS uc{};
+  uc.dwStructSize = sizeof(uc);
+  wchar_t host[256]{};
+  wchar_t path[4096]{};
+  wchar_t extra[2048]{};
+  uc.lpszHostName = host;
+  uc.dwHostNameLength = 256;
+  uc.lpszUrlPath = path;
+  uc.dwUrlPathLength = 4096;
+  uc.lpszExtraInfo = extra;
+  uc.dwExtraInfoLength = 2048;
+  if (!WinHttpCrackUrl(wurl.c_str(), 0, 0, &uc)) throw_github_transport(GetLastError());
+  if (uc.nScheme != INTERNET_SCHEME_HTTPS) throw UpdateError("Ссылка на установщик не HTTPS");
+
+  std::wstring full_path(path, uc.dwUrlPathLength);
+  if (uc.dwExtraInfoLength) full_path.append(extra, uc.dwExtraInfoLength);
+
+  WinHttpHandle session{WinHttpOpen(L"FaTTY", access_type, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0)};
+  if (!session) throw_github_transport(GetLastError());
+  enable_secure_session(session.h);
+  WinHttpSetTimeouts(session.h, 15000, 15000, 15000, 120000);
+  WinHttpHandle connect{WinHttpConnect(session.h, host, INTERNET_DEFAULT_HTTPS_PORT, 0)};
+  if (!connect) throw_github_transport(GetLastError());
+  WinHttpHandle request{WinHttpOpenRequest(connect.h, L"GET", full_path.c_str(), nullptr, WINHTTP_NO_REFERER,
+                                           WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE)};
+  if (!request) throw_github_transport(GetLastError());
+  DWORD redirect = WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS;
+  WinHttpSetOption(request.h, WINHTTP_OPTION_REDIRECT_POLICY, &redirect, sizeof(redirect));
+  std::wstring headers = L"Accept: */*\r\nUser-Agent: FaTTY\r\n";
+  if (!WinHttpSendRequest(request.h, headers.c_str(), static_cast<DWORD>(-1), WINHTTP_NO_REQUEST_DATA, 0, 0, 0) ||
+      !WinHttpReceiveResponse(request.h, nullptr)) {
+    throw_github_transport(GetLastError());
+  }
+  DWORD status = 0;
+  DWORD size = sizeof(status);
+  WinHttpQueryHeaders(request.h, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,
+                      &status, &size, WINHTTP_NO_HEADER_INDEX);
+  if (status != 200) throw UpdateError("GitHub ответил HTTP " + std::to_string(status));
+
+  auto part = dest;
+  part += ".part";
+  std::ofstream out(part, std::ios::binary | std::ios::trunc);
+  if (!out) throw UpdateError("Не удалось записать файл установщика");
+  DWORD avail = 0;
+  while (WinHttpQueryDataAvailable(request.h, &avail) && avail) {
+    std::string chunk(avail, '\0');
+    DWORD read = 0;
+    WinHttpReadData(request.h, chunk.data(), avail, &read);
+    out.write(chunk.data(), static_cast<std::streamsize>(read));
+    if (!out) {
+      out.close();
+      std::filesystem::remove(part);
+      throw UpdateError("Не удалось записать файл установщика");
+    }
+  }
+  out.close();
+
+  std::ifstream in(part, std::ios::binary);
+  char mz[2]{};
+  in.read(mz, 2);
+  in.close();
+  std::error_code ec;
+  auto bytes = std::filesystem::file_size(part, ec);
+  if (ec || bytes < 256 * 1024 || mz[0] != 'M' || mz[1] != 'Z') {
+    std::filesystem::remove(part, ec);
+    throw UpdateError("GitHub отдал не установщик");
+  }
+  std::filesystem::remove(dest, ec);
+  std::filesystem::rename(part, dest, ec);
+  if (ec) throw UpdateError("Не удалось сохранить установщик");
+}
+
+void winhttp_download(const std::string& url, const std::filesystem::path& dest) {
+  try {
+    winhttp_download_once(WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, url, dest);
+    return;
+  } catch (const UpdateError& e) {
+    std::string what = e.what();
+    if (what.find("HTTP ") != std::string::npos) throw;
+  }
+  winhttp_download_once(WINHTTP_ACCESS_TYPE_NO_PROXY, url, dest);
+}
+#endif
 
 }  // namespace
 
@@ -230,6 +348,54 @@ UpdateCheckResult check_for_updates(const std::string& current_in) {
   return from_tags(parsed, local);
 #else
   return {"none", local, std::nullopt, std::nullopt, std::nullopt};
+#endif
+}
+
+std::optional<std::string> pick_github_setup_url(std::string_view assets_json) {
+  auto parsed = json::parse(std::string(assets_json), nullptr, false);
+  if (parsed.is_discarded()) return std::nullopt;
+  if (parsed.is_object()) return pick_asset_url(parsed.value("assets", json::array()));
+  return pick_asset_url(parsed);
+}
+
+std::vector<std::string> installer_download_urls(const std::string& version,
+                                                 const std::optional<std::string>& preferred) {
+  std::vector<std::string> urls;
+  auto add = [&](const std::string& u) {
+    if (u.empty()) return;
+    if (std::find(urls.begin(), urls.end(), u) != urls.end()) return;
+    urls.push_back(u);
+  };
+  if (preferred && looks_like_asset_url(*preferred)) add(*preferred);
+  auto ver = normalize_version(version);
+  if (!ver.empty()) {
+    add(setup_asset_url(ver));
+    add(github_repo_url("/releases/download/v" + ver + "/FaTTY%20" + ver + "%20Setup.exe"));
+    add(github_repo_url("/releases/latest/download/FaTTY." + ver + ".Setup.exe"));
+  }
+  return urls;
+}
+
+void download_installer(const std::string& version, const std::optional<std::string>& preferred_url,
+                       const std::filesystem::path& dest) {
+#ifdef _WIN32
+  auto urls = installer_download_urls(version, preferred_url);
+  if (urls.empty()) throw UpdateError("Нет ссылки на установщик");
+  std::string last = "Не удалось скачать установщик";
+  for (const auto& url : urls) {
+    try {
+      winhttp_download(url, dest);
+      return;
+    } catch (const UpdateError& e) {
+      last = e.what();
+    }
+  }
+  throw UpdateError(last);
+#else
+  (void)version;
+  (void)preferred_url;
+  (void)dest;
+  throw UpdateError("Скачивание установщика только на Windows");
 #endif
 }
 

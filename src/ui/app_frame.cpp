@@ -39,6 +39,7 @@
 #include <wx/wrapsizer.h>
 #include <algorithm>
 #include <chrono>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <thread>
@@ -1108,8 +1109,33 @@ void AppFrame::check_updates_async(bool interactive) {
           UpdateAvailableDialog dlg(this, r.current, latest);
           int ans = dlg.ShowModal();
           if (ans == wxID_YES) {
-            std::string url = r.download_url.value_or(r.page_url.value_or(""));
-            if (!url.empty()) open_url(url);
+            status_->SetLabel(L"Скачивание установщика…");
+            checking_updates_ = true;
+            auto dest = std::filesystem::temp_directory_path() /
+                        ("FaTTY-" + (latest.empty() ? std::string("update") : latest) + "-Setup.exe");
+            auto preferred = r.download_url;
+            std::thread([this, alive, latest, preferred, dest] {
+              std::string err;
+              try {
+                download_installer(latest, preferred, dest);
+              } catch (const std::exception& exc) {
+                err = exc.what();
+              }
+              wxTheApp->CallAfter([this, alive, dest, err] {
+                if (!alive->load()) return;
+                checking_updates_ = false;
+                if (!err.empty()) {
+                  auto text = wxString::FromUTF8(err) + L"\n\nОткрыть страницу релизов в браузере?";
+                  if (wxMessageBox(text, L"Обновления", wxYES_NO | wxICON_ERROR, this) == wxYES) {
+                    open_url(std::string("https://github.com/") + kGithubOwner + "/" + kGithubRepo + "/releases");
+                  }
+                  status_->SetLabel(L"Готово");
+                  return;
+                }
+                status_->SetLabel(L"Запуск установщика…");
+                open_path(dest);
+              });
+            }).detach();
           } else if (dlg.dont_remind() && !latest.empty()) {
             if (config_.settings.skipped_update_version != latest) {
               config_.settings.skipped_update_version = latest;

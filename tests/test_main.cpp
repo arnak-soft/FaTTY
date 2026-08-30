@@ -10,6 +10,7 @@ void test_quote();
 void test_journal();
 void test_backup();
 void test_placeholders();
+void test_updates();
 }  // namespace fatty::test
 
 int main() {
@@ -21,6 +22,7 @@ int main() {
     test_journal();
     test_backup();
     test_placeholders();
+    test_updates();
   } catch (const std::exception& exc) {
     std::fprintf(stderr, "exception: %s\n", exc.what());
     return 1;

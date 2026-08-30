@@ -17,6 +17,7 @@ std::filesystem::path resource_root();
 std::filesystem::path exe_dir();
 
 void open_directory(const std::filesystem::path& path);
+void open_path(const std::filesystem::path& path);
 void open_url(const std::string& url);
 
 }  // namespace fatty
