@@ -5,7 +5,9 @@
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
+#include <algorithm>
 #include <wx/filedlg.h>
+#include <wx/listctrl.h>
 #include <wx/msgdlg.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
@@ -401,6 +403,176 @@ void CommandDialog::on_ok(wxCommandEvent&) {
   } else {
     result.folder_id.clear();
   }
+  accepted = true;
+  EndModal(wxID_OK);
+}
+
+BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config& config, const wxString& title)
+    : PositionedDialog(parent, title, wxSize(760, 560)), bundle_(bundle), config_(config),
+      selected_ids_(bundle.command_ids) {
+  auto* body = new wxPanel(this);
+  auto* form = new wxFlexGridSizer(2, 2, 6, 8);
+  form->AddGrowableCol(1);
+  name_ = labeled_entry(body, form, L"Название", wxString::FromUTF8(bundle.name));
+  interval_ = labeled_entry(body, form, L"Пауза по умолчанию, с",
+                            wxString::FromUTF8(std::to_string(bundle.interval_sec)));
+
+  auto* lists = new wxBoxSizer(wxHORIZONTAL);
+  auto* left = new wxBoxSizer(wxVERTICAL);
+  left->Add(new wxStaticText(body, wxID_ANY, L"Доступные команды (все папки)"), 0, wxBOTTOM, 4);
+  available_ = new wxListCtrl(body, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                              wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES);
+  available_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(120));
+  available_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(200));
+  left->Add(available_, 1, wxEXPAND);
+
+  auto* mid = new wxBoxSizer(wxVERTICAL);
+  mid->AddStretchSpacer();
+  auto* add = make_button(body, L"→", BtnIcon::None);
+  auto* rem = make_button(body, L"←", BtnIcon::None);
+  mid->Add(add, 0, wxBOTTOM, 8);
+  mid->Add(rem, 0);
+  mid->AddStretchSpacer();
+
+  auto* right = new wxBoxSizer(wxVERTICAL);
+  right->Add(new wxStaticText(body, wxID_ANY, L"Порядок запуска"), 0, wxBOTTOM, 4);
+  selected_ = new wxListCtrl(body, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                             wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES);
+  selected_->AppendColumn(L"#", wxLIST_FORMAT_LEFT, FromDIP(36));
+  selected_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(110));
+  selected_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(180));
+  right->Add(selected_, 1, wxEXPAND);
+  auto* order = new wxBoxSizer(wxHORIZONTAL);
+  auto* up = make_button(body, L"Вверх", BtnIcon::ArrowUp);
+  auto* down = make_button(body, L"Вниз", BtnIcon::ArrowDown);
+  order->Add(up, 0, wxRIGHT, 8);
+  order->Add(down);
+  right->Add(order, 0, wxTOP, 8);
+
+  lists->Add(left, 1, wxEXPAND);
+  lists->Add(mid, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
+  lists->Add(right, 1, wxEXPAND);
+
+  auto* hint = new wxStaticText(
+      body, wxID_ANY, L"Команды можно брать из разных папок этого VPS. Двойной клик добавляет или убирает.");
+  hint->SetName(L"muted");
+  hint->SetForegroundColour(Theme::muted());
+
+  auto* btns = new wxBoxSizer(wxHORIZONTAL);
+  btns->AddStretchSpacer();
+  auto* save = accent_button(body, L"Сохранить", BtnIcon::Save);
+  btns->Add(save, 0, wxRIGHT, 8);
+  btns->Add(make_button(body, L"Отмена", BtnIcon::Cancel, wxID_CANCEL));
+  save->SetDefault();
+
+  auto* root = new wxBoxSizer(wxVERTICAL);
+  root->Add(form, 0, wxEXPAND | wxALL, 12);
+  root->Add(hint, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  root->Add(lists, 1, wxEXPAND | wxLEFT | wxRIGHT, 12);
+  root->Add(btns, 0, wxEXPAND | wxALL, 12);
+  body->SetSizer(root);
+  auto* outer = new wxBoxSizer(wxVERTICAL);
+  outer->Add(body, 1, wxEXPAND);
+  SetSizerAndFit(outer);
+  SetMinSize(FromDIP(wxSize(640, 420)));
+  apply_dark(this);
+  rebuild_lists();
+
+  add->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { add_selected(); });
+  rem->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { remove_selected(); });
+  up->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { move_selected(-1); });
+  down->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { move_selected(1); });
+  available_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { add_selected(); });
+  selected_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { remove_selected(); });
+  save->Bind(wxEVT_BUTTON, &BundleDialog::on_ok, this);
+}
+
+std::string BundleDialog::folder_label(const Command& cmd) const {
+  if (cmd.folder_id.empty()) return "Общее";
+  if (auto* f = config_.folder_by_id(cmd.folder_id)) return f->name;
+  return "Общее";
+}
+
+void BundleDialog::rebuild_lists() {
+  std::vector<char> used(selected_ids_.size(), 0);
+  (void)used;
+  available_ids_.clear();
+  for (const auto& c : config_.commands_for(bundle_.server_id)) {
+    if (std::find(selected_ids_.begin(), selected_ids_.end(), c.id) == selected_ids_.end()) {
+      available_ids_.push_back(c.id);
+    }
+  }
+  available_->DeleteAllItems();
+  for (std::size_t i = 0; i < available_ids_.size(); ++i) {
+    auto* c = config_.command_by_id(available_ids_[i]);
+    if (!c) continue;
+    long row = available_->InsertItem(static_cast<long>(i), wxString::FromUTF8(folder_label(*c)));
+    available_->SetItem(row, 1, wxString::FromUTF8(c->name));
+  }
+  selected_->DeleteAllItems();
+  std::vector<std::string> kept;
+  for (std::size_t i = 0; i < selected_ids_.size(); ++i) {
+    auto* c = config_.command_by_id(selected_ids_[i]);
+    if (!c) continue;
+    kept.push_back(c->id);
+    long row = selected_->InsertItem(selected_->GetItemCount(),
+                                     wxString::FromUTF8(std::to_string(kept.size())));
+    selected_->SetItem(row, 1, wxString::FromUTF8(folder_label(*c)));
+    selected_->SetItem(row, 2, wxString::FromUTF8(c->name));
+  }
+  selected_ids_ = std::move(kept);
+}
+
+void BundleDialog::add_selected() {
+  long i = available_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (i < 0 || i >= static_cast<long>(available_ids_.size())) return;
+  selected_ids_.push_back(available_ids_[static_cast<std::size_t>(i)]);
+  rebuild_lists();
+  if (selected_->GetItemCount() > 0) {
+    long last = selected_->GetItemCount() - 1;
+    selected_->SetItemState(last, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
+                            wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+  }
+}
+
+void BundleDialog::remove_selected() {
+  long i = selected_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (i < 0 || i >= static_cast<long>(selected_ids_.size())) return;
+  selected_ids_.erase(selected_ids_.begin() + i);
+  rebuild_lists();
+}
+
+void BundleDialog::move_selected(int delta) {
+  long i = selected_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (i < 0) return;
+  int n = static_cast<int>(selected_ids_.size());
+  int to = static_cast<int>(i) + delta;
+  if (to < 0 || to >= n) return;
+  std::swap(selected_ids_[static_cast<std::size_t>(i)], selected_ids_[static_cast<std::size_t>(to)]);
+  rebuild_lists();
+  selected_->SetItemState(to, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
+                          wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+}
+
+void BundleDialog::on_ok(wxCommandEvent&) {
+  auto name = trim(std::string(name_->GetValue().utf8_string()));
+  if (name.empty()) {
+    wxMessageBox(L"Укажите название связки.", L"Связка", wxOK | wxICON_WARNING, this);
+    return;
+  }
+  if (selected_ids_.empty()) {
+    wxMessageBox(L"Добавьте хотя бы одну команду.", L"Связка", wxOK | wxICON_WARNING, this);
+    return;
+  }
+  int interval = bundle_.interval_sec;
+  if (!parse_int(std::string(interval_->GetValue().utf8_string()), interval) || interval < 0) {
+    wxMessageBox(L"Пауза — целое число секунд (0 и больше).", L"Связка", wxOK | wxICON_WARNING, this);
+    return;
+  }
+  result = bundle_;
+  result.name = name;
+  result.interval_sec = clamp_int(interval, 0, 3600);
+  result.command_ids = selected_ids_;
   accepted = true;
   EndModal(wxID_OK);
 }

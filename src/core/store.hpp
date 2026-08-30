@@ -54,6 +54,16 @@ struct ExtraProgram {
   static ExtraProgram make_new();
 };
 
+struct Bundle {
+  std::string id;
+  std::string name;
+  std::string server_id;
+  std::vector<std::string> command_ids;
+  int interval_sec = 5;
+
+  static Bundle make_new(const std::string& server_id);
+};
+
 struct AppSettings {
   bool confirm_before_run = true;
   bool check_updates_on_start = true;
@@ -89,6 +99,7 @@ struct Config {
   std::vector<Server> servers;
   std::vector<Command> commands;
   std::vector<Folder> folders;
+  std::vector<Bundle> bundles;
   AppSettings settings;
   VaultMeta vault;
   bool has_vault = false;
@@ -109,6 +120,11 @@ struct Config {
   void sort_commands_for(const std::string& server_id, const std::string& by);
   void sort_commands_for(const std::string& server_id, const std::string& folder_id, const std::string& by);
   void remove_folder(const std::string& folder_id);
+  std::vector<Bundle> bundles_for(const std::string& server_id) const;
+  Bundle* bundle_by_id(const std::string& id);
+  const Bundle* bundle_by_id(const std::string& id) const;
+  void drop_command_from_bundles(const std::string& command_id);
+  void drop_server_bundles(const std::string& server_id);
 };
 
 Config load_config();

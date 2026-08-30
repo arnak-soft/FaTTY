@@ -143,6 +143,32 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
         {"name", folder.name},
     });
   }
+  json bundles = json::array();
+  for (const auto& bundle : config.bundles) {
+    auto* server = config.server_by_id(bundle.server_id);
+    if (!server) continue;
+    json steps = json::array();
+    for (const auto& cid : bundle.command_ids) {
+      auto* cmd = config.command_by_id(cid);
+      if (!cmd) continue;
+      std::string folder_name;
+      if (!cmd->folder_id.empty()) {
+        if (auto* f = config.folder_by_id(cmd->folder_id)) folder_name = f->name;
+      }
+      steps.push_back({
+          {"name", cmd->name},
+          {"folder", folder_name},
+      });
+    }
+    if (steps.empty()) continue;
+    bundles.push_back({
+        {"server_name", server->name},
+        {"server_host", server->host},
+        {"name", bundle.name},
+        {"interval_sec", bundle.interval_sec},
+        {"commands", steps},
+    });
+  }
   json payload = {
       {"fatty_export", 1},
       {"app", kAppName},
@@ -152,6 +178,7 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
       {"servers", servers},
       {"commands", commands},
       {"folders", folders},
+      {"bundles", bundles},
   };
   if (include_settings) {
     payload["settings"] = portable_settings(config.settings);
@@ -255,6 +282,44 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       imported_folders.push_back(std::move(item));
     }
   }
+  struct ImpBundle {
+    std::string server_name;
+    std::string server_host;
+    Bundle bundle;
+    std::vector<std::pair<std::string, std::string>> steps;  // folder, name
+  };
+  std::vector<ImpBundle> imported_bundles;
+  json raw_bundles = data.value("bundles", json::array());
+  if (raw_bundles.is_array()) {
+    for (const auto& raw : raw_bundles) {
+      if (!raw.is_object()) continue;
+      ImpBundle item;
+      item.server_name = trim(raw.value("server_name", ""));
+      item.server_host = trim(raw.value("server_host", ""));
+      item.bundle = Bundle::make_new("");
+      item.bundle.name = trim(raw.value("name", ""));
+      item.bundle.interval_sec = clamp_int(raw.value("interval_sec", 5), 0, 3600);
+      json steps = raw.value("commands", json::array());
+      if (steps.is_array()) {
+        for (const auto& step : steps) {
+          if (step.is_string()) {
+            auto name = trim(step.get<std::string>());
+            if (!name.empty()) item.steps.emplace_back("", name);
+            continue;
+          }
+          if (!step.is_object()) continue;
+          auto name = trim(step.value("name", ""));
+          if (name.empty()) continue;
+          item.steps.emplace_back(trim(step.value("folder", step.value("folder_name", ""))), name);
+        }
+      }
+      if (item.server_name.empty() || item.server_host.empty() || item.bundle.name.empty() ||
+          item.steps.empty()) {
+        continue;
+      }
+      imported_bundles.push_back(std::move(item));
+    }
+  }
 
   auto ensure_folder = [&](const std::string& server_id, const std::string& name) -> std::string {
     auto want = to_lower(trim(name));
@@ -268,11 +333,66 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
     return id;
   };
 
+  auto resolve_bundle_steps = [&](ImpBundle& item, const std::string& server_id) {
+    item.bundle.server_id = server_id;
+    item.bundle.command_ids.clear();
+    for (const auto& [folder_name, cmd_name] : item.steps) {
+      auto folder_id = folder_name.empty() ? std::string() : ensure_folder(server_id, folder_name);
+      const Command* found = nullptr;
+      for (const auto& c : config.commands) {
+        if (c.server_id != server_id) continue;
+        if (to_lower(trim(c.name)) != to_lower(cmd_name)) continue;
+        if (c.folder_id != folder_id) continue;
+        found = &c;
+        break;
+      }
+      if (!found) {
+        for (const auto& c : config.commands) {
+          if (c.server_id == server_id && to_lower(trim(c.name)) == to_lower(cmd_name)) {
+            found = &c;
+            break;
+          }
+        }
+      }
+      if (found) item.bundle.command_ids.push_back(found->id);
+    }
+  };
+
+  auto import_bundles = [&](const std::map<std::pair<std::string, std::string>, std::string>& id_by_key,
+                            bool skip_existing) {
+    std::set<std::pair<std::string, std::string>> existing;
+    if (skip_existing) {
+      for (const auto& b : config.bundles) {
+        existing.insert({b.server_id, to_lower(trim(b.name))});
+      }
+    }
+    for (auto& item : imported_bundles) {
+      auto it = id_by_key.find(server_key(item.server_name, item.server_host));
+      if (it == id_by_key.end()) {
+        result.bundles_skipped++;
+        continue;
+      }
+      if (skip_existing && existing.count({it->second, to_lower(item.bundle.name)})) {
+        result.bundles_skipped++;
+        continue;
+      }
+      resolve_bundle_steps(item, it->second);
+      if (item.bundle.command_ids.empty()) {
+        result.bundles_skipped++;
+        continue;
+      }
+      if (skip_existing) existing.insert({it->second, to_lower(item.bundle.name)});
+      config.bundles.push_back(std::move(item.bundle));
+      result.bundles_added++;
+    }
+  };
+
   if (mode == "replace") {
     result.servers_replaced = static_cast<int>(config.servers.size());
     config.servers = imported_servers;
     config.commands.clear();
     config.folders.clear();
+    config.bundles.clear();
     std::map<std::pair<std::string, std::string>, std::string> id_by_key;
     for (const auto& s : imported_servers) {
       id_by_key[server_key(s.name, s.host)] = s.id;
@@ -292,6 +412,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       config.commands.push_back(item.cmd);
       result.commands_added++;
     }
+    import_bundles(id_by_key, false);
   } else {
     std::map<std::pair<std::string, std::string>, std::string> id_by_key;
     for (const auto& s : config.servers) {
@@ -332,6 +453,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       existing_cmds.insert(cmd_key);
       result.commands_added++;
     }
+    import_bundles(id_by_key, true);
   }
   if (import_settings && data.contains("settings") && data["settings"].is_object()) {
     apply_portable_settings(config.settings, data["settings"]);
@@ -353,6 +475,12 @@ std::string format_import_summary(const ImportResult& result, const std::string&
   ss << "Команд добавлено: " << result.commands_added;
   if (result.commands_skipped) {
     ss << "\nКоманд пропущено: " << result.commands_skipped;
+  }
+  if (result.bundles_added || result.bundles_skipped) {
+    ss << "\nСвязок добавлено: " << result.bundles_added;
+    if (result.bundles_skipped) {
+      ss << "\nСвязок пропущено: " << result.bundles_skipped;
+    }
   }
   if (result.settings_applied) {
     ss << "\nНастройки приложения импортированы.";

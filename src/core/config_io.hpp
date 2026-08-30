@@ -15,6 +15,8 @@ struct ImportResult {
   int servers_replaced = 0;
   int commands_added = 0;
   int commands_skipped = 0;
+  int bundles_added = 0;
+  int bundles_skipped = 0;
   bool settings_applied = false;
 };
 

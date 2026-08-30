@@ -45,6 +45,13 @@ ExtraProgram ExtraProgram::make_new() {
   return p;
 }
 
+Bundle Bundle::make_new(const std::string& server_id) {
+  Bundle b;
+  b.id = new_uuid();
+  b.server_id = server_id;
+  return b;
+}
+
 Command Command::duplicate(const std::string& new_name, const std::string& new_server_id) const {
   Command c = *this;
   c.id = new_uuid();
@@ -238,6 +245,42 @@ void Config::remove_folder(const std::string& folder_id) {
                 folders.end());
 }
 
+std::vector<Bundle> Config::bundles_for(const std::string& server_id) const {
+  std::vector<Bundle> out;
+  for (const auto& b : bundles) {
+    if (b.server_id == server_id) out.push_back(b);
+  }
+  return out;
+}
+
+Bundle* Config::bundle_by_id(const std::string& id) {
+  for (auto& b : bundles) {
+    if (b.id == id) return &b;
+  }
+  return nullptr;
+}
+
+const Bundle* Config::bundle_by_id(const std::string& id) const {
+  for (const auto& b : bundles) {
+    if (b.id == id) return &b;
+  }
+  return nullptr;
+}
+
+void Config::drop_command_from_bundles(const std::string& command_id) {
+  if (command_id.empty()) return;
+  for (auto& b : bundles) {
+    b.command_ids.erase(std::remove(b.command_ids.begin(), b.command_ids.end(), command_id),
+                        b.command_ids.end());
+  }
+}
+
+void Config::drop_server_bundles(const std::string& server_id) {
+  bundles.erase(std::remove_if(bundles.begin(), bundles.end(),
+                               [&](const Bundle& b) { return b.server_id == server_id; }),
+                bundles.end());
+}
+
 namespace {
 
 int json_int(const json& j, const char* key, int def, int lo, int hi) {
@@ -404,6 +447,24 @@ Config load_config() {
     if (f.name.empty() || f.server_id.empty()) continue;
     cfg.folders.push_back(std::move(f));
   }
+  for (const auto& raw : data.value("bundles", json::array())) {
+    if (!raw.is_object()) continue;
+    Bundle b;
+    b.id = raw.value("id", new_uuid());
+    if (b.id.empty()) b.id = new_uuid();
+    b.name = trim(raw.value("name", ""));
+    b.server_id = raw.value("server_id", "");
+    b.interval_sec = json_int(raw, "interval_sec", 5, 0, 3600);
+    if (raw.contains("command_ids") && raw["command_ids"].is_array()) {
+      for (const auto& id : raw["command_ids"]) {
+        if (!id.is_string()) continue;
+        auto cid = trim(id.get<std::string>());
+        if (!cid.empty()) b.command_ids.push_back(std::move(cid));
+      }
+    }
+    if (b.server_id.empty()) continue;
+    cfg.bundles.push_back(std::move(b));
+  }
   json settings_raw = data.value("settings", json::object());
   auto& st = cfg.settings;
   st.confirm_before_run = settings_raw.value("confirm_before_run", true);
@@ -523,6 +584,16 @@ void save_config(Config& config, SessionVault& vault) {
         {"id", f.id},
         {"server_id", f.server_id},
         {"name", f.name},
+    });
+  }
+  payload["bundles"] = json::array();
+  for (const auto& b : config.bundles) {
+    payload["bundles"].push_back({
+        {"id", b.id},
+        {"name", b.name},
+        {"server_id", b.server_id},
+        {"command_ids", b.command_ids},
+        {"interval_sec", b.interval_sec},
     });
   }
   json settings = {

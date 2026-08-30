@@ -55,6 +55,18 @@ void test_store() {
   expect(cfg.folders.empty(), "folder removed");
   expect(cfg.commands_for(s.id, "").size() == 2, "commands moved to general");
 
+  auto bundle = Bundle::make_new(s.id);
+  bundle.name = "deploy";
+  bundle.interval_sec = 8;
+  bundle.command_ids = {cfg.commands[0].id, cfg.commands[1].id};
+  cfg.bundles.push_back(bundle);
+  expect(cfg.bundles_for(s.id).size() == 1, "bundles_for");
+  expect(cfg.bundle_by_id(bundle.id)->command_ids.size() == 2, "bundle commands");
+  cfg.drop_command_from_bundles(cfg.commands[0].id);
+  expect(cfg.bundle_by_id(bundle.id)->command_ids.size() == 1, "pruned deleted command");
+  cfg.drop_server_bundles(s.id);
+  expect(cfg.bundles_for(s.id).empty(), "server bundles dropped");
+
   auto clone = s.duplicate(copy_name(s.name, {"alpha"}));
   expect(clone.name == "alpha (копия)", "copy name");
   expect(clone.id != s.id, "new id");
@@ -97,6 +109,18 @@ void test_store() {
   expect(cfg.settings.extra_programs.size() == 1, "extra program imported");
   expect(cfg.settings.extra_programs[0].name == "FileZilla", "extra name");
   expect(cfg.settings.extra_programs[0].args == "{sftp_url}", "extra args");
+
+  auto with_bundle = nlohmann::json::parse(
+      R"({"fatty_export":1,"app":"FaTTY","servers":[{"name":"eps","host":"7.7.7.7","username":"u"}],"commands":[{"server_name":"eps","server_host":"7.7.7.7","name":"pull","command":"git pull","folder":"app"},{"server_name":"eps","server_host":"7.7.7.7","name":"restart","command":"pm2 restart x","folder":"app"}],"folders":[{"server_name":"eps","server_host":"7.7.7.7","name":"app"}],"bundles":[{"server_name":"eps","server_host":"7.7.7.7","name":"Deploy","interval_sec":12,"commands":[{"name":"pull","folder":"app"},{"name":"restart","folder":"app"}]}]})");
+  result = import_into_config(cfg, with_bundle, "merge", false);
+  expect(result.bundles_added == 1, "import bundle");
+  bool found_bundle = false;
+  for (const auto& b : cfg.bundles) {
+    if (b.name == "Deploy" && b.interval_sec == 12 && b.command_ids.size() == 2) found_bundle = true;
+  }
+  expect(found_bundle, "imported bundle steps");
+  result = import_into_config(cfg, with_bundle, "merge", false);
+  expect(result.bundles_skipped == 1, "skip existing bundle");
 
   auto without_tools = nlohmann::json::parse(
       R"({"fatty_export":1,"app":"FaTTY","servers":[],"commands":[],"settings":{"theme":"light"}})");

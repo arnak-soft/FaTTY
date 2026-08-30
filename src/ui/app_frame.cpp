@@ -28,6 +28,7 @@
 #include <wx/filedlg.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
+#include <wx/numdlg.h>
 #include <wx/panel.h>
 #include <wx/window.h>
 #include <wx/sizer.h>
@@ -37,6 +38,7 @@
 #include <wx/wrapsizer.h>
 #include <algorithm>
 #include <chrono>
+#include <functional>
 #include <map>
 #include <thread>
 
@@ -118,6 +120,10 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       }
     }
     if (busy_ && session_) session_->cancel();
+    bundle_cancel_ = true;
+    bundle_wait_timer_.Stop();
+    bundle_active_ = false;
+    clear_run_queue();
     // Закрытие подтверждено: гасим живой-токен, чтобы фоновые задачи не трогали окно.
     alive_->store(false);
     busy_timer_.Stop();
@@ -138,13 +144,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       }
     }
     if (e.GetKeyCode() == WXK_F5) {
-      if (auto* c = selected_command()) {
-        auto* s = selected_server();
-        if (s) {
-          if (!confirm_saved_run(this, *c)) return;
-          run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
-        }
-      }
+      request_saved_runs();
       return;
     }
     if (e.GetKeyCode() == WXK_F2) {
@@ -321,7 +321,8 @@ void AppFrame::build_ui() {
   ls->Add(sact, 0);
   ls->Add(extra_tools_sizer_, 0);
   left->SetSizer(ls);
-  // Кнопки редактирования VPS/команд гасятся на время выполнения команды.
+  // Кнопки VPS и внешние программы гасятся на время SSH; список команд
+  // остаётся доступен — запуск ставит в очередь.
   busy_disable_ = {sedit, sdup, sdel, cons, putty, winscp, test, files};
   rebuild_extra_tools();
 
@@ -369,6 +370,24 @@ void AppFrame::build_ui() {
   cbtns->AddStretchSpacer();
   cbtns->Add(run_btn_, 0, wxRIGHT, gap);
   cbtns->Add(stop_btn_);
+  auto* bundles_card = new RoundedCard(right);
+  bundles_ = new StripedListCtrl(bundles_card, wxID_ANY, wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
+  bundles_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(160));
+  bundles_->AppendColumn(L"Команд", wxLIST_FORMAT_LEFT, FromDIP(70));
+  bundles_->AppendColumn(L"Пауза", wxLIST_FORMAT_LEFT, FromDIP(70));
+  auto* bundles_sz = new wxBoxSizer(wxVERTICAL);
+  bundles_sz->Add(bundles_, 1, wxEXPAND);
+  bundles_card->SetSizer(bundles_sz);
+  bundles_card->SetMinSize(FromDIP(wxSize(-1, 110)));
+  auto* bbtns = new wxWrapSizer(wxHORIZONTAL);
+  auto* badd = make_button(right, L"Добавить", BtnIcon::Plus);
+  auto* bedit = make_button(right, L"Изменить", BtnIcon::Pencil);
+  auto* bdel = make_button(right, L"Удалить", BtnIcon::Trash);
+  auto* brun = make_button(right, L"Запустить связку", BtnIcon::Play);
+  add_btn(bbtns, badd);
+  add_btn(bbtns, bedit);
+  add_btn(bbtns, bdel);
+  add_btn(bbtns, brun);
   auto* qrow = new wxBoxSizer(wxHORIZONTAL);
   qrow->Add(new wxStaticText(right, wxID_ANY, L"Разовая команда:"), 0, wxALIGN_CENTER_VERTICAL);
   quick_ = new wxTextCtrl(right, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
@@ -381,12 +400,11 @@ void AppFrame::build_ui() {
   rs->Add(folders_nb_, 1, wxEXPAND);
   rs->Add(corder, 0, wxTOP, pad);
   rs->Add(cbtns, 0);
+  rs->Add(section_label(right, L"Связки"), 0, wxTOP | wxBOTTOM, gap);
+  rs->Add(bundles_card, 0, wxEXPAND);
+  rs->Add(bbtns, 0, wxTOP, gap);
   rs->Add(qrow, 0, wxEXPAND | wxTOP, pad);
   right->SetSizer(rs);
-  for (wxWindow* b : {cadd, cedit, cdup, cdel, cmove, presets, up, down, byname, fadd, frename, fdel, qrun}) {
-    busy_disable_.push_back(b);
-  }
-  busy_disable_.push_back(quick_);
   hsplit_->SplitVertically(left, right, FromDIP(400));
   auto* ts = new wxBoxSizer(wxVERTICAL);
   ts->Add(hsplit_, 1, wxEXPAND);
@@ -436,7 +454,14 @@ void AppFrame::build_ui() {
   status_bar->SetSizer(sbs);
   status_bar->SetMinSize(wxSize(-1, FromDIP(26)));
   busy_timer_.SetOwner(this);
-  Bind(wxEVT_TIMER, [this](wxTimerEvent&) { update_busy_indicator(); });
+  bundle_wait_timer_.SetOwner(this);
+  Bind(wxEVT_TIMER, [this](wxTimerEvent& e) {
+    if (e.GetEventObject() == &bundle_wait_timer_) {
+      on_bundle_wait_tick();
+      return;
+    }
+    update_busy_indicator();
+  });
 
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(vsplit_, 1, wxEXPAND | wxALL, pad);
@@ -458,13 +483,7 @@ void AppFrame::build_ui() {
     wxCommandEvent ev(wxEVT_BUTTON);
     sedit->GetEventHandler()->ProcessEvent(ev);
   });
-  commands_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) {
-    auto* c = selected_command();
-    auto* s = selected_server();
-    if (!c || !s) return;
-    if (!confirm_saved_run(this, *c, s->name)) return;
-    run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
-  });
+  commands_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { request_saved_runs(); });
   commands_->Bind(wxEVT_LIST_COL_CLICK, [this](wxListEvent& e) {
     auto* s = selected_server();
     if (!s) return;
@@ -549,6 +568,7 @@ void AppFrame::build_ui() {
       config_.folders.push_back(nf);
     }
     config_.servers.push_back(clone);
+    std::map<std::string, std::string> cmd_map;
     for (auto& c : cmds) {
       auto d = c.duplicate("", clone.id);
       if (!c.folder_id.empty() && folder_map.count(c.folder_id)) {
@@ -557,6 +577,20 @@ void AppFrame::build_ui() {
         d.folder_id.clear();
       }
       config_.commands.push_back(d);
+      cmd_map[c.id] = d.id;
+    }
+    for (const auto& b : config_.bundles_for(s->id)) {
+      auto nb = b;
+      nb.id = new_uuid();
+      nb.server_id = clone.id;
+      std::vector<std::string> ids;
+      for (const auto& cid : b.command_ids) {
+        auto it = cmd_map.find(cid);
+        if (it != cmd_map.end()) ids.push_back(it->second);
+      }
+      if (ids.empty()) continue;
+      nb.command_ids = std::move(ids);
+      config_.bundles.push_back(std::move(nb));
     }
     persist();
     refresh_servers(clone.id);
@@ -575,6 +609,7 @@ void AppFrame::build_ui() {
     config_.folders.erase(std::remove_if(config_.folders.begin(), config_.folders.end(),
                                          [&](const Folder& x) { return x.server_id == id; }),
                           config_.folders.end());
+    config_.drop_server_bundles(id);
     persist();
     refresh_servers();
   });
@@ -794,6 +829,7 @@ void AppFrame::build_ui() {
     std::vector<std::string> ids;
     ids.reserve(sel.size());
     for (auto* c : sel) ids.push_back(c->id);
+    for (const auto& id : ids) config_.drop_command_from_bundles(id);
     config_.commands.erase(std::remove_if(config_.commands.begin(), config_.commands.end(),
                                           [&](const Command& x) {
                                             return std::find(ids.begin(), ids.end(), x.id) != ids.end();
@@ -866,16 +902,25 @@ void AppFrame::build_ui() {
     status_->SetLabel(wxString::Format(L"Добавлено команд: %d", added));
   });
   run_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* c = selected_command();
     auto* s = selected_server();
-    if (!c || !s) {
+    if (!s || selected_commands().empty()) {
       wxMessageBox(L"Выберите VPS и команду.", L"Запуск");
       return;
     }
-    if (!confirm_saved_run(this, *c, s->name)) return;
-    run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
+    request_saved_runs();
   });
   stop_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    clear_run_queue();
+    if (bundle_active_) {
+      bundle_cancel_ = true;
+      bundle_wait_timer_.Stop();
+      if (session_) {
+        session_->cancel();
+      } else {
+        finish_bundle("прервано");
+      }
+      return;
+    }
     if (session_) session_->cancel();
   });
   qrun->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
@@ -900,15 +945,63 @@ void AppFrame::build_ui() {
   });
   clear->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { output_->Clear(); });
   jbtn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { show_journal(); });
+
+  auto edit_bundle = [this](bool is_new) {
+    auto* s = selected_server();
+    if (!s) {
+      wxMessageBox(L"Сначала выберите или добавьте VPS.", L"Связка");
+      return;
+    }
+    if (config_.commands_for(s->id).empty()) {
+      wxMessageBox(L"Сначала добавьте хотя бы одну команду.", L"Связка");
+      return;
+    }
+    Bundle src;
+    wxString title = L"Новая связка";
+    if (is_new) {
+      src = Bundle::make_new(s->id);
+    } else {
+      auto* b = selected_bundle();
+      if (!b) {
+        wxMessageBox(L"Выберите связку.", L"Связка");
+        return;
+      }
+      src = *b;
+      title = wxString::FromUTF8("Связка: " + b->name);
+    }
+    BundleDialog dlg(this, src, config_, title);
+    dlg.setup_layout(&config_.settings, "bundle", true, [this] { persist(); });
+    if (dlg.ShowModal() != wxID_OK || !dlg.accepted) return;
+    if (is_new) {
+      config_.bundles.push_back(dlg.result);
+    } else if (auto* b = config_.bundle_by_id(dlg.result.id)) {
+      *b = dlg.result;
+    }
+    persist();
+    refresh_bundles();
+  };
+  badd->Bind(wxEVT_BUTTON, [edit_bundle](wxCommandEvent&) { edit_bundle(true); });
+  bedit->Bind(wxEVT_BUTTON, [edit_bundle](wxCommandEvent&) { edit_bundle(false); });
+  bdel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    auto* b = selected_bundle();
+    if (!b) return;
+    if (wxMessageBox(L"Удалить связку «" + wxString::FromUTF8(b->name) + L"»?", L"Связка", wxYES_NO, this) !=
+        wxYES)
+      return;
+    auto id = b->id;
+    config_.bundles.erase(std::remove_if(config_.bundles.begin(), config_.bundles.end(),
+                                         [&](const Bundle& x) { return x.id == id; }),
+                          config_.bundles.end());
+    persist();
+    refresh_bundles();
+  });
+  brun->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { start_bundle(); });
+  bundles_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { start_bundle(); });
 }
 
 void AppFrame::show_journal() {
   if (!journal_window_) {
     journal_window_ = new JournalWindow(this, journal_, [this](const JournalEntry& e) {
-      if (busy_) {
-        wxMessageBox(L"Дождитесь окончания текущей команды или нажмите Стоп.", L"Занято", wxOK, this);
-        return;
-      }
       auto* s = config_.server_by_id(e.server_id);
       if (!s) {
         wxMessageBox(L"VPS из этой записи больше нет в списке.", L"Журнал", wxOK | wxICON_ERROR, this);
@@ -1178,6 +1271,7 @@ void AppFrame::apply_ui_theme() {
   apply_theme(this);
   style_list(servers_);
   style_list(commands_);
+  if (bundles_) style_list(bundles_);
   if (journal_window_) apply_theme(journal_window_);
   if (help_window_) apply_theme(help_window_);
   for (auto& [id, win] : files_windows_) {
@@ -1252,6 +1346,7 @@ void AppFrame::refresh_commands() {
   auto* s = selected_server();
   if (!s) {
     update_cwd_label();
+    refresh_bundles();
     return;
   }
   auto cmds = config_.commands_for(s->id, current_folder_id());
@@ -1289,6 +1384,7 @@ void AppFrame::refresh_commands() {
                             wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
   }
   update_cwd_label();
+  refresh_bundles();
 }
 
 std::vector<std::string> AppFrame::command_column_ids() const {
@@ -1394,6 +1490,36 @@ Command* AppFrame::selected_command() {
   return sel.empty() ? nullptr : sel.front();
 }
 
+Bundle* AppFrame::selected_bundle() {
+  if (!bundles_) return nullptr;
+  auto* s = selected_server();
+  if (!s) return nullptr;
+  long row = bundles_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (row < 0) return nullptr;
+  auto list = config_.bundles_for(s->id);
+  if (row >= static_cast<long>(list.size())) return nullptr;
+  return config_.bundle_by_id(list[static_cast<std::size_t>(row)].id);
+}
+
+void AppFrame::refresh_bundles() {
+  if (!bundles_) return;
+  bundles_->DeleteAllItems();
+  auto* s = selected_server();
+  if (!s) return;
+  auto list = config_.bundles_for(s->id);
+  for (std::size_t i = 0; i < list.size(); ++i) {
+    const auto& b = list[i];
+    int n = 0;
+    for (const auto& cid : b.command_ids) {
+      if (config_.command_by_id(cid)) ++n;
+    }
+    long row = bundles_->InsertItem(static_cast<long>(i), wxString::FromUTF8(b.name));
+    bundles_->SetItem(row, 1, wxString::FromUTF8(std::to_string(n)));
+    bundles_->SetItem(row, 2, wxString::FromUTF8(std::to_string(b.interval_sec) + " с"));
+    style_list_row(bundles_, row, Theme::text());
+  }
+}
+
 void AppFrame::append_output(const std::string& text, const wxColour* colour) {
   output_->SetDefaultStyle(wxTextAttr(colour ? *colour : Theme::text()));
   output_->AppendText(wxString::FromUTF8(text));
@@ -1401,7 +1527,6 @@ void AppFrame::append_output(const std::string& text, const wxColour* colour) {
 
 void AppFrame::set_busy(bool busy) {
   busy_ = busy;
-  run_btn_->Enable(!busy);
   stop_btn_->Enable(busy);
   for (wxWindow* w : busy_disable_) {
     if (w) w->Enable(!busy);
@@ -1425,7 +1550,7 @@ void AppFrame::update_busy_indicator() {
   if (!busy_) return;
   busy_gauge_->Pulse();
   auto secs = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - run_start_).count();
-  status_->SetLabel(wxString::FromUTF8(busy_label_ + "  •  " + std::to_string(secs) + " с"));
+  status_->SetLabel(wxString::FromUTF8(busy_label_ + "  •  " + std::to_string(secs) + " с" + queue_suffix()));
 }
 
 void AppFrame::update_cwd_label() {
@@ -1445,24 +1570,69 @@ void AppFrame::update_cwd_label() {
   }
 }
 
-void AppFrame::run_command(const Server& server, const std::string& command, int timeout, bool login_shell,
-                           const std::string& title, const std::string& command_id, const std::string& kind) {
-  if (busy_) {
-    wxMessageBox(L"Дождитесь окончания текущей команды или нажмите Стоп.", L"Занято", wxOK, this);
+void AppFrame::request_saved_runs() {
+  auto* s = selected_server();
+  auto cmds = selected_commands();
+  if (!s || cmds.empty()) return;
+  for (auto* c : cmds) {
+    if (!c) continue;
+    if (!confirm_saved_run(this, *c, s->name)) continue;
+    run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
+  }
+}
+
+std::string AppFrame::queue_suffix() const {
+  if (run_queue_.empty()) return {};
+  return "  •  очередь: " + std::to_string(run_queue_.size());
+}
+
+void AppFrame::clear_run_queue() {
+  run_queue_.clear();
+}
+
+void AppFrame::pump_run_queue() {
+  if (bundle_active_) return;
+  if (run_queue_.empty()) {
+    set_busy(false);
     return;
   }
-  if (config_.settings.clear_output_before_run) output_->Clear();
+  auto job = std::move(run_queue_.front());
+  run_queue_.pop_front();
+  start_ssh_run(std::move(job.server), std::move(job.command), job.timeout, job.login_shell, std::move(job.title),
+                std::move(job.command_id), std::move(job.kind), {});
+}
+
+void AppFrame::run_command(const Server& server, const std::string& command, int timeout, bool login_shell,
+                           const std::string& title, const std::string& command_id, const std::string& kind,
+                           std::function<void(int code, std::string status)> on_done) {
+  const bool chained = static_cast<bool>(on_done);
+  if (busy_ && !chained) {
+    run_queue_.push_back({server, command, timeout, login_shell, title, command_id, kind});
+    const wxColour meta = Theme::meta();
+    append_output("В очередь: " + title + "  •  " + server.name + " (" + std::to_string(run_queue_.size()) + ")\n",
+                  &meta);
+    status_->SetLabel(wxString::FromUTF8(busy_label_ + queue_suffix()));
+    return;
+  }
+  start_ssh_run(server, command, timeout, login_shell, title, command_id, kind, std::move(on_done));
+}
+
+void AppFrame::start_ssh_run(Server server, std::string command, int timeout, bool login_shell, std::string title,
+                             std::string command_id, std::string kind,
+                             std::function<void(int code, std::string status)> on_done) {
+  const bool chained = static_cast<bool>(on_done);
+  if (config_.settings.clear_output_before_run && !chained && !busy_) output_->Clear();
   busy_label_ = "Выполняется: " + title + " → " + server.name;
-  set_busy(true);
+  if (!chained) set_busy(true);
   auto cwd = remote_cwd_[server.id];
-  status_->SetLabel(wxString::FromUTF8(busy_label_));
+  status_->SetLabel(wxString::FromUTF8(busy_label_ + queue_suffix()));
   const wxColour meta = Theme::meta();
   append_output("\n" + std::string(60, '-') + "\n", &meta);
   append_output(title + "  •  " + server.name + "\n", &meta);
   session_ = std::make_shared<SSHSession>();
   auto started = now_iso();
   auto t0 = std::chrono::steady_clock::now();
-  Server srv = server;
+  Server srv = std::move(server);
   // Поток держит собственные копии shared_ptr на сессию и журнал, а к окну
   // обращается только через живой-токен: закрытие FaTTY во время выполнения
   // больше не оставляет поток работать по разрушенному AppFrame.
@@ -1471,8 +1641,9 @@ void AppFrame::run_command(const Server& server, const std::string& command, int
   auto journal = journal_;
   auto running = worker_running_;
   running->store(true);
-  std::thread([this, alive, session, journal, running, srv, command, timeout, login_shell, title, command_id, kind, cwd,
-               started, t0] {
+  std::thread([this, alive, session, journal, running, srv, command = std::move(command), timeout, login_shell,
+               title = std::move(title), command_id = std::move(command_id), kind = std::move(kind), cwd, started, t0,
+               on_done = std::move(on_done)] {
     struct RunningGuard {
       std::shared_ptr<std::atomic<bool>> flag;
       ~RunningGuard() { flag->store(false); }
@@ -1538,16 +1709,167 @@ void AppFrame::run_command(const Server& server, const std::string& command, int
     e.error = error;
     e.output = truncated ? ("…\n" + captured) : captured;
     journal->append(e);
-    post([this, srv, title, code, status, error, new_cwd] {
+    post([this, srv, title, code, status, error, new_cwd, on_done] {
       if (!new_cwd.empty()) remote_cwd_[srv.id] = new_cwd;
       update_cwd_label();
-      set_busy(false);
       session_.reset();
+      if (on_done) {
+        on_done(code, status);
+        return;
+      }
+      if (!run_queue_.empty()) {
+        status_->SetLabel(wxString::FromUTF8(
+            "Готово  •  код " +
+            (status == "error" && code == 1 && !error.empty() ? std::string("—") : std::to_string(code)) + "  •  " +
+            title + queue_suffix()));
+        pump_run_queue();
+        return;
+      }
+      set_busy(false);
       status_->SetLabel(wxString::FromUTF8(
           "Готово  •  код " + (status == "error" && code == 1 && !error.empty() ? std::string("—") : std::to_string(code)) +
           "  •  " + title));
     });
   }).detach();
+}
+
+void AppFrame::start_bundle() {
+  auto* s = selected_server();
+  auto* b = selected_bundle();
+  if (!s || !b) {
+    wxMessageBox(L"Выберите VPS и связку.", L"Связка");
+    return;
+  }
+  std::vector<Command> cmds;
+  for (const auto& cid : b->command_ids) {
+    if (auto* c = config_.command_by_id(cid)) cmds.push_back(*c);
+  }
+  if (cmds.empty()) {
+    wxMessageBox(L"В связке нет доступных команд (их удалили?).", L"Связка");
+    return;
+  }
+  long pause = wxGetNumberFromUser(
+      L"Пауза между командами, секунд.\n0 — запускать следующую сразу после предыдущей.\nСтоп прервёт очередь.",
+      L"Интервал", L"Запуск связки", b->interval_sec, 0, 3600, this);
+  if (pause < 0) return;
+  if (pause != b->interval_sec) {
+    b->interval_sec = static_cast<int>(pause);
+    persist();
+    refresh_bundles();
+  }
+  auto msg = wxString::Format(L"Запустить связку «%s»?\n%d команд, пауза %d с.", wxString::FromUTF8(b->name),
+                              static_cast<int>(cmds.size()), static_cast<int>(pause));
+  if (wxMessageBox(msg, L"Связка", wxYES_NO, this) != wxYES) return;
+  if (busy_) {
+    for (const auto& c : cmds) {
+      run_command(*s, c.command, c.timeout_sec, c.login_shell, c.name, c.id, "command");
+    }
+    return;
+  }
+  if (config_.settings.clear_output_before_run) output_->Clear();
+  bundle_active_ = true;
+  bundle_cancel_ = false;
+  bundle_index_ = 0;
+  bundle_interval_sec_ = static_cast<int>(pause);
+  bundle_name_ = b->name;
+  bundle_server_ = *s;
+  bundle_cmds_ = std::move(cmds);
+  busy_label_ = "Связка «" + bundle_name_ + "»";
+  set_busy(true);
+  const wxColour meta = Theme::meta();
+  append_output("\n" + std::string(60, '=') + "\n", &meta);
+  append_output("Связка «" + bundle_name_ + "»  •  " + std::to_string(bundle_cmds_.size()) + " команд, пауза " +
+                    std::to_string(bundle_interval_sec_) + " с\n",
+                &meta);
+  run_bundle_step();
+}
+
+void AppFrame::run_bundle_step() {
+  if (!bundle_active_) return;
+  if (bundle_cancel_ || bundle_index_ >= static_cast<int>(bundle_cmds_.size())) {
+    finish_bundle(bundle_cancel_ ? "прервано" : "готово");
+    return;
+  }
+  const auto& c = bundle_cmds_[static_cast<std::size_t>(bundle_index_)];
+  busy_label_ = "Связка «" + bundle_name_ + "» (" + std::to_string(bundle_index_ + 1) + "/" +
+                std::to_string(bundle_cmds_.size()) + "): " + c.name;
+  status_->SetLabel(wxString::FromUTF8(busy_label_));
+  run_command(bundle_server_, c.command, c.timeout_sec, c.login_shell, c.name, c.id, "command",
+              [this](int code, std::string status) {
+                if (!bundle_active_) return;
+                if (bundle_cancel_ || status == "cancelled") {
+                  finish_bundle("прервано");
+                  return;
+                }
+                if (status != "ok") {
+                  const wxColour err = Theme::err();
+                  append_output("\nСвязка остановлена: команда завершилась с ошибкой (код " + std::to_string(code) +
+                                    ").\n",
+                                &err);
+                  finish_bundle("ошибка");
+                  return;
+                }
+                ++bundle_index_;
+                if (bundle_index_ >= static_cast<int>(bundle_cmds_.size())) {
+                  finish_bundle("готово");
+                  return;
+                }
+                schedule_bundle_wait();
+              });
+}
+
+void AppFrame::schedule_bundle_wait() {
+  if (!bundle_active_) return;
+  if (bundle_cancel_) {
+    finish_bundle("прервано");
+    return;
+  }
+  bundle_wait_left_ = bundle_interval_sec_;
+  if (bundle_wait_left_ <= 0) {
+    run_bundle_step();
+    return;
+  }
+  busy_label_ = "Связка «" + bundle_name_ + "»: пауза " + std::to_string(bundle_wait_left_) + " с до " +
+                std::to_string(bundle_index_ + 1) + "/" + std::to_string(bundle_cmds_.size());
+  status_->SetLabel(wxString::FromUTF8(busy_label_));
+  bundle_wait_timer_.Start(1000);
+}
+
+void AppFrame::on_bundle_wait_tick() {
+  if (!bundle_active_) {
+    bundle_wait_timer_.Stop();
+    return;
+  }
+  if (bundle_cancel_) {
+    bundle_wait_timer_.Stop();
+    finish_bundle("прервано");
+    return;
+  }
+  --bundle_wait_left_;
+  if (bundle_wait_left_ <= 0) {
+    bundle_wait_timer_.Stop();
+    run_bundle_step();
+    return;
+  }
+  busy_label_ = "Связка «" + bundle_name_ + "»: пауза " + std::to_string(bundle_wait_left_) + " с до " +
+                std::to_string(bundle_index_ + 1) + "/" + std::to_string(bundle_cmds_.size());
+  status_->SetLabel(wxString::FromUTF8(busy_label_));
+}
+
+void AppFrame::finish_bundle(const std::string& reason) {
+  bundle_wait_timer_.Stop();
+  bundle_active_ = false;
+  bundle_cancel_ = false;
+  bundle_cmds_.clear();
+  const wxColour meta = Theme::meta();
+  append_output("Связка «" + bundle_name_ + "»: " + reason + "\n", &meta);
+  if (!run_queue_.empty() && reason != "прервано") {
+    status_->SetLabel(wxString::FromUTF8("Связка «" + bundle_name_ + "»: " + reason + queue_suffix()));
+    pump_run_queue();
+    return;
+  }
+  set_busy(false);
+  status_->SetLabel(wxString::FromUTF8("Связка «" + bundle_name_ + "»: " + reason));
 }
 
 }  // namespace fatty

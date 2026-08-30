@@ -16,6 +16,8 @@
 #include <wx/timer.h>
 #include <atomic>
 #include <chrono>
+#include <deque>
+#include <functional>
 #include <map>
 #include <memory>
 #include <vector>
@@ -41,6 +43,7 @@ class AppFrame : public wxFrame {
   void apply_ui_theme();
   void refresh_servers(const std::string& keep_id = {});
   void refresh_commands();
+  void refresh_bundles();
   void rebuild_folder_tabs();
   void setup_command_columns();
   void setup_server_columns();
@@ -52,8 +55,22 @@ class AppFrame : public wxFrame {
   Server* selected_server();
   Command* selected_command();
   std::vector<Command*> selected_commands();
+  Bundle* selected_bundle();
   void run_command(const Server& server, const std::string& command, int timeout, bool login_shell,
-                   const std::string& title, const std::string& command_id, const std::string& kind);
+                   const std::string& title, const std::string& command_id, const std::string& kind,
+                   std::function<void(int code, std::string status)> on_done = {});
+  void request_saved_runs();
+  void start_ssh_run(Server server, std::string command, int timeout, bool login_shell, std::string title,
+                     std::string command_id, std::string kind,
+                     std::function<void(int code, std::string status)> on_done);
+  void pump_run_queue();
+  void clear_run_queue();
+  std::string queue_suffix() const;
+  void start_bundle();
+  void run_bundle_step();
+  void schedule_bundle_wait();
+  void on_bundle_wait_tick();
+  void finish_bundle(const std::string& reason);
   void append_output(const std::string& text, const wxColour* colour = nullptr);
   void set_busy(bool busy);
   void update_cwd_label();
@@ -82,6 +99,15 @@ class AppFrame : public wxFrame {
   std::string server_filter_;
   std::string busy_label_;
   std::chrono::steady_clock::time_point run_start_{};
+  bool bundle_active_ = false;
+  bool bundle_cancel_ = false;
+  int bundle_index_ = 0;
+  int bundle_interval_sec_ = 5;
+  int bundle_wait_left_ = 0;
+  std::string bundle_name_;
+  Server bundle_server_;
+  std::vector<Command> bundle_cmds_;
+  wxTimer bundle_wait_timer_;
   // Живой-токен: воркеры проверяют его перед обращением к окну через CallAfter,
   // чтобы не работать по разрушенному AppFrame.
   std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
@@ -89,12 +115,24 @@ class AppFrame : public wxFrame {
   // иначе поток может дёрнуть wxTheApp уже после разрушения приложения.
   std::shared_ptr<std::atomic<bool>> worker_running_ = std::make_shared<std::atomic<bool>>(false);
 
+  struct QueuedRun {
+    Server server;
+    std::string command;
+    int timeout = 180;
+    bool login_shell = true;
+    std::string title;
+    std::string command_id;
+    std::string kind;
+  };
+  std::deque<QueuedRun> run_queue_;
+
   wxSplitterWindow* vsplit_{};
   wxSplitterWindow* hsplit_{};
   wxTextCtrl* server_search_{};
   StripedListCtrl* servers_{};
   RoundedNotebook* folders_nb_{};
   StripedListCtrl* commands_{};
+  StripedListCtrl* bundles_{};
   std::vector<std::string> folder_tab_ids_;
   wxTextCtrl* output_{};
   wxTextCtrl* quick_{};

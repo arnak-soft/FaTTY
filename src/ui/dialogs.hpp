@@ -9,6 +9,7 @@
 #include <wx/checkbox.h>
 #include <wx/combobox.h>
 #include <wx/dialog.h>
+#include <wx/listctrl.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 
@@ -96,6 +97,29 @@ class MasterPasswordDialog : public PositionedDialog {
   wxTextCtrl* pw2_{};
   wxStaticText* error_{};
   RoundButton* continue_btn_{};
+};
+
+class BundleDialog : public PositionedDialog {
+ public:
+  BundleDialog(wxWindow* parent, const Bundle& bundle, const Config& config, const wxString& title);
+  Bundle result;
+  bool accepted = false;
+
+ private:
+  void rebuild_lists();
+  void add_selected();
+  void remove_selected();
+  void move_selected(int delta);
+  void on_ok(wxCommandEvent&);
+  std::string folder_label(const Command& cmd) const;
+  Bundle bundle_;
+  Config config_;
+  std::vector<std::string> available_ids_;
+  std::vector<std::string> selected_ids_;
+  wxTextCtrl* name_{};
+  wxTextCtrl* interval_{};
+  wxListCtrl* available_{};
+  wxListCtrl* selected_{};
 };
 
 class ChangeMasterDialog : public PositionedDialog {
