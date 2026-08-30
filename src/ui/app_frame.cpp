@@ -121,7 +121,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     }
     if (busy_ && session_) session_->cancel();
     bundle_cancel_ = true;
-    bundle_wait_timer_.Stop();
+    bundle_waiting_ = false;
     bundle_active_ = false;
     clear_run_queue();
     // Закрытие подтверждено: гасим живой-токен, чтобы фоновые задачи не трогали окно.
@@ -454,14 +454,7 @@ void AppFrame::build_ui() {
   status_bar->SetSizer(sbs);
   status_bar->SetMinSize(wxSize(-1, FromDIP(26)));
   busy_timer_.SetOwner(this);
-  bundle_wait_timer_.SetOwner(this);
-  Bind(wxEVT_TIMER, [this](wxTimerEvent& e) {
-    if (e.GetEventObject() == &bundle_wait_timer_) {
-      on_bundle_wait_tick();
-      return;
-    }
-    update_busy_indicator();
-  });
+  Bind(wxEVT_TIMER, [this](wxTimerEvent&) { update_busy_indicator(); });
 
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(vsplit_, 1, wxEXPAND | wxALL, pad);
@@ -913,7 +906,7 @@ void AppFrame::build_ui() {
     clear_run_queue();
     if (bundle_active_) {
       bundle_cancel_ = true;
-      bundle_wait_timer_.Stop();
+      bundle_waiting_ = false;
       if (session_) {
         session_->cancel();
       } else {
@@ -1548,6 +1541,24 @@ void AppFrame::set_busy(bool busy) {
 
 void AppFrame::update_busy_indicator() {
   if (!busy_) return;
+  if (bundle_waiting_) {
+    if (bundle_cancel_) {
+      bundle_waiting_ = false;
+      finish_bundle("прервано");
+      return;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (now >= bundle_wait_until_) {
+      bundle_waiting_ = false;
+      run_bundle_step();
+      return;
+    }
+    auto left_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(bundle_wait_until_ - now).count();
+    const int left_sec = static_cast<int>((left_ms + 999) / 1000);
+    busy_label_ = "Связка «" + bundle_name_ + "»: пауза " + std::to_string(std::max(1, left_sec)) + " с до " +
+                  std::to_string(bundle_index_ + 1) + "/" + std::to_string(bundle_cmds_.size());
+  }
   busy_gauge_->Pulse();
   auto secs = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - run_start_).count();
   status_->SetLabel(wxString::FromUTF8(busy_label_ + "  •  " + std::to_string(secs) + " с" + queue_suffix()));
@@ -1824,40 +1835,19 @@ void AppFrame::schedule_bundle_wait() {
     finish_bundle("прервано");
     return;
   }
-  bundle_wait_left_ = bundle_interval_sec_;
-  if (bundle_wait_left_ <= 0) {
+  if (bundle_interval_sec_ <= 0) {
     run_bundle_step();
     return;
   }
-  busy_label_ = "Связка «" + bundle_name_ + "»: пауза " + std::to_string(bundle_wait_left_) + " с до " +
+  bundle_waiting_ = true;
+  bundle_wait_until_ = std::chrono::steady_clock::now() + std::chrono::seconds(bundle_interval_sec_);
+  busy_label_ = "Связка «" + bundle_name_ + "»: пауза " + std::to_string(bundle_interval_sec_) + " с до " +
                 std::to_string(bundle_index_ + 1) + "/" + std::to_string(bundle_cmds_.size());
-  status_->SetLabel(wxString::FromUTF8(busy_label_));
-  bundle_wait_timer_.Start(1000);
-}
-
-void AppFrame::on_bundle_wait_tick() {
-  if (!bundle_active_) {
-    bundle_wait_timer_.Stop();
-    return;
-  }
-  if (bundle_cancel_) {
-    bundle_wait_timer_.Stop();
-    finish_bundle("прервано");
-    return;
-  }
-  --bundle_wait_left_;
-  if (bundle_wait_left_ <= 0) {
-    bundle_wait_timer_.Stop();
-    run_bundle_step();
-    return;
-  }
-  busy_label_ = "Связка «" + bundle_name_ + "»: пауза " + std::to_string(bundle_wait_left_) + " с до " +
-                std::to_string(bundle_index_ + 1) + "/" + std::to_string(bundle_cmds_.size());
-  status_->SetLabel(wxString::FromUTF8(busy_label_));
+  status_->SetLabel(wxString::FromUTF8(busy_label_ + queue_suffix()));
 }
 
 void AppFrame::finish_bundle(const std::string& reason) {
-  bundle_wait_timer_.Stop();
+  bundle_waiting_ = false;
   bundle_active_ = false;
   bundle_cancel_ = false;
   bundle_cmds_.clear();

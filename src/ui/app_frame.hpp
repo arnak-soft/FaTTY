@@ -69,7 +69,6 @@ class AppFrame : public wxFrame {
   void start_bundle();
   void run_bundle_step();
   void schedule_bundle_wait();
-  void on_bundle_wait_tick();
   void finish_bundle(const std::string& reason);
   void append_output(const std::string& text, const wxColour* colour = nullptr);
   void set_busy(bool busy);
@@ -101,13 +100,13 @@ class AppFrame : public wxFrame {
   std::chrono::steady_clock::time_point run_start_{};
   bool bundle_active_ = false;
   bool bundle_cancel_ = false;
+  bool bundle_waiting_ = false;
   int bundle_index_ = 0;
   int bundle_interval_sec_ = 5;
-  int bundle_wait_left_ = 0;
   std::string bundle_name_;
   Server bundle_server_;
   std::vector<Command> bundle_cmds_;
-  wxTimer bundle_wait_timer_;
+  std::chrono::steady_clock::time_point bundle_wait_until_{};
   // Живой-токен: воркеры проверяют его перед обращением к окну через CallAfter,
   // чтобы не работать по разрушенному AppFrame.
   std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
