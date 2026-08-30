@@ -156,6 +156,33 @@ void test_store() {
   result = import_into_config(cfg, with_bundle, "merge", false);
   expect(result.bundles_skipped == 1, "skip existing bundle");
 
+  auto saved = Bundle::make_new(s.id);
+  saved.name = "roundtrip";
+  saved.interval_sec = 9;
+  saved.command_ids = {"aa", "bb"};
+  nlohmann::json item = nlohmann::json::object();
+  item["id"] = saved.id;
+  item["name"] = saved.name;
+  item["server_id"] = saved.server_id;
+  item["interval_sec"] = saved.interval_sec;
+  item["command_ids"] = saved.command_ids;
+  expect(item.is_object(), "bundle json object");
+  expect(item["command_ids"].is_array() && item["command_ids"].size() == 2, "command_ids array");
+  nlohmann::json saved_payload;
+  saved_payload["bundles"] = nlohmann::json::array();
+  saved_payload["bundles"].push_back(item);
+  int loaded = 0;
+  for (const auto& raw : saved_payload.value("bundles", nlohmann::json::array())) {
+    if (!raw.is_object()) continue;
+    if (raw.value("server_id", "").empty()) continue;
+    if (raw.value("id", "") == saved.id && raw.value("name", "") == "roundtrip" &&
+        raw.value("server_id", "") == s.id && raw.value("interval_sec", 0) == 9 &&
+        raw["command_ids"].size() == 2) {
+      loaded++;
+    }
+  }
+  expect(loaded == 1, "bundle survives json roundtrip");
+
   auto without_tools = nlohmann::json::parse(
       R"({"fatty_export":1,"app":"FaTTY","servers":[],"commands":[],"settings":{"theme":"light"}})");
   result = import_into_config(cfg, without_tools, "merge", true);

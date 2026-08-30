@@ -604,13 +604,13 @@ void save_config(Config& config, SessionVault& vault) {
   }
   payload["bundles"] = json::array();
   for (const auto& b : config.bundles) {
-    payload["bundles"].push_back({
-        {"id", b.id},
-        {"name", b.name},
-        {"server_id", b.server_id},
-        {"command_ids", b.command_ids},
-        {"interval_sec", b.interval_sec},
-    });
+    json item = json::object();
+    item["id"] = b.id;
+    item["name"] = b.name;
+    item["server_id"] = b.server_id;
+    item["interval_sec"] = b.interval_sec;
+    item["command_ids"] = b.command_ids;
+    payload["bundles"].push_back(std::move(item));
   }
   json settings = {
       {"confirm_before_run", config.settings.confirm_before_run},

@@ -417,6 +417,13 @@ void AppFrame::build_ui() {
 
   right_nb->AddPage(groups_page, L"Группы");
   right_nb->AddPage(bundles_page, L"Связки");
+  right_nb->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this, right_nb, bundles_page](wxBookCtrlEvent& e) {
+    const int sel = e.GetSelection();
+    if (sel >= 0 && right_nb->GetPage(static_cast<std::size_t>(sel)) == bundles_page) {
+      refresh_bundles();
+    }
+    e.Skip();
+  });
 
   auto* qrow = new wxBoxSizer(wxHORIZONTAL);
   qrow->Add(new wxStaticText(right, wxID_ANY, L"Разовая команда:"), 0, wxALIGN_CENTER_VERTICAL);
