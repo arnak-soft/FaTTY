@@ -44,7 +44,15 @@ std::pair<std::string, std::string> wrap_remote_command(const std::string& comma
   std::string cwd = trim(cwd_in);
   if (!cwd.empty()) {
     std::string warn = "■ Нет каталога " + cwd + " — стартую из домашней";
-    lines += "\ncd " + shlex_quote(cwd) + " || printf '%s\\n' " + shlex_quote(warn);
+    std::string cd_arg;
+    if (cwd == "~") {
+      cd_arg = "~";
+    } else if (cwd.size() >= 2 && cwd[0] == '~' && cwd[1] == '/') {
+      cd_arg = "~/" + shlex_quote(cwd.substr(2));
+    } else {
+      cd_arg = shlex_quote(cwd);
+    }
+    lines += "\ncd " + cd_arg + " || printf '%s\\n' " + shlex_quote(warn);
   }
   lines += "\n" + trim(command);
   lines += "\n_fatty_st=$?";

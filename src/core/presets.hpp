@@ -11,6 +11,7 @@ struct Preset {
   int timeout_sec = 180;
   bool login_shell = true;
   std::string comment;
+  std::string working_dir;
 };
 
 inline constexpr const char* kDefaultAppDir = "/var/www/app";

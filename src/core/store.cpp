@@ -64,6 +64,14 @@ Command Command::duplicate(const std::string& new_name, const std::string& new_s
   return c;
 }
 
+std::string Command::effective_cwd(const std::string& session_cwd) const {
+  if (cd_before_run) {
+    auto dir = trim(working_dir);
+    if (!dir.empty()) return dir;
+  }
+  return session_cwd;
+}
+
 Server* Config::server_by_id(const std::string& id) {
   for (auto& s : servers) {
     if (s.id == id) {
@@ -210,6 +218,10 @@ void Config::sort_commands_for(const std::string& server_id, const std::string& 
   auto primary = [&](const Command& c) {
     if (by == "command") return to_lower(trim(c.command));
     if (by == "comment") return to_lower(trim(c.comment));
+    if (by == "folder") {
+      if (c.cd_before_run) return to_lower(trim(c.working_dir));
+      return {};
+    }
     return to_lower(trim(c.name));
   };
   std::sort(group.begin(), group.end(), [&](const Command& a, const Command& b) {
@@ -434,9 +446,11 @@ Config load_config() {
     c.server_id = raw.value("server_id", "");
     c.command = raw.value("command", "");
     c.folder_id = raw.value("folder_id", "");
+    c.working_dir = trim(raw.value("working_dir", ""));
     c.timeout_sec = raw.value("timeout_sec", 180);
     c.login_shell = raw.value("login_shell", true);
     c.confirm_before_run = raw.value("confirm_before_run", true);
+    c.cd_before_run = raw.value("cd_before_run", true);
     cfg.commands.push_back(std::move(c));
   }
   for (const auto& raw : data.value("folders", json::array())) {
@@ -573,9 +587,11 @@ void save_config(Config& config, SessionVault& vault) {
         {"server_id", c.server_id},
         {"command", c.command},
         {"folder_id", c.folder_id},
+        {"working_dir", c.working_dir},
         {"timeout_sec", c.timeout_sec},
         {"login_shell", c.login_shell},
         {"confirm_before_run", c.confirm_before_run},
+        {"cd_before_run", c.cd_before_run},
     });
   }
   payload["folders"] = json::array();

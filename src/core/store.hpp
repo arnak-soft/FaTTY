@@ -29,12 +29,16 @@ struct Command {
   std::string server_id;
   std::string folder_id;
   std::string command;
+  std::string working_dir;
   int timeout_sec = 180;
   bool login_shell = true;
   bool confirm_before_run = true;
+  bool cd_before_run = true;
 
   static Command make_new(const std::string& server_id);
   Command duplicate(const std::string& new_name = "", const std::string& new_server_id = "") const;
+  // Если галочка «переходить в папку» включена и путь задан — этот путь, иначе текущий каталог сессии.
+  std::string effective_cwd(const std::string& session_cwd) const;
 };
 
 struct Folder {

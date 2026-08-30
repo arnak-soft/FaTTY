@@ -25,6 +25,14 @@ void test_store() {
   c2.name = "a";
   c2.command = "echo a";
   expect(c1.confirm_before_run, "new command warns by default");
+  expect(c1.cd_before_run, "new command cds by default");
+  expect(c1.effective_cwd("/home") == "/home", "empty working_dir keeps session cwd");
+  c1.working_dir = "/var/www/app";
+  expect(c1.effective_cwd("/home") == "/var/www/app", "working_dir overrides session");
+  c1.cd_before_run = false;
+  expect(c1.effective_cwd("/home") == "/home", "checkbox off keeps session cwd");
+  c1.cd_before_run = true;
+  c1.working_dir.clear();
   cfg.commands.push_back(c1);
   cfg.commands.push_back(c2);
   expect(cfg.commands_for(s.id).size() == 2, "commands_for");
@@ -39,6 +47,11 @@ void test_store() {
   cfg.commands[1].comment = c1.comment;
   cfg.sort_commands_for(s.id, "comment");
   expect(cfg.commands_for(s.id)[0].comment == "alpha note", "sort by comment");
+
+  cfg.commands[0].working_dir = "zzz";
+  cfg.commands[1].working_dir = "aaa";
+  cfg.sort_commands_for(s.id, "folder");
+  expect(cfg.commands_for(s.id)[0].working_dir == "aaa", "sort by working_dir");
 
   expect(prefer_order({"a", "b", "c"}, {"c", "a"}) == std::vector<std::string>({"c", "a", "b"}),
          "prefer_order keeps leftovers");
@@ -71,8 +84,11 @@ void test_store() {
   expect(clone.name == "alpha (копия)", "copy name");
   expect(clone.id != s.id, "new id");
   cfg.commands[0].confirm_before_run = false;
+  cfg.commands[0].working_dir = "/opt/app";
   auto cmd_copy = cfg.commands[0].duplicate("copy");
   expect(!cmd_copy.confirm_before_run, "duplicate keeps confirm off");
+  expect(cmd_copy.working_dir == "/opt/app", "duplicate keeps working_dir");
+  expect(cmd_copy.cd_before_run, "duplicate keeps cd_before_run");
 
   SessionVault vault;
   vault.create("correct-horse");
@@ -100,6 +116,24 @@ void test_store() {
     if (cmd.name == "uptime" && !cmd.confirm_before_run) found_no_warn = true;
   }
   expect(found_no_warn, "imported confirm_before_run false");
+
+  auto with_dir = nlohmann::json::parse(
+      R"({"fatty_export":1,"app":"FaTTY","servers":[{"name":"zeta","host":"6.6.6.6","username":"u"}],"commands":[{"server_name":"zeta","server_host":"6.6.6.6","name":"pull","command":"git pull","working_dir":"/var/home/project1","cd_before_run":true}]})");
+  result = import_into_config(cfg, with_dir, "merge", false);
+  bool found_dir = false;
+  for (const auto& cmd : cfg.commands) {
+    if (cmd.name == "pull" && cmd.working_dir == "/var/home/project1" && cmd.cd_before_run) found_dir = true;
+  }
+  expect(found_dir, "imported working_dir");
+
+  auto no_cd = nlohmann::json::parse(
+      R"({"fatty_export":1,"app":"FaTTY","servers":[{"name":"eta","host":"5.5.5.5","username":"u"}],"commands":[{"server_name":"eta","server_host":"5.5.5.5","name":"who","command":"whoami","cd_before_run":false}]})");
+  result = import_into_config(cfg, no_cd, "merge", false);
+  bool found_no_cd = false;
+  for (const auto& cmd : cfg.commands) {
+    if (cmd.name == "who" && !cmd.cd_before_run) found_no_cd = true;
+  }
+  expect(found_no_cd, "imported cd_before_run false");
 
   auto with_tools = nlohmann::json::parse(
       R"({"fatty_export":1,"app":"FaTTY","servers":[],"commands":[],"settings":{"winscp_path":"C:\\WinSCP\\WinSCP.exe","extra_programs":[{"id":"1","name":"FileZilla","path":"C:\\fz.exe","args":"{sftp_url}"}]}})");

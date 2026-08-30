@@ -342,9 +342,9 @@ void AppFrame::build_ui() {
   auto* up = make_button(right, L"Вверх", BtnIcon::ArrowUp);
   auto* down = make_button(right, L"Вниз", BtnIcon::ArrowDown);
   auto* byname = make_button(right, L"По имени", BtnIcon::Sort);
-  auto* fadd = make_button(right, L"Папка+", BtnIcon::FolderPlus);
+  auto* fadd = make_button(right, L"Группа+", BtnIcon::FolderPlus);
   auto* frename = make_button(right, L"Переименовать", BtnIcon::Pencil);
-  auto* fdel = make_button(right, L"Удалить папку", BtnIcon::Trash);
+  auto* fdel = make_button(right, L"Удалить группу", BtnIcon::Trash);
   add_btn(corder, up);
   add_btn(corder, down);
   corder->Add(byname, 0, wxRIGHT | wxBOTTOM, FromDIP(16));
@@ -356,7 +356,7 @@ void AppFrame::build_ui() {
   auto* cedit = make_button(right, L"Изменить  (F2)", BtnIcon::Pencil);
   auto* cdup = make_button(right, L"Дублировать", BtnIcon::Copy);
   auto* cdel = make_button(right, L"Удалить", BtnIcon::Trash);
-  auto* cmove = make_button(right, L"Переместить в папку", BtnIcon::FolderMove);
+  auto* cmove = make_button(right, L"Переместить в группу", BtnIcon::FolderMove);
   auto* presets = make_button(right, L"Пресеты…", BtnIcon::List);
   stop_btn_ = make_button(right, L"Стоп", BtnIcon::Stop);
   run_btn_ = accent_button(right, L"Запустить  (F5)", BtnIcon::Play);
@@ -396,7 +396,7 @@ void AppFrame::build_ui() {
   qrow->Add(quick_, 1, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, pad);
   qrow->Add(qrun, 0, wxALIGN_CENTER_VERTICAL);
   auto* rs = new wxBoxSizer(wxVERTICAL);
-  rs->Add(section_label(right, L"Команды"), 0, wxBOTTOM, gap);
+  rs->Add(section_label(right, L"Группы"), 0, wxBOTTOM, gap);
   rs->Add(folders_nb_, 1, wxEXPAND);
   rs->Add(corder, 0, wxTOP, pad);
   rs->Add(cbtns, 0);
@@ -504,7 +504,7 @@ void AppFrame::build_ui() {
         return a.id < b.id;
       });
       config_.set_commands_for(s->id, current_folder_id(), group);
-    } else if (by == "name" || by == "command" || by == "comment") {
+    } else if (by == "name" || by == "command" || by == "comment" || by == "folder") {
       config_.sort_commands_for(s->id, current_folder_id(), by);
     } else {
       return;
@@ -716,15 +716,15 @@ void AppFrame::build_ui() {
   fadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) {
-      wxMessageBox(L"Сначала выберите VPS.", L"Папка");
+      wxMessageBox(L"Сначала выберите VPS.", L"Группа");
       return;
     }
-    auto name = wxGetTextFromUser(L"Имя папки (проект)", L"Новая папка", L"", this);
+    auto name = wxGetTextFromUser(L"Имя группы", L"Новая группа", L"", this);
     auto trimmed = trim(std::string(name.utf8_string()));
     if (trimmed.empty()) return;
     for (const auto& f : config_.folders_for(s->id)) {
       if (to_lower(f.name) == to_lower(trimmed)) {
-        wxMessageBox(L"Такая папка уже есть.", L"Папка", wxOK | wxICON_WARNING, this);
+        wxMessageBox(L"Такая группа уже есть.", L"Группа", wxOK | wxICON_WARNING, this);
         return;
       }
     }
@@ -739,10 +739,10 @@ void AppFrame::build_ui() {
     auto id = current_folder_id();
     auto* f = config_.folder_by_id(id);
     if (!f) {
-      wxMessageBox(L"Вкладку «Общее» переименовать нельзя — создайте папку.", L"Папка");
+      wxMessageBox(L"Вкладку «Общее» переименовать нельзя — создайте группу.", L"Группа");
       return;
     }
-    auto name = wxGetTextFromUser(L"Новое имя", L"Папка", wxString::FromUTF8(f->name), this);
+    auto name = wxGetTextFromUser(L"Новое имя", L"Группа", wxString::FromUTF8(f->name), this);
     auto trimmed = trim(std::string(name.utf8_string()));
     if (trimmed.empty()) return;
     f->name = trimmed;
@@ -753,14 +753,14 @@ void AppFrame::build_ui() {
   fdel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto id = current_folder_id();
     if (id.empty()) {
-      wxMessageBox(L"Вкладку «Общее» удалить нельзя.", L"Папка");
+      wxMessageBox(L"Вкладку «Общее» удалить нельзя.", L"Группа");
       return;
     }
     auto* f = config_.folder_by_id(id);
     if (!f) return;
-    if (wxMessageBox(L"Удалить папку «" + wxString::FromUTF8(f->name) +
+    if (wxMessageBox(L"Удалить группу «" + wxString::FromUTF8(f->name) +
                          L"»? Команды останутся во вкладке «Общее».",
-                     L"Папка", wxYES_NO, this) != wxYES)
+                     L"Группа", wxYES_NO, this) != wxYES)
       return;
     auto* s = selected_server();
     if (s) config_.settings.last_folder_by_server[s->id].clear();
@@ -834,7 +834,7 @@ void AppFrame::build_ui() {
   cmove->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto sel = selected_commands();
     if (sel.empty()) {
-      wxMessageBox(L"Выберите одну или несколько команд.", L"Переместить в папку");
+      wxMessageBox(L"Выберите одну или несколько команд.", L"Переместить в группу");
       return;
     }
     auto* s = selected_server();
@@ -847,7 +847,7 @@ void AppFrame::build_ui() {
       labels.Add(wxString::FromUTF8(f.name));
       ids.push_back(f.id);
     }
-    const int n = wxGetSingleChoiceIndex(L"Куда переместить выбранные команды?", L"Переместить в папку", labels, this);
+    const int n = wxGetSingleChoiceIndex(L"Куда переместить выбранные команды?", L"Переместить в группу", labels, this);
     if (n < 0 || n >= static_cast<int>(ids.size())) return;
     const std::string dest = ids[static_cast<std::size_t>(n)];
     int moved = 0;
@@ -858,7 +858,7 @@ void AppFrame::build_ui() {
       ++moved;
     }
     if (moved == 0) {
-      wxMessageBox(L"Выбранные команды уже в этой папке.", L"Переместить в папку");
+      wxMessageBox(L"Выбранные команды уже в этой группе.", L"Переместить в группу");
       return;
     }
     config_.settings.last_folder_by_server[s->id] = dest;
@@ -886,6 +886,8 @@ void AppFrame::build_ui() {
       cmd.timeout_sec = p.timeout_sec;
       cmd.login_shell = p.login_shell;
       cmd.folder_id = current_folder_id();
+      cmd.working_dir = p.working_dir;
+      cmd.cd_before_run = true;
       config_.commands.push_back(cmd);
       names.push_back(p.name);
       ++added;
@@ -1002,7 +1004,11 @@ void AppFrame::show_journal() {
       }
       if (auto* c = config_.command_by_id(e.command_id)) {
         if (!confirm_saved_run(this, *c, s->name)) return;
-      } else if (config_.settings.confirm_before_run) {
+        run_command(*s, e.command, e.timeout_sec, e.login_shell, e.title.empty() ? "журнал" : e.title, e.command_id,
+                    e.kind, {}, c->working_dir, c->cd_before_run);
+        return;
+      }
+      if (config_.settings.confirm_before_run) {
         if (wxMessageBox(L"Повторить команду из журнала?", L"Запуск", wxYES_NO, this) != wxYES) return;
       }
       run_command(*s, e.command, e.timeout_sec, e.login_shell, e.title.empty() ? "журнал" : e.title, e.command_id,
@@ -1365,7 +1371,7 @@ void AppFrame::refresh_commands() {
     fill_row(commands_, row, command_column_ids(),
              {{"name", wxString::FromUTF8(c.name)},
               {"comment", wxString::FromUTF8(comment)},
-              {"folder", wxString::FromUTF8(folder_display_name(c.folder_id))},
+              {"folder", wxString::FromUTF8(c.cd_before_run && !c.working_dir.empty() ? c.working_dir : "—")},
               {"command", wxString::FromUTF8(preview)},
               {"last", last},
               {"avg", avg}});
@@ -1401,12 +1407,6 @@ std::vector<std::string> AppFrame::server_column_ids() const {
   return prefer_order(available, it->second);
 }
 
-std::string AppFrame::folder_display_name(const std::string& folder_id) const {
-  if (folder_id.empty()) return "Общее";
-  if (auto* f = config_.folder_by_id(folder_id)) return f->name;
-  return "Общее";
-}
-
 void AppFrame::setup_server_columns() {
   if (!servers_) return;
   servers_->DeleteAllItems();
@@ -1438,7 +1438,7 @@ void AppFrame::setup_command_columns() {
     if (id == "comment") {
       commands_->AppendColumn(L"Комментарий", wxLIST_FORMAT_LEFT, FromDIP(180));
     } else if (id == "folder") {
-      commands_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(110));
+      commands_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(180));
     } else if (id == "command") {
       commands_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(320));
     } else if (id == "last") {
@@ -1588,7 +1588,8 @@ void AppFrame::request_saved_runs() {
   for (auto* c : cmds) {
     if (!c) continue;
     if (!confirm_saved_run(this, *c, s->name)) continue;
-    run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command");
+    run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command", {}, c->working_dir,
+                c->cd_before_run);
   }
 }
 
@@ -1610,32 +1611,40 @@ void AppFrame::pump_run_queue() {
   auto job = std::move(run_queue_.front());
   run_queue_.pop_front();
   start_ssh_run(std::move(job.server), std::move(job.command), job.timeout, job.login_shell, std::move(job.title),
-                std::move(job.command_id), std::move(job.kind), {});
+                std::move(job.command_id), std::move(job.kind), {}, std::move(job.working_dir), job.cd_before_run);
 }
 
 void AppFrame::run_command(const Server& server, const std::string& command, int timeout, bool login_shell,
                            const std::string& title, const std::string& command_id, const std::string& kind,
-                           std::function<void(int code, std::string status)> on_done) {
+                           std::function<void(int code, std::string status)> on_done, std::string working_dir,
+                           bool cd_before_run) {
   const bool chained = static_cast<bool>(on_done);
   if (busy_ && !chained) {
-    run_queue_.push_back({server, command, timeout, login_shell, title, command_id, kind});
+    run_queue_.push_back({server, command, timeout, login_shell, title, command_id, kind, std::move(working_dir),
+                          cd_before_run});
     const wxColour meta = Theme::meta();
     append_output("В очередь: " + title + "  •  " + server.name + " (" + std::to_string(run_queue_.size()) + ")\n",
                   &meta);
     status_->SetLabel(wxString::FromUTF8(busy_label_ + queue_suffix()));
     return;
   }
-  start_ssh_run(server, command, timeout, login_shell, title, command_id, kind, std::move(on_done));
+  start_ssh_run(server, command, timeout, login_shell, title, command_id, kind, std::move(on_done),
+                std::move(working_dir), cd_before_run);
 }
 
 void AppFrame::start_ssh_run(Server server, std::string command, int timeout, bool login_shell, std::string title,
                              std::string command_id, std::string kind,
-                             std::function<void(int code, std::string status)> on_done) {
+                             std::function<void(int code, std::string status)> on_done, std::string working_dir,
+                             bool cd_before_run) {
   const bool chained = static_cast<bool>(on_done);
   if (config_.settings.clear_output_before_run && !chained && !busy_) output_->Clear();
   busy_label_ = "Выполняется: " + title + " → " + server.name;
   if (!chained) set_busy(true);
-  auto cwd = remote_cwd_[server.id];
+  std::string cwd = remote_cwd_[server.id];
+  if (cd_before_run) {
+    auto dir = trim(working_dir);
+    if (!dir.empty()) cwd = dir;
+  }
   status_->SetLabel(wxString::FromUTF8(busy_label_ + queue_suffix()));
   const wxColour meta = Theme::meta();
   append_output("\n" + std::string(60, '-') + "\n", &meta);
@@ -1773,7 +1782,8 @@ void AppFrame::start_bundle() {
   if (wxMessageBox(msg, L"Связка", wxYES_NO, this) != wxYES) return;
   if (busy_) {
     for (const auto& c : cmds) {
-      run_command(*s, c.command, c.timeout_sec, c.login_shell, c.name, c.id, "command");
+      run_command(*s, c.command, c.timeout_sec, c.login_shell, c.name, c.id, "command", {}, c.working_dir,
+                  c.cd_before_run);
     }
     return;
   }
@@ -1826,7 +1836,8 @@ void AppFrame::run_bundle_step() {
                   return;
                 }
                 schedule_bundle_wait();
-              });
+              },
+              c.working_dir, c.cd_before_run);
 }
 
 void AppFrame::schedule_bundle_wait() {

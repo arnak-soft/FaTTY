@@ -66,6 +66,7 @@ class CommandDialog : public PositionedDialog {
  private:
   void on_ok(wxCommandEvent&);
   void fill_folders();
+  void sync_cd_ui();
   Command command_;
   std::vector<Server> servers_;
   std::vector<Folder> folders_;
@@ -74,6 +75,8 @@ class CommandDialog : public PositionedDialog {
   wxTextCtrl* name_{};
   wxComboBox* server_{};
   wxComboBox* folder_{};
+  wxTextCtrl* working_dir_{};
+  wxCheckBox* cd_before_{};
   wxTextCtrl* timeout_{};
   wxCheckBox* login_{};
   wxCheckBox* confirm_{};

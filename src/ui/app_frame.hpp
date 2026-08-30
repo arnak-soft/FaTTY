@@ -49,7 +49,6 @@ class AppFrame : public wxFrame {
   void setup_server_columns();
   std::vector<std::string> command_column_ids() const;
   std::vector<std::string> server_column_ids() const;
-  std::string folder_display_name(const std::string& folder_id) const;
   void attach_commands_page(int index);
   std::string current_folder_id() const;
   Server* selected_server();
@@ -58,11 +57,13 @@ class AppFrame : public wxFrame {
   Bundle* selected_bundle();
   void run_command(const Server& server, const std::string& command, int timeout, bool login_shell,
                    const std::string& title, const std::string& command_id, const std::string& kind,
-                   std::function<void(int code, std::string status)> on_done = {});
+                   std::function<void(int code, std::string status)> on_done = {},
+                   std::string working_dir = {}, bool cd_before_run = false);
   void request_saved_runs();
   void start_ssh_run(Server server, std::string command, int timeout, bool login_shell, std::string title,
                      std::string command_id, std::string kind,
-                     std::function<void(int code, std::string status)> on_done);
+                     std::function<void(int code, std::string status)> on_done, std::string working_dir,
+                     bool cd_before_run);
   void pump_run_queue();
   void clear_run_queue();
   std::string queue_suffix() const;
@@ -122,6 +123,8 @@ class AppFrame : public wxFrame {
     std::string title;
     std::string command_id;
     std::string kind;
+    std::string working_dir;
+    bool cd_before_run = false;
   };
   std::deque<QueuedRun> run_queue_;
 

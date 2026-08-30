@@ -266,9 +266,9 @@ void PresetDialog::on_ok(wxCommandEvent&) {
 
 CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std::vector<Server>& servers,
                              const std::vector<Folder>& folders, const wxString& title)
-    : PositionedDialog(parent, title, wxSize(640, 580)), command_(command), servers_(servers), folders_(folders) {
+    : PositionedDialog(parent, title, wxSize(640, 620)), command_(command), servers_(servers), folders_(folders) {
   auto* body = new wxPanel(this);
-  auto* form = new wxFlexGridSizer(8, 2, 6, 8);
+  auto* form = new wxFlexGridSizer(10, 2, 6, 8);
   form->AddGrowableCol(1);
   name_ = labeled_entry(body, form, L"Название", wxString::FromUTF8(command.name));
   comment_ = labeled_entry(body, form, L"Комментарий", wxString::FromUTF8(command.comment));
@@ -282,10 +282,16 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   }
   server_ = new wxComboBox(body, wxID_ANY, current, wxDefaultPosition, wxDefaultSize, names, wxCB_READONLY);
   form->Add(server_, 1, wxEXPAND);
-  form->Add(new wxStaticText(body, wxID_ANY, L"Папка"), 0, wxALIGN_CENTER_VERTICAL);
+  form->Add(new wxStaticText(body, wxID_ANY, L"Группа"), 0, wxALIGN_CENTER_VERTICAL);
   folder_ = new wxComboBox(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxArrayString(), wxCB_READONLY);
   form->Add(folder_, 1, wxEXPAND);
   fill_folders();
+  working_dir_ = labeled_entry(body, form, L"Папка", wxString::FromUTF8(command.working_dir));
+  working_dir_->SetHint(L"/var/www/app или относительный путь");
+  form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
+  cd_before_ = new wxCheckBox(body, wxID_ANY, L"Переходить в папку перед выполнением");
+  cd_before_->SetValue(command.cd_before_run);
+  form->Add(cd_before_, 1);
   timeout_ = labeled_entry(body, form, L"Таймаут, с", wxString::FromUTF8(std::to_string(command.timeout_sec)));
   form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
   login_ = new wxCheckBox(body, wxID_ANY, L"Login-shell (bash -lc) — подхватывает PATH из .bashrc");
@@ -324,12 +330,14 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   auto* outer = new wxBoxSizer(wxVERTICAL);
   outer->Add(body, 1, wxEXPAND);
   SetSizerAndFit(outer);
-  SetMinSize(FromDIP(wxSize(520, 420)));
-  if (GetSize().GetHeight() < FromDIP(420)) {
-    SetSize(GetSize().GetWidth(), FromDIP(520));
+  SetMinSize(FromDIP(wxSize(520, 460)));
+  if (GetSize().GetHeight() < FromDIP(460)) {
+    SetSize(GetSize().GetWidth(), FromDIP(560));
   }
   apply_dark(this);
+  sync_cd_ui();
   server_->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) { fill_folders(); });
+  cd_before_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { sync_cd_ui(); });
   preset_->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) {
     auto chosen = std::string(preset_->GetValue().utf8_string());
     for (const auto& p : presets_) {
@@ -339,6 +347,11 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
         timeout_->SetValue(std::to_wstring(p.timeout_sec));
         login_->SetValue(p.login_shell);
         text_->SetValue(wxString::FromUTF8(p.command));
+        if (!p.working_dir.empty()) {
+          working_dir_->SetValue(wxString::FromUTF8(p.working_dir));
+          cd_before_->SetValue(true);
+        }
+        sync_cd_ui();
         break;
       }
     }
@@ -369,6 +382,10 @@ void CommandDialog::fill_folders() {
   folder_->SetSelection(sel);
 }
 
+void CommandDialog::sync_cd_ui() {
+  working_dir_->Enable(cd_before_->GetValue());
+}
+
 void CommandDialog::on_ok(wxCommandEvent&) {
   auto name = trim(std::string(name_->GetValue().utf8_string()));
   auto server_name = trim(std::string(server_->GetValue().utf8_string()));
@@ -397,6 +414,8 @@ void CommandDialog::on_ok(wxCommandEvent&) {
   result.timeout_sec = timeout;
   result.login_shell = login_->GetValue();
   result.confirm_before_run = confirm_->GetValue();
+  result.cd_before_run = cd_before_->GetValue();
+  result.working_dir = trim(std::string(working_dir_->GetValue().utf8_string()));
   int fsel = folder_->GetSelection();
   if (fsel >= 0 && fsel < static_cast<int>(folder_ids_.size())) {
     result.folder_id = folder_ids_[static_cast<std::size_t>(fsel)];
@@ -419,10 +438,10 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
 
   auto* lists = new wxBoxSizer(wxHORIZONTAL);
   auto* left = new wxBoxSizer(wxVERTICAL);
-  left->Add(new wxStaticText(body, wxID_ANY, L"Доступные команды (все папки)"), 0, wxBOTTOM, 4);
+  left->Add(new wxStaticText(body, wxID_ANY, L"Доступные команды (все группы)"), 0, wxBOTTOM, 4);
   available_ = new wxListCtrl(body, wxID_ANY, wxDefaultPosition, wxDefaultSize,
                               wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES);
-  available_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(120));
+  available_->AppendColumn(L"Группа", wxLIST_FORMAT_LEFT, FromDIP(120));
   available_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(200));
   left->Add(available_, 1, wxEXPAND);
 
@@ -439,7 +458,7 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
   selected_ = new wxListCtrl(body, wxID_ANY, wxDefaultPosition, wxDefaultSize,
                              wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES);
   selected_->AppendColumn(L"#", wxLIST_FORMAT_LEFT, FromDIP(36));
-  selected_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(110));
+  selected_->AppendColumn(L"Группа", wxLIST_FORMAT_LEFT, FromDIP(110));
   selected_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(180));
   right->Add(selected_, 1, wxEXPAND);
   auto* order = new wxBoxSizer(wxHORIZONTAL);
@@ -454,7 +473,7 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
   lists->Add(right, 1, wxEXPAND);
 
   auto* hint = new wxStaticText(
-      body, wxID_ANY, L"Команды можно брать из разных папок этого VPS. Двойной клик добавляет или убирает.");
+      body, wxID_ANY, L"Команды можно брать из разных групп этого VPS. Двойной клик добавляет или убирает.");
   hint->SetName(L"muted");
   hint->SetForegroundColour(Theme::muted());
 

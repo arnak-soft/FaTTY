@@ -12,6 +12,10 @@ void test_quote() {
   auto [remote, mark] = wrap_remote_command("echo hi", "/tmp", true);
   expect(remote.rfind("bash -lc ", 0) == 0, "login shell");
   expect(mark.rfind("FATTYCWD_", 0) == 0, "mark prefix");
+  expect(remote.find("cd /tmp") != std::string::npos, "cwd in wrap");
+  auto [home, mark_home] = wrap_remote_command("echo hi", "~/proj", false);
+  expect(mark_home.rfind("FATTYCWD_", 0) == 0, "mark for tilde wrap");
+  expect(home.find("cd ~/proj") != std::string::npos, "tilde cwd unquoted prefix");
 
   std::string out;
   CwdOutputFilter filt(mark, [&](const std::string& t) { out += t; });

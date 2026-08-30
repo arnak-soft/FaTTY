@@ -8,14 +8,12 @@ std::vector<Preset> deploy_presets(std::string app, std::string branch, std::str
   if (branch.empty()) branch = kDefaultBranch;
   if (pm2.empty()) pm2 = kDefaultPm2;
   return {
-      {"Deploy", "cd " + app + " && git pull origin " + branch + " && pm2 restart " + pm2, 300, true,
-       "git pull и перезапуск pm2"},
-      {"Git pull", "cd " + app + " && git pull origin " + branch, 180, true, "подтянуть ветку без перезапуска"},
-      {"PM2 restart", "pm2 restart " + pm2, 60, true, "перезапустить процесс"},
-      {"PM2 status", "pm2 status", 30, true, "список процессов"},
-      {"PM2 logs", "pm2 logs " + pm2 + " --lines 120 --nostream", 30, true, "последние 120 строк, без follow"},
-      {"Git status", "cd " + app + " && git status -sb && echo && git log -8 --oneline", 30, true,
-       "ветка и последние коммиты"},
+      {"Deploy", "git pull origin " + branch + " && pm2 restart " + pm2, 300, true, "git pull и перезапуск pm2", app},
+      {"Git pull", "git pull origin " + branch, 180, true, "подтянуть ветку без перезапуска", app},
+      {"PM2 restart", "pm2 restart " + pm2, 60, true, "перезапустить процесс", app},
+      {"PM2 status", "pm2 status", 30, true, "список процессов", app},
+      {"PM2 logs", "pm2 logs " + pm2 + " --lines 120 --nostream", 30, true, "последние 120 строк, без follow", app},
+      {"Git status", "git status -sb && echo && git log -8 --oneline", 30, true, "ветка и последние коммиты", app},
   };
 }
 
