@@ -27,6 +27,7 @@ namespace fatty {
 class FilesWindow;
 class JournalWindow;
 class HelpWindow;
+class BundleStepsWindow;
 
 class AppFrame : public wxFrame {
  public:
@@ -68,6 +69,7 @@ class AppFrame : public wxFrame {
   void clear_run_queue();
   std::string queue_suffix() const;
   void start_bundle();
+  void open_bundle_steps();
   void run_bundle_step();
   void schedule_bundle_wait();
   void finish_bundle(const std::string& reason);
@@ -142,6 +144,7 @@ class AppFrame : public wxFrame {
   RoundButton* cwd_reset_{};
   RoundButton* run_btn_{};
   RoundButton* stop_btn_{};
+  RoundButton* bundles_stop_btn_{};
   wxGauge* busy_gauge_{};
   wxTimer busy_timer_;
   std::vector<wxWindow*> busy_disable_;
@@ -152,6 +155,7 @@ class AppFrame : public wxFrame {
   std::map<std::string, FilesWindow*> files_windows_;
   JournalWindow* journal_window_ = nullptr;
   HelpWindow* help_window_ = nullptr;
+  BundleStepsWindow* bundle_steps_window_ = nullptr;
 };
 
 }  // namespace fatty

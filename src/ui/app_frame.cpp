@@ -14,6 +14,7 @@
 #include "ui/files_window.hpp"
 #include "ui/help_window.hpp"
 #include "ui/journal_window.hpp"
+#include "ui/bundle_steps_window.hpp"
 #include "ui/layout.hpp"
 #include "ui/settings_dialog.hpp"
 #include "ui/striped_list.hpp"
@@ -326,7 +327,13 @@ void AppFrame::build_ui() {
   busy_disable_ = {sedit, sdup, sdel, cons, putty, winscp, test, files};
   rebuild_extra_tools();
 
-  folders_nb_ = new RoundedNotebook(right);
+  auto* right_nb = new RoundedNotebook(right);
+
+  auto* groups_page = new wxPanel(right_nb);
+  groups_page->SetName(L"card-page");
+  groups_page->SetBackgroundColour(Theme::elevated());
+  groups_page->SetForegroundColour(Theme::text());
+  folders_nb_ = new RoundedNotebook(groups_page);
   auto* first_page = new wxPanel(folders_nb_);
   first_page->SetName(L"card-page");
   first_page->SetBackgroundColour(Theme::elevated());
@@ -339,12 +346,12 @@ void AppFrame::build_ui() {
   folders_nb_->AddPage(first_page, L"Общее");
   folder_tab_ids_.push_back("");
   auto* corder = new wxWrapSizer(wxHORIZONTAL);
-  auto* up = make_button(right, L"Вверх", BtnIcon::ArrowUp);
-  auto* down = make_button(right, L"Вниз", BtnIcon::ArrowDown);
-  auto* byname = make_button(right, L"По имени", BtnIcon::Sort);
-  auto* fadd = make_button(right, L"Группа+", BtnIcon::FolderPlus);
-  auto* frename = make_button(right, L"Переименовать", BtnIcon::Pencil);
-  auto* fdel = make_button(right, L"Удалить группу", BtnIcon::Trash);
+  auto* up = make_button(groups_page, L"Вверх", BtnIcon::ArrowUp);
+  auto* down = make_button(groups_page, L"Вниз", BtnIcon::ArrowDown);
+  auto* byname = make_button(groups_page, L"По имени", BtnIcon::Sort);
+  auto* fadd = make_button(groups_page, L"Группа+", BtnIcon::FolderPlus);
+  auto* frename = make_button(groups_page, L"Переименовать", BtnIcon::Pencil);
+  auto* fdel = make_button(groups_page, L"Удалить группу", BtnIcon::Trash);
   add_btn(corder, up);
   add_btn(corder, down);
   corder->Add(byname, 0, wxRIGHT | wxBOTTOM, FromDIP(16));
@@ -352,14 +359,14 @@ void AppFrame::build_ui() {
   add_btn(corder, frename);
   add_btn(corder, fdel);
   auto* cbtns = new wxBoxSizer(wxHORIZONTAL);
-  auto* cadd = make_button(right, L"Добавить", BtnIcon::Plus);
-  auto* cedit = make_button(right, L"Изменить  (F2)", BtnIcon::Pencil);
-  auto* cdup = make_button(right, L"Дублировать", BtnIcon::Copy);
-  auto* cdel = make_button(right, L"Удалить", BtnIcon::Trash);
-  auto* cmove = make_button(right, L"Переместить в группу", BtnIcon::FolderMove);
-  auto* presets = make_button(right, L"Пресеты…", BtnIcon::List);
-  stop_btn_ = make_button(right, L"Стоп", BtnIcon::Stop);
-  run_btn_ = accent_button(right, L"Запустить  (F5)", BtnIcon::Play);
+  auto* cadd = make_button(groups_page, L"Добавить", BtnIcon::Plus);
+  auto* cedit = make_button(groups_page, L"Изменить  (F2)", BtnIcon::Pencil);
+  auto* cdup = make_button(groups_page, L"Дублировать", BtnIcon::Copy);
+  auto* cdel = make_button(groups_page, L"Удалить", BtnIcon::Trash);
+  auto* cmove = make_button(groups_page, L"Переместить в группу", BtnIcon::FolderMove);
+  auto* presets = make_button(groups_page, L"Пресеты…", BtnIcon::List);
+  stop_btn_ = make_button(groups_page, L"Стоп", BtnIcon::Stop);
+  run_btn_ = accent_button(groups_page, L"Запустить  (F5)", BtnIcon::Play);
   stop_btn_->Enable(false);
   cbtns->Add(cadd, 0, wxRIGHT, gap);
   cbtns->Add(cedit, 0, wxRIGHT, gap);
@@ -370,7 +377,17 @@ void AppFrame::build_ui() {
   cbtns->AddStretchSpacer();
   cbtns->Add(run_btn_, 0, wxRIGHT, gap);
   cbtns->Add(stop_btn_);
-  auto* bundles_card = new RoundedCard(right);
+  auto* gs = new wxBoxSizer(wxVERTICAL);
+  gs->Add(folders_nb_, 1, wxEXPAND);
+  gs->Add(corder, 0, wxTOP, pad);
+  gs->Add(cbtns, 0);
+  groups_page->SetSizer(gs);
+
+  auto* bundles_page = new wxPanel(right_nb);
+  bundles_page->SetName(L"card-page");
+  bundles_page->SetBackgroundColour(Theme::elevated());
+  bundles_page->SetForegroundColour(Theme::text());
+  auto* bundles_card = new RoundedCard(bundles_page);
   bundles_ = new StripedListCtrl(bundles_card, wxID_ANY, wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
   bundles_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(160));
   bundles_->AppendColumn(L"Команд", wxLIST_FORMAT_LEFT, FromDIP(70));
@@ -378,16 +395,28 @@ void AppFrame::build_ui() {
   auto* bundles_sz = new wxBoxSizer(wxVERTICAL);
   bundles_sz->Add(bundles_, 1, wxEXPAND);
   bundles_card->SetSizer(bundles_sz);
-  bundles_card->SetMinSize(FromDIP(wxSize(-1, 110)));
   auto* bbtns = new wxWrapSizer(wxHORIZONTAL);
-  auto* badd = make_button(right, L"Добавить", BtnIcon::Plus);
-  auto* bedit = make_button(right, L"Изменить", BtnIcon::Pencil);
-  auto* bdel = make_button(right, L"Удалить", BtnIcon::Trash);
-  auto* brun = make_button(right, L"Запустить связку", BtnIcon::Play);
+  auto* badd = make_button(bundles_page, L"Добавить", BtnIcon::Plus);
+  auto* bedit = make_button(bundles_page, L"Изменить", BtnIcon::Pencil);
+  auto* bsteps = make_button(bundles_page, L"По шагам", BtnIcon::List);
+  auto* bdel = make_button(bundles_page, L"Удалить", BtnIcon::Trash);
+  auto* brun = make_button(bundles_page, L"Запустить связку", BtnIcon::Play);
+  bundles_stop_btn_ = make_button(bundles_page, L"Стоп", BtnIcon::Stop);
+  bundles_stop_btn_->Enable(false);
   add_btn(bbtns, badd);
   add_btn(bbtns, bedit);
+  add_btn(bbtns, bsteps);
   add_btn(bbtns, bdel);
   add_btn(bbtns, brun);
+  add_btn(bbtns, bundles_stop_btn_);
+  auto* bs = new wxBoxSizer(wxVERTICAL);
+  bs->Add(bundles_card, 1, wxEXPAND);
+  bs->Add(bbtns, 0, wxTOP, gap);
+  bundles_page->SetSizer(bs);
+
+  right_nb->AddPage(groups_page, L"Группы");
+  right_nb->AddPage(bundles_page, L"Связки");
+
   auto* qrow = new wxBoxSizer(wxHORIZONTAL);
   qrow->Add(new wxStaticText(right, wxID_ANY, L"Разовая команда:"), 0, wxALIGN_CENTER_VERTICAL);
   quick_ = new wxTextCtrl(right, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
@@ -396,13 +425,7 @@ void AppFrame::build_ui() {
   qrow->Add(quick_, 1, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, pad);
   qrow->Add(qrun, 0, wxALIGN_CENTER_VERTICAL);
   auto* rs = new wxBoxSizer(wxVERTICAL);
-  rs->Add(section_label(right, L"Группы"), 0, wxBOTTOM, gap);
-  rs->Add(folders_nb_, 1, wxEXPAND);
-  rs->Add(corder, 0, wxTOP, pad);
-  rs->Add(cbtns, 0);
-  rs->Add(section_label(right, L"Связки"), 0, wxTOP | wxBOTTOM, gap);
-  rs->Add(bundles_card, 0, wxEXPAND);
-  rs->Add(bbtns, 0, wxTOP, gap);
+  rs->Add(right_nb, 1, wxEXPAND);
   rs->Add(qrow, 0, wxEXPAND | wxTOP, pad);
   right->SetSizer(rs);
   hsplit_->SplitVertically(left, right, FromDIP(400));
@@ -904,7 +927,7 @@ void AppFrame::build_ui() {
     }
     request_saved_runs();
   });
-  stop_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+  auto on_stop = [this](wxCommandEvent&) {
     clear_run_queue();
     if (bundle_active_) {
       bundle_cancel_ = true;
@@ -917,7 +940,9 @@ void AppFrame::build_ui() {
       return;
     }
     if (session_) session_->cancel();
-  });
+  };
+  stop_btn_->Bind(wxEVT_BUTTON, on_stop);
+  bundles_stop_btn_->Bind(wxEVT_BUTTON, on_stop);
   qrun->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* s = selected_server();
     auto cmd = trim(std::string(quick_->GetValue().utf8_string()));
@@ -977,6 +1002,7 @@ void AppFrame::build_ui() {
   };
   badd->Bind(wxEVT_BUTTON, [edit_bundle](wxCommandEvent&) { edit_bundle(true); });
   bedit->Bind(wxEVT_BUTTON, [edit_bundle](wxCommandEvent&) { edit_bundle(false); });
+  bsteps->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { open_bundle_steps(); });
   bdel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* b = selected_bundle();
     if (!b) return;
@@ -991,7 +1017,7 @@ void AppFrame::build_ui() {
     refresh_bundles();
   });
   brun->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { start_bundle(); });
-  bundles_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { start_bundle(); });
+  bundles_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { open_bundle_steps(); });
 }
 
 void AppFrame::show_journal() {
@@ -1273,6 +1299,7 @@ void AppFrame::apply_ui_theme() {
   if (bundles_) style_list(bundles_);
   if (journal_window_) apply_theme(journal_window_);
   if (help_window_) apply_theme(help_window_);
+  if (bundle_steps_window_) apply_theme(bundle_steps_window_);
   for (auto& [id, win] : files_windows_) {
     if (win) apply_theme(win);
   }
@@ -1521,6 +1548,7 @@ void AppFrame::append_output(const std::string& text, const wxColour* colour) {
 void AppFrame::set_busy(bool busy) {
   busy_ = busy;
   stop_btn_->Enable(busy);
+  if (bundles_stop_btn_) bundles_stop_btn_->Enable(busy);
   for (wxWindow* w : busy_disable_) {
     if (w) w->Enable(!busy);
   }
@@ -1751,6 +1779,44 @@ void AppFrame::start_ssh_run(Server server, std::string command, int timeout, bo
           "  •  " + title));
     });
   }).detach();
+}
+
+void AppFrame::open_bundle_steps() {
+  auto* s = selected_server();
+  auto* b = selected_bundle();
+  if (!s || !b) {
+    wxMessageBox(L"Выберите VPS и связку.", L"Связка");
+    return;
+  }
+  int n = 0;
+  for (const auto& cid : b->command_ids) {
+    if (config_.command_by_id(cid)) ++n;
+  }
+  if (n == 0) {
+    wxMessageBox(L"В связке нет доступных команд (их удалили?).", L"Связка");
+    return;
+  }
+  if (!bundle_steps_window_) {
+    bundle_steps_window_ = new BundleStepsWindow(this, config_, [this](const Command& cmd) {
+      auto* live = config_.command_by_id(cmd.id);
+      const Command* c = live ? live : &cmd;
+      auto* srv = config_.server_by_id(c->server_id);
+      if (!srv) {
+        wxMessageBox(L"VPS этой команды больше нет в списке.", L"Связка", wxOK | wxICON_ERROR,
+                     bundle_steps_window_ ? static_cast<wxWindow*>(bundle_steps_window_) : this);
+        return;
+      }
+      wxWindow* parent = bundle_steps_window_ ? static_cast<wxWindow*>(bundle_steps_window_) : this;
+      if (!confirm_saved_run(parent, *c, srv->name)) return;
+      run_command(*srv, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command", {}, c->working_dir,
+                  c->cd_before_run);
+    });
+    bundle_steps_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
+      bundle_steps_window_ = nullptr;
+      ev.Skip();
+    });
+  }
+  bundle_steps_window_->show_bundle(b->id);
 }
 
 void AppFrame::start_bundle() {

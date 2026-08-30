@@ -72,6 +72,7 @@ set(FATTY_UI_SOURCES
   src/ui/settings_dialog.cpp
   src/ui/files_window.cpp
   src/ui/journal_window.cpp
+  src/ui/bundle_steps_window.cpp
   src/ui/help_window.cpp
   src/ui/splash.cpp
   src/ui/app_frame.cpp

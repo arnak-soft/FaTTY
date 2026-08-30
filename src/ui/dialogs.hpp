@@ -112,6 +112,7 @@ class BundleDialog : public PositionedDialog {
   void rebuild_lists();
   void add_selected();
   void remove_selected();
+  void duplicate_selected();
   void move_selected(int delta);
   void on_ok(wxCommandEvent&);
   std::string folder_label(const Command& cmd) const;

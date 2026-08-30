@@ -464,8 +464,10 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
   auto* order = new wxBoxSizer(wxHORIZONTAL);
   auto* up = make_button(body, L"Вверх", BtnIcon::ArrowUp);
   auto* down = make_button(body, L"Вниз", BtnIcon::ArrowDown);
+  auto* dup = make_button(body, L"Копировать", BtnIcon::Copy);
   order->Add(up, 0, wxRIGHT, 8);
-  order->Add(down);
+  order->Add(down, 0, wxRIGHT, 8);
+  order->Add(dup);
   right->Add(order, 0, wxTOP, 8);
 
   lists->Add(left, 1, wxEXPAND);
@@ -473,7 +475,8 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
   lists->Add(right, 1, wxEXPAND);
 
   auto* hint = new wxStaticText(
-      body, wxID_ANY, L"Команды можно брать из разных групп этого VPS. Двойной клик добавляет или убирает.");
+      body, wxID_ANY,
+      L"Добавленная команда исчезает слева. Чтобы повторить шаг, выберите его справа и нажмите «Копировать».");
   hint->SetName(L"muted");
   hint->SetForegroundColour(Theme::muted());
 
@@ -501,6 +504,7 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
   rem->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { remove_selected(); });
   up->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { move_selected(-1); });
   down->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { move_selected(1); });
+  dup->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { duplicate_selected(); });
   available_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { add_selected(); });
   selected_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { remove_selected(); });
   save->Bind(wxEVT_BUTTON, &BundleDialog::on_ok, this);
@@ -513,8 +517,6 @@ std::string BundleDialog::folder_label(const Command& cmd) const {
 }
 
 void BundleDialog::rebuild_lists() {
-  std::vector<char> used(selected_ids_.size(), 0);
-  (void)used;
   available_ids_.clear();
   for (const auto& c : config_.commands_for(bundle_.server_id)) {
     if (std::find(selected_ids_.begin(), selected_ids_.end(), c.id) == selected_ids_.end()) {
@@ -559,6 +561,19 @@ void BundleDialog::remove_selected() {
   if (i < 0 || i >= static_cast<long>(selected_ids_.size())) return;
   selected_ids_.erase(selected_ids_.begin() + i);
   rebuild_lists();
+}
+
+void BundleDialog::duplicate_selected() {
+  long i = selected_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (i < 0 || i >= static_cast<long>(selected_ids_.size())) return;
+  auto id = selected_ids_[static_cast<std::size_t>(i)];
+  selected_ids_.insert(selected_ids_.begin() + static_cast<std::size_t>(i) + 1, id);
+  rebuild_lists();
+  long next = i + 1;
+  if (next < selected_->GetItemCount()) {
+    selected_->SetItemState(next, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
+                            wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+  }
 }
 
 void BundleDialog::move_selected(int delta) {
