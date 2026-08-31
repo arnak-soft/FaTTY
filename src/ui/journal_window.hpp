@@ -14,7 +14,8 @@ namespace fatty {
 class JournalWindow : public wxFrame {
  public:
   JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
-                std::function<void(const JournalEntry&)> on_rerun);
+                std::function<void(const JournalEntry&)> on_rerun, AppSettings* settings = nullptr,
+                std::function<void()> persist = {});
   ~JournalWindow() override;
 
  private:

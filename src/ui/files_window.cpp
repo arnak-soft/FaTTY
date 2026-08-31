@@ -1,6 +1,7 @@
 #include "ui/files_window.hpp"
 
 #include "core/util.hpp"
+#include "ui/layout.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
@@ -28,13 +29,17 @@
 
 namespace fatty {
 
-FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string start_path)
+FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string start_path, AppSettings* settings,
+                         std::function<void()> persist)
     : wxFrame(parent, wxID_ANY, wxString::FromUTF8("Файлы — " + (server.name.empty() ? server.host : server.name)),
               wxDefaultPosition, wxDefaultSize),
       server_(server),
       start_path_(std::move(start_path)) {
   set_icon(this);
+  const bool had_geometry = settings && settings->dialog_geometry.count("files");
   SetSize(FromDIP(wxSize(780, 520)));
+  setup_frame_geometry(this, settings, "files", true, std::move(persist));
+  if (!had_geometry) CentreOnParent();
   auto* panel = new wxPanel(this);
   path_ = new wxTextCtrl(panel, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
   auto* up = make_button(panel, L"Вверх", BtnIcon::ArrowUp);

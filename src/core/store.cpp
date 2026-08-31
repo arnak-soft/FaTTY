@@ -517,6 +517,7 @@ Config load_config() {
   st.default_command_timeout = json_int(settings_raw, "default_command_timeout", 180, 1, 86400);
   st.journal_max_entries = json_int(settings_raw, "journal_max_entries", 5000, 100, 50000);
   st.clear_output_before_run = settings_raw.value("clear_output_before_run", false);
+  st.advance_command_after_run = settings_raw.value("advance_command_after_run", true);
   st.allow_short_master_password = settings_raw.value("allow_short_master_password", false);
   st.master_password_max_attempts = json_int(settings_raw, "master_password_max_attempts", 5, 0, 100);
   st.master_password_lockout_minutes = json_int(settings_raw, "master_password_lockout_minutes", 20, 1, 24 * 60);
@@ -633,6 +634,7 @@ void save_config(Config& config, SessionVault& vault) {
       {"default_command_timeout", config.settings.default_command_timeout},
       {"journal_max_entries", config.settings.journal_max_entries},
       {"clear_output_before_run", config.settings.clear_output_before_run},
+      {"advance_command_after_run", config.settings.advance_command_after_run},
       {"allow_short_master_password", config.settings.allow_short_master_password},
       {"master_password_max_attempts", config.settings.master_password_max_attempts},
       {"master_password_lockout_minutes", config.settings.master_password_lockout_minutes},

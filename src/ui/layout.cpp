@@ -91,6 +91,17 @@ void store_dialog_geometry(wxWindow* window, AppSettings& settings, const std::s
   (void)remember_size;
 }
 
+void setup_frame_geometry(wxWindow* window, AppSettings* settings, const std::string& key, bool remember_size,
+                          std::function<void()> persist) {
+  if (!settings || key.empty()) return;
+  restore_dialog_geometry(window, *settings, key, remember_size);
+  window->Bind(wxEVT_CLOSE_WINDOW, [window, settings, key, remember_size, persist = std::move(persist)](wxCloseEvent& e) {
+    store_dialog_geometry(window, *settings, key, remember_size);
+    if (persist) persist();
+    e.Skip();
+  });
+}
+
 void apply_list_columns(wxListCtrl* list, const std::map<std::string, int>& widths, const std::vector<std::string>& ids) {
   for (int i = 0; i < static_cast<int>(ids.size()); ++i) {
     auto it = widths.find(ids[static_cast<std::size_t>(i)]);

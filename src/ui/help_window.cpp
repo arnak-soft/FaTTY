@@ -3,6 +3,7 @@
 #include "core/paths.hpp"
 #include "core/presets.hpp"
 #include "core/util.hpp"
+#include "ui/layout.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
@@ -26,11 +27,15 @@ wxTextCtrl* prose(wxWindow* parent, const wxString& text) {
 
 }  // namespace
 
-HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)> on_insert_quick)
+HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)> on_insert_quick,
+                       AppSettings* settings, std::function<void()> persist)
     : wxFrame(parent, wxID_ANY, wxString(L"Справка — ") + wxString::FromUTF8(kAppName), wxDefaultPosition,
               wxDefaultSize) {
   set_icon(this);
+  const bool had_geometry = settings && settings->dialog_geometry.count("help");
   SetSize(FromDIP(wxSize(840, 600)));
+  setup_frame_geometry(this, settings, "help", true, std::move(persist));
+  if (!had_geometry) CentreOnParent();
   auto* panel = new wxPanel(this);
   nb_ = new RoundedNotebook(panel);
   auto start = wxString(

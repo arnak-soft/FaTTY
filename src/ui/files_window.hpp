@@ -3,6 +3,7 @@
 #include "core/store.hpp"
 #include "net/sftp_session.hpp"
 #include "ui/chrome.hpp"
+#include "ui/layout.hpp"
 
 #include <wx/frame.h>
 #include <wx/gauge.h>
@@ -10,6 +11,7 @@
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -18,7 +20,8 @@ namespace fatty {
 
 class FilesWindow : public wxFrame {
  public:
-  FilesWindow(wxWindow* parent, const Server& server, std::string start_path);
+  FilesWindow(wxWindow* parent, const Server& server, std::string start_path, AppSettings* settings = nullptr,
+              std::function<void()> persist = {});
   ~FilesWindow() override;
   bool is_busy() const { return busy_.load(); }
 

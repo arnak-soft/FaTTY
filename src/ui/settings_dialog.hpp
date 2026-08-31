@@ -34,6 +34,7 @@ class SettingsDialog : public PositionedDialog {
   wxCheckBox* confirm_{};
   wxCheckBox* updates_{};
   wxCheckBox* clear_output_{};
+  wxCheckBox* advance_command_{};
   wxCheckBox* show_folder_col_{};
   wxCheckBox* backup_{};
   wxChoice* theme_{};

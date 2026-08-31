@@ -8,6 +8,7 @@
 #include <wx/clipbrd.h>
 #include <wx/filedlg.h>
 #include <wx/listctrl.h>
+#include <wx/menu.h>
 #include <wx/msgdlg.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
@@ -19,12 +20,16 @@
 namespace fatty {
 
 JournalWindow::JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
-                             std::function<void(const JournalEntry&)> on_rerun)
+                             std::function<void(const JournalEntry&)> on_rerun, AppSettings* settings,
+                             std::function<void()> persist)
     : wxFrame(parent, wxID_ANY, L"Журнал команд", wxDefaultPosition, wxDefaultSize),
       journal_(std::move(journal)),
       on_rerun_(std::move(on_rerun)) {
   set_icon(this);
+  const bool had_geometry = settings && settings->dialog_geometry.count("journal");
   SetSize(FromDIP(wxSize(960, 580)));
+  setup_frame_geometry(this, settings, "journal", true, std::move(persist));
+  if (!had_geometry) CentreOnParent();
   auto* panel = new wxPanel(this);
   filter_ = new wxTextCtrl(panel, wxID_ANY);
   auto* rerun = make_button(panel, L"Повтор", BtnIcon::Repeat);
@@ -104,8 +109,21 @@ JournalWindow::JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
     detail_->Clear();
     reload();
   });
+  list_->Bind(wxEVT_LIST_ITEM_RIGHT_CLICK, [this](wxListEvent& e) {
+    list_->SetItemState(e.GetIndex(), wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
+                        wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+    wxMenu menu;
+    menu.Append(1, L"Удалить запись");
+    menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { delete_selected(); }, 1);
+    PopupMenu(&menu);
+  });
   Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
-    if (e.GetKeyCode() == WXK_DELETE && wxWindow::FindFocus() != filter_) {
+    if (e.GetKeyCode() == WXK_DELETE) {
+      auto* focus = wxWindow::FindFocus();
+      if (focus == filter_) {
+        e.Skip();
+        return;
+      }
       long i = list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
       if (i >= 0) {
         delete_selected();

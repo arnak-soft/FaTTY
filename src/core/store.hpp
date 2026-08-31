@@ -89,6 +89,7 @@ struct AppSettings {
   int default_command_timeout = 180;
   int journal_max_entries = 5000;
   bool clear_output_before_run = false;
+  bool advance_command_after_run = true;
   bool allow_short_master_password = false;
   int master_password_max_attempts = 5;
   int master_password_lockout_minutes = 20;

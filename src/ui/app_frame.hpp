@@ -61,6 +61,7 @@ class AppFrame : public wxFrame {
                    std::function<void(int code, std::string status)> on_done = {},
                    std::string working_dir = {}, bool cd_before_run = false);
   void request_saved_runs();
+  void advance_command_selection();
   void start_ssh_run(Server server, std::string command, int timeout, bool login_shell, std::string title,
                      std::string command_id, std::string kind,
                      std::function<void(int code, std::string status)> on_done, std::string working_dir,
@@ -68,7 +69,7 @@ class AppFrame : public wxFrame {
   void pump_run_queue();
   void clear_run_queue();
   std::string queue_suffix() const;
-  void start_bundle();
+  void start_bundle(const std::string& bundle_id_override = {});
   void open_bundle_steps();
   void run_bundle_step();
   void schedule_bundle_wait();

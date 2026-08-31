@@ -20,6 +20,8 @@ std::string window_geometry(wxWindow* window);
 void restore_window_geometry(wxWindow* window, const std::string& geom, bool remember_size);
 void restore_dialog_geometry(wxWindow* window, AppSettings& settings, const std::string& key, bool remember_size);
 void store_dialog_geometry(wxWindow* window, AppSettings& settings, const std::string& key, bool remember_size);
+void setup_frame_geometry(wxWindow* window, AppSettings* settings, const std::string& key, bool remember_size = true,
+                          std::function<void()> persist = {});
 void apply_list_columns(wxListCtrl* list, const std::map<std::string, int>& widths, const std::vector<std::string>& ids);
 void store_list_columns(wxListCtrl* list, AppSettings& settings, const std::string& key,
                         const std::vector<std::string>& ids);

@@ -30,8 +30,12 @@ class ExtraProgramDialog : public wxDialog {
   ExtraProgram extra;
   bool accepted = false;
 
-  ExtraProgramDialog(wxWindow* parent, ExtraProgram program)
+  ExtraProgramDialog(wxWindow* parent, ExtraProgram program, AppSettings* settings = nullptr,
+                     std::function<void()> persist = {})
       : wxDialog(parent, wxID_ANY, L"Программа", wxDefaultPosition, wxSize(520, 360)), extra(std::move(program)) {
+    const bool had_geometry = settings && settings->dialog_geometry.count("extra_program");
+    setup_frame_geometry(this, settings, "extra_program", true, std::move(persist));
+    if (!had_geometry) CentreOnParent();
     auto* body = new wxPanel(this);
     auto* grid = new wxFlexGridSizer(3, 2, 8, 8);
     grid->AddGrowableCol(1);
@@ -135,6 +139,8 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   confirm_->SetValue(st.confirm_before_run);
   clear_output_ = new wxCheckBox(general, wxID_ANY, L"Очищать панель вывода перед новым запуском");
   clear_output_->SetValue(st.clear_output_before_run);
+  advance_command_ = new wxCheckBox(general, wxID_ANY, L"Переходить к следующей команде после запуска (F5 / двойной клик)");
+  advance_command_->SetValue(st.advance_command_after_run);
   show_folder_col_ = new wxCheckBox(general, wxID_ANY, L"Показывать столбец «Папка» (рабочий каталог) в списке команд");
   show_folder_col_->SetValue(st.show_command_folder_column);
   updates_ = new wxCheckBox(general, wxID_ANY, L"Проверять обновления при запуске (не чаще раза в сутки)");
@@ -158,6 +164,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* check_now = make_button(general, L"Проверить сейчас…", BtnIcon::Refresh);
   gsz->Add(confirm_, 0, wxALL, 8);
   gsz->Add(clear_output_, 0, wxALL, 8);
+  gsz->Add(advance_command_, 0, wxALL, 8);
   gsz->Add(show_folder_col_, 0, wxALL, 8);
   gsz->Add(theme_row, 0, wxALL, 8);
   gsz->Add(trow, 0, wxALL, 8);
@@ -371,6 +378,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.confirm_before_run = confirm_->GetValue();
   config_.settings.check_updates_on_start = updates_->GetValue();
   config_.settings.clear_output_before_run = clear_output_->GetValue();
+  config_.settings.advance_command_after_run = advance_command_->GetValue();
   config_.settings.show_command_folder_column = show_folder_col_->GetValue();
   config_.settings.backup_enabled = backup_->GetValue();
   const std::string old_theme = config_.settings.theme;
@@ -408,7 +416,9 @@ void SettingsDialog::edit_extra(long index) {
   ExtraProgram program = index >= 0 && index < static_cast<long>(extra_programs_.size())
                              ? extra_programs_[static_cast<std::size_t>(index)]
                              : ExtraProgram::make_new();
-  ExtraProgramDialog dlg(this, program);
+  ExtraProgramDialog dlg(this, program, &config_.settings, [this] {
+    if (on_apply_) on_apply_();
+  });
   if (dlg.ShowModal() != wxID_OK || !dlg.accepted) return;
   if (index >= 0 && index < static_cast<long>(extra_programs_.size())) {
     extra_programs_[static_cast<std::size_t>(index)] = dlg.extra;

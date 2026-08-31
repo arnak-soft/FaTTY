@@ -650,7 +650,7 @@ void AppFrame::build_ui() {
       return;
     }
     auto start = guess_start_path(config_.commands_for(s->id));
-    auto* win = new FilesWindow(this, *s, start);
+    auto* win = new FilesWindow(this, *s, start, &config_.settings, [this] { persist(); });
     files_windows_[s->id] = win;
     win->Bind(wxEVT_CLOSE_WINDOW, [this, id = s->id](wxCloseEvent& e) {
       files_windows_.erase(id);
@@ -1047,7 +1047,7 @@ void AppFrame::show_journal() {
       }
       run_command(*s, e.command, e.timeout_sec, e.login_shell, e.title.empty() ? "журнал" : e.title, e.command_id,
                   e.kind);
-    });
+    }, &config_.settings, [this] { persist(); });
     journal_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
       journal_window_ = nullptr;
       ev.Skip();
@@ -1059,7 +1059,8 @@ void AppFrame::show_journal() {
 
 void AppFrame::show_help(const std::string& tab) {
   if (!help_window_) {
-    help_window_ = new HelpWindow(this, [this](const std::string& cmd) { quick_->SetValue(wxString::FromUTF8(cmd)); });
+    help_window_ = new HelpWindow(this, [this](const std::string& cmd) { quick_->SetValue(wxString::FromUTF8(cmd)); },
+                                &config_.settings, [this] { persist(); });
     help_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
       help_window_ = nullptr;
       ev.Skip();
@@ -1646,12 +1647,30 @@ void AppFrame::request_saved_runs() {
   auto* s = selected_server();
   auto cmds = selected_commands();
   if (!s || cmds.empty()) return;
+  int started = 0;
   for (auto* c : cmds) {
     if (!c) continue;
     if (!confirm_saved_run(this, *c, s->name)) continue;
     run_command(*s, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command", {}, c->working_dir,
                 c->cd_before_run);
+    ++started;
   }
+  if (started > 0 && config_.settings.advance_command_after_run && cmds.size() == 1) {
+    advance_command_selection();
+  }
+}
+
+void AppFrame::advance_command_selection() {
+  auto* s = selected_server();
+  if (!s) return;
+  auto cmds = config_.commands_for(s->id, current_folder_id());
+  if (cmds.size() < 2) return;
+  long cur = commands_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (cur < 0 || cur + 1 >= static_cast<long>(cmds.size())) return;
+  const long next = cur + 1;
+  commands_->SetItemState(next, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
+                          wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+  config_.settings.last_command_id = cmds[static_cast<std::size_t>(next)].id;
 }
 
 std::string AppFrame::queue_suffix() const {
@@ -1843,7 +1862,7 @@ void AppFrame::open_bundle_steps() {
       if (!confirm_saved_run(parent, *c, srv->name)) return;
       run_command(*srv, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command", {}, c->working_dir,
                   c->cd_before_run);
-    });
+    }, [this](const std::string& bundle_id) { start_bundle(bundle_id); }, &config_.settings, [this] { persist(); });
     bundle_steps_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
       bundle_steps_window_ = nullptr;
       ev.Skip();
@@ -1852,9 +1871,9 @@ void AppFrame::open_bundle_steps() {
   bundle_steps_window_->show_bundle(b->id);
 }
 
-void AppFrame::start_bundle() {
+void AppFrame::start_bundle(const std::string& bundle_id_override) {
   auto* s = selected_server();
-  auto* b = selected_bundle();
+  Bundle* b = bundle_id_override.empty() ? selected_bundle() : config_.bundle_by_id(bundle_id_override);
   if (!s || !b) {
     wxMessageBox(L"Выберите VPS и связку.", L"Связка");
     return;

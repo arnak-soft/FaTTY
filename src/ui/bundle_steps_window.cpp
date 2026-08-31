@@ -1,5 +1,6 @@
 #include "ui/bundle_steps_window.hpp"
 
+#include "ui/layout.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
@@ -18,13 +19,18 @@ wxString folder_cell(const Command& c) {
 
 }  // namespace
 
-BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config, std::function<void(const Command&)> on_run)
+BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config, std::function<void(const Command&)> on_run,
+                                     std::function<void(const std::string& bundle_id)> on_run_bundle,
+                                     AppSettings* settings, std::function<void()> persist)
     : wxFrame(parent, wxID_ANY, L"Связка — по шагам", wxDefaultPosition, wxDefaultSize),
       config_(config),
-      on_run_(std::move(on_run)) {
+      on_run_(std::move(on_run)),
+      on_run_bundle_(std::move(on_run_bundle)) {
   set_icon(this);
+  const bool had_geometry = settings && settings->dialog_geometry.count("bundle_steps");
   SetSize(FromDIP(wxSize(780, 520)));
-  CentreOnParent();
+  setup_frame_geometry(this, settings, "bundle_steps", true, std::move(persist));
+  if (!had_geometry) CentreOnParent();
   auto* panel = new wxPanel(this);
   hint_ = new wxStaticText(
       panel, wxID_ANY,
@@ -32,6 +38,7 @@ BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config, std::func
   hint_->SetName(L"muted");
   hint_->SetForegroundColour(Theme::muted());
   hint_->Wrap(FromDIP(740));
+  auto* run_bundle_btn = accent_button(panel, L"Запустить связку", BtnIcon::Play);
   auto* run = accent_button(panel, L"Запустить шаг  (F5)", BtnIcon::Play);
   auto* list_card = new RoundedCard(panel);
   list_ = new StripedListCtrl(list_card, wxID_ANY, wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
@@ -54,6 +61,7 @@ BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config, std::func
   bind_copy_on_select(detail_);
   auto* top = new wxBoxSizer(wxHORIZONTAL);
   top->Add(hint_, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
+  top->Add(run_bundle_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
   top->Add(run, 0, wxALIGN_CENTER_VERTICAL);
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(top, 0, wxEXPAND | wxALL, 8);
@@ -68,6 +76,7 @@ BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config, std::func
   style_list(list_);
   bind_escape_close(this);
 
+  run_bundle_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { run_bundle(); });
   run->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { run_selected(); });
   list_->Bind(wxEVT_LIST_ITEM_SELECTED, [this](wxListEvent&) { show_detail(); });
   list_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { run_selected(); });
@@ -136,6 +145,11 @@ void BundleStepsWindow::show_detail() {
   if (!c.comment.empty()) text += "\n\n" + c.comment;
   text += "\n\n" + c.command;
   detail_->SetValue(wxString::FromUTF8(text));
+}
+
+void BundleStepsWindow::run_bundle() {
+  if (bundle_id_.empty() || !on_run_bundle_) return;
+  on_run_bundle_(bundle_id_);
 }
 
 void BundleStepsWindow::run_selected() {
