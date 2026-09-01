@@ -174,6 +174,7 @@ add_executable(fatty_tests
   tests/test_updates.cpp
   tests/test_config_roundtrip.cpp
   tests/test_checklist.cpp
+  tests/test_smoke.cpp
 )
 target_include_directories(fatty_tests PRIVATE "${CMAKE_SOURCE_DIR}" "${CMAKE_SOURCE_DIR}/src" "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(fatty_tests PRIVATE fatty_core fatty_net)
@@ -181,8 +182,6 @@ if(MSVC)
   set_property(TARGET fatty_tests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 add_test(NAME fatty_tests COMMAND fatty_tests)
-add_test(NAME fatty_smoke COMMAND ${CMAKE_COMMAND} -E env FATTY_SMOKE_TEST=1 $<TARGET_FILE:fatty>)
-set_tests_properties(fatty_smoke PROPERTIES RUN_SERIAL TRUE)
 
 install(TARGETS fatty RUNTIME DESTINATION .)
 install(FILES "${CMAKE_BINARY_DIR}/generated/_version.txt" DESTINATION .)

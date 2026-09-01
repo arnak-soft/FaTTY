@@ -33,6 +33,17 @@
 namespace fatty {
 namespace {
 
+bool smoke_test_requested(int argc, wxChar** argv) {
+  if (const char* smoke = std::getenv("FATTY_SMOKE_TEST"); smoke && smoke[0] == '1') return true;
+  for (int i = 1; i < argc; ++i) {
+    if (wxString(argv[i]) == L"--smoke-test") return true;
+  }
+#ifdef _WIN32
+  if (wxString(GetCommandLineW()).Contains(L"--smoke-test")) return true;
+#endif
+  return false;
+}
+
 // MSWEnableDarkMode должен быть вызван до создания первого окна, т.е. до
 // полного load_config(). Читаем только тему, молча падая обратно на тёмную.
 std::string peek_theme() {
@@ -67,13 +78,10 @@ class FattyApp : public wxApp {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     SetCurrentProcessExplicitAppUserModelID(L"FaTTY");
 #endif
-    if (const char* smoke = std::getenv("FATTY_SMOKE_TEST"); smoke && smoke[0] == '1') return false;
-    for (int i = 1; i < argc; ++i) {
-      if (wxString(argv[i]) == L"--smoke-test") return false;
+    if (smoke_test_requested(argc, argv)) {
+      SetErrorExitCode(0);
+      return false;
     }
-#ifdef _WIN32
-    if (wxString(GetCommandLineW()).Contains(L"--smoke-test")) return false;
-#endif
     if (!try_become_primary()) {
       activate_existing();
       return false;

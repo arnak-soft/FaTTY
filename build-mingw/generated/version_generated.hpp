@@ -1,4 +1,4 @@
 #pragma once
 
-#define FATTY_VERSION_STRING "1.6.12-dirty"
-#define FATTY_VERSION_TUPLE 1,6,12,0
+#define FATTY_VERSION_STRING "1.6.13-dirty"
+#define FATTY_VERSION_TUPLE 1,6,13,0
