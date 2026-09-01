@@ -70,7 +70,7 @@ const std::filesystem::path& lockout_path() {
 }
 
 const std::filesystem::path& error_log_path() {
-  static const auto path = app_dir() / "error.log";
+  static const auto path = app_dir() / "fatty.log";
   return path;
 }
 

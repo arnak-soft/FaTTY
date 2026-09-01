@@ -24,6 +24,7 @@
     {
       "name": "mingw-static",
       "inherits": "base",
+      "binaryDir": "${sourceDir}/build-mingw",
       "generator": "Ninja",
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "x64-mingw-static",

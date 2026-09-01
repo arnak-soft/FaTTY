@@ -1,5 +1,6 @@
 #include "ui/bundle_steps_window.hpp"
 
+#include "core/store.hpp"
 #include "ui/layout.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
@@ -12,9 +13,8 @@
 namespace fatty {
 namespace {
 
-wxString folder_cell(const Command& c) {
-  if (c.cd_before_run && !c.working_dir.empty()) return wxString::FromUTF8(c.working_dir);
-  return L"—";
+wxString folder_cell(const Config& config, const Command& c) {
+  return wxString::FromUTF8(command_display_folder(config, c));
 }
 
 }  // namespace
@@ -118,7 +118,7 @@ void BundleStepsWindow::reload() {
     long row = list_->InsertItem(static_cast<long>(i), wxString::FromUTF8(std::to_string(i + 1)));
     list_->SetItem(row, 1, wxString::FromUTF8(c.name));
     list_->SetItem(row, 2, wxString::FromUTF8(group_label(c)));
-    list_->SetItem(row, 3, folder_cell(c));
+    list_->SetItem(row, 3, folder_cell(config_, c));
     list_->SetItem(row, 4, wxString::FromUTF8(preview));
     list_->SetItem(row, 5, wxString::FromUTF8(comment));
     style_list_row(list_, row, Theme::text());
@@ -139,8 +139,9 @@ void BundleStepsWindow::show_detail() {
   const auto& c = steps_[static_cast<std::size_t>(i)];
   std::string text = "Шаг " + std::to_string(i + 1) + " / " + std::to_string(steps_.size()) + "  •  " + c.name;
   text += "\nГруппа: " + group_label(c);
-  if (c.cd_before_run && !c.working_dir.empty()) {
-    text += "\nПапка: " + c.working_dir;
+  const auto folder = command_display_folder(config_, c);
+  if (folder != "—") {
+    text += "\nПапка: " + folder;
   }
   if (!c.comment.empty()) text += "\n\n" + c.comment;
   text += "\n\n" + c.command;
@@ -165,8 +166,8 @@ void BundleStepsWindow::run_selected() {
 }
 
 std::string BundleStepsWindow::group_label(const Command& cmd) const {
-  if (cmd.folder_id.empty()) return "Общее";
-  if (auto* f = config_.folder_by_id(cmd.folder_id)) return f->name;
+  if (cmd.group_id.empty()) return "Общее";
+  if (auto* g = config_.group_by_id(cmd.group_id)) return g->name;
   return "Общее";
 }
 

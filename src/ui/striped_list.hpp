@@ -91,6 +91,7 @@ class StripedListCtrl : public wxPanel {
 
   void emit_selected(long row);
   void emit_activated(long row);
+  void emit_right_click(long row);
   void emit_col_click(int col);
   void emit_col_end_drag(int from, int to_before);
   void MoveColumn(int from, int to_before);

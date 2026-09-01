@@ -27,6 +27,7 @@
 #endif
 
 #include <fstream>
+#include <cstdlib>
 #include <nlohmann/json.hpp>
 
 namespace fatty {
@@ -66,6 +67,13 @@ class FattyApp : public wxApp {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
     SetCurrentProcessExplicitAppUserModelID(L"FaTTY");
 #endif
+    if (const char* smoke = std::getenv("FATTY_SMOKE_TEST"); smoke && smoke[0] == '1') return false;
+    for (int i = 1; i < argc; ++i) {
+      if (wxString(argv[i]) == L"--smoke-test") return false;
+    }
+#ifdef _WIN32
+    if (wxString(GetCommandLineW()).Contains(L"--smoke-test")) return false;
+#endif
     if (!try_become_primary()) {
       activate_existing();
       return false;
@@ -85,6 +93,7 @@ class FattyApp : public wxApp {
     try {
       config = load_config();
     } catch (const std::exception& exc) {
+      log_error(std::string("load_config: ") + exc.what());
       hide_splash();
       wxMessageBox(wxString::FromUTF8(exc.what()), wxString::FromUTF8(kAppName), wxOK | wxICON_ERROR);
       install_close_timer_.Stop();

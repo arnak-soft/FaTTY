@@ -59,13 +59,13 @@ void test_store() {
          "prefer_order drops unknown");
   expect(prefer_order({"a", "b"}, {}) == std::vector<std::string>({"a", "b"}), "prefer_order empty preferred");
 
-  auto folder = Folder::make_new(s.id, "proj-a");
-  cfg.folders.push_back(folder);
-  cfg.commands[0].folder_id = folder.id;
-  expect(cfg.commands_for(s.id, folder.id).size() == 1, "folder commands");
-  expect(cfg.commands_for(s.id, "").size() == 1, "general folder");
-  cfg.remove_folder(folder.id);
-  expect(cfg.folders.empty(), "folder removed");
+  auto folder = CommandGroup::make_new(s.id, "proj-a");
+  cfg.groups.push_back(folder);
+  cfg.commands[0].group_id = folder.id;
+  expect(cfg.commands_for(s.id, folder.id).size() == 1, "group commands");
+  expect(cfg.commands_for(s.id, "").size() == 1, "general group");
+  cfg.remove_group(folder.id);
+  expect(cfg.groups.empty(), "group removed");
   expect(cfg.commands_for(s.id, "").size() == 2, "commands moved to general");
 
   auto bundle = Bundle::make_new(s.id);

@@ -1,0 +1,261 @@
+Package: vcpkg-cmake-config
+Version: 2026-07-21
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: e286f1920cf9753bbd1a90aceee67479277ffff8c47b9435bc165dfd37a29354
+Status: install ok installed
+
+Package: vcpkg-cmake
+Version: 2025-08-07
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 07a56f69a1d3684e29daba589d33b8996a1f22920d9cd3678b6a320566c2e33f
+Status: install ok installed
+
+Package: zlib
+Version: 1.3.2
+Port-Version: 2
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 521a80ecea6b76840755e832311af05717e47af8a7a4bfc711ffdfc5d179712a
+Description: A compression library
+Status: install ok installed
+
+Package: vcpkg-cmake-get-vars
+Version: 2025-05-29
+Depends: vcpkg-cmake
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 18a0ff33b83e964ae388e215678809dea871eab69d02f5575026a17519120e97
+Status: install ok installed
+
+Package: openssl
+Version: 3.6.3
+Depends: vcpkg-cmake, vcpkg-cmake-config, vcpkg-cmake-get-vars
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 5376610d22b1adbdfb1eacb301d7af710823244c93f3c64fdc08c0249d299947
+Description: OpenSSL is an open source project that provides a robust, commercial-grade, and full-featured toolkit for the Transport Layer Security (TLS) and Secure Sockets Layer (SSL) protocols. It is also a general-purpose cryptography library.
+Status: install ok installed
+
+Package: libssh2
+Version: 1.11.1
+Port-Version: 3
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 693c26dc7d74a94d1c8d54cd478ee8b877548cb5498f561ca2714d3efaae95e1
+Description: libssh2 is a client-side C library implementing the SSH2 protocol.
+Default-Features: openssl, zlib
+Status: install ok installed
+
+Package: libssh2
+Feature: openssl
+Depends: openssl
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Use the openssl crypto backend
+Status: install ok installed
+
+Package: libssh2
+Feature: zlib
+Depends: zlib
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Use compression via zlib
+Status: install ok installed
+
+Package: nlohmann-json
+Version: 3.12.0
+Port-Version: 2
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 65451dbc3b5bb1e91423f4b2ab98ca4fffd31bb19fca3e4980806914ca4231b7
+Description: JSON for Modern C++
+Status: install ok installed
+
+Package: liblzma
+Version: 5.8.3
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: a46c22d548528645808f3de23101445da95addb98f5fd32a96559df4e96e9acc
+Description: Compression library with an API similar to that of zlib.
+Status: install ok installed
+
+Package: libjpeg-turbo
+Version: 3.2.0
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: ce5c3d111fa7088c5c2d57355aef6a28946da767b9a071b1206c5e0292b02ace
+Description: libjpeg-turbo is a JPEG image codec that uses SIMD instructions (MMX, SSE2, NEON, AltiVec) to accelerate baseline JPEG compression and decompression on x86, x86-64, ARM, and PowerPC systems.
+Status: install ok installed
+
+Package: tiff
+Version: 4.7.2
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 5e66fd505f3b837509ebc393c15ccf5e208bedb0099a06d1ca674bed4b43d36a
+Description: A library that supports the manipulation of TIFF image files
+Default-Features: jpeg, lzma, zip
+Status: install ok installed
+
+Package: tiff
+Feature: jpeg
+Depends: libjpeg-turbo
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Support JPEG compression in TIFF image files
+Status: install ok installed
+
+Package: tiff
+Feature: lzma
+Depends: liblzma
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Support LZMA compression in TIFF image files
+Status: install ok installed
+
+Package: tiff
+Feature: zip
+Depends: zlib
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Support ZIP/deflate compression in TIFF image files
+Status: install ok installed
+
+Package: pcre2
+Version: 10.47
+Port-Version: 1
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 31f70c4b3f106d581d6a5f78540dc26473efc0df59c16e27587fbaa7b3f0ee68
+Description: Regular Expression pattern matching using the same syntax and semantics as Perl 5.
+Default-Features: platform-default-features
+Status: install ok installed
+
+Package: pcre2
+Feature: jit
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Enable support for Just-In-Time compiling regex matchers
+Status: install ok installed
+
+Package: pcre2
+Feature: platform-default-features
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Enable default features
+Status: install ok installed
+
+Package: egl-registry
+Version: 2025-05-27
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 39c81bd209133d6b3acdffc59c38370b9281e75d02bdbee7394a2cbbf345c7d6
+Description: EGL API and Extension Registry
+Status: install ok installed
+
+Package: opengl-registry
+Version: 2026-08-03
+Depends: egl-registry
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 5d40fcde7e8e725dc664ccaa19296434dd0b88d9570dcb7bac9b5c52a0a735eb
+Description: OpenGL, OpenGL ES, and OpenGL ES-SC API and Extension Registry
+Status: install ok installed
+
+Package: opengl
+Version: 2022-12-04
+Port-Version: 3
+Depends: opengl-registry
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: f7e4c6daa11621da2212ff46ab0634898aeb2ee1a396f902e4601c12019df6de
+Description: Open Graphics Library (OpenGL)[3][4][5] is a cross-language, cross-platform application programming interface (API) for rendering 2D and 3D vector graphics.
+Status: install ok installed
+
+Package: nanosvg
+Version: 2023-12-29
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 99b50d7d25ed2d7e8d684d3cd7497bf93a0f9d12eed1b75c09b5f3867c05036e
+Description: NanoSVG is a simple stupid single-header-file SVG parser. It is accompanied by a simple SVG rasterizer.
+Status: install ok installed
+
+Package: libwebp
+Version: 1.6.0
+Port-Version: 2
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: ef3e3998ffdfe46b5726547fdbdce6545fbe9200113fc76373ba68308529cc05
+Description: WebP codec: library to encode and decode images in WebP format
+Default-Features: libwebpmux, nearlossless, simd
+Status: install ok installed
+
+Package: libwebp
+Feature: libwebpmux
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Build the libwebpmux library
+Status: install ok installed
+
+Package: libwebp
+Feature: nearlossless
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Enable near-lossless encoding
+Status: install ok installed
+
+Package: libwebp
+Feature: simd
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Enable any SIMD optimization.
+Status: install ok installed
+
+Package: libwebp
+Feature: unicode
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Build Unicode executables. (Adds definition UNICODE and _UNICODE)
+Status: install ok installed
+
+Package: libpng
+Version: 1.6.58
+Depends: vcpkg-cmake, vcpkg-cmake-config, zlib
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: b83e1c04ddef7534a60bc8690c5b39f0510b374c31956af3696a635825b6f563
+Description: libpng is a library implementing an interface for reading and writing PNG (Portable Network Graphics) format files
+Status: install ok installed
+
+Package: expat
+Version: 2.8.3
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 3013ff69a3762e736f5fdfa9324c5399a5083eda8ca074de291c6cb8b76555b7
+Description: XML parser library written in C
+Status: install ok installed
+
+Package: wxwidgets
+Version: 3.3.3
+Port-Version: 1
+Depends: expat, libjpeg-turbo, libpng, libwebp, nanosvg, opengl, pcre2, tiff, vcpkg-cmake, vcpkg-cmake-config, zlib
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 982ae615d2429b0512f55889f8fbcf39dc72662b4f4a3ce20d679d452af6295e
+Description: Widget toolkit and tools library for creating graphical user interfaces (GUIs) for cross-platform applications.
+    Set WXWIDGETS_USE_STL in a custom triplet to build with the wxUSE_STL build option.
+    Set WXWIDGETS_USE_STD_CONTAINERS in a custom triplet to build with the wxUSE_STD_CONTAINERS build option.
+Default-Features: debug-support, sound
+Status: install ok installed
+

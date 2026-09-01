@@ -101,3 +101,74 @@ jobs:
             build/generated/_version.txt
           if-no-files-found: error
           retention-days: 14
+
+  windows-mingw:
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Install MSYS2 MinGW
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            git
+
+      - name: Install Ninja (PATH)
+        run: choco install ninja --yes --no-progress
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            third_party/vcpkg
+            !third_party/vcpkg/buildtrees
+            !third_party/vcpkg/packages
+            !third_party/vcpkg/downloads
+            build-mingw/vcpkg_installed
+            .vcpkg-cache
+          key: vcpkg-${{ runner.os }}-mingw-static-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json', 'CMakePresets.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-mingw-static-${{ env.VCPKG_COMMIT }}-
+            vcpkg-${{ runner.os }}-mingw-static-
+
+      - name: Bootstrap vcpkg
+        shell: cmd
+        run: |
+          if not exist ".vcpkg-cache" mkdir ".vcpkg-cache"
+          if not exist "third_party" mkdir "third_party"
+          if not exist "third_party\vcpkg\.git" (
+            mkdir "third_party\vcpkg" 2>nul
+            git -C "third_party\vcpkg" init
+            git -C "third_party\vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+          )
+          git -C "third_party\vcpkg" fetch --depth 1 origin %VCPKG_COMMIT%
+          if errorlevel 1 exit /b 1
+          git -C "third_party\vcpkg" checkout --force FETCH_HEAD
+          if errorlevel 1 exit /b 1
+          if not exist "third_party\vcpkg\vcpkg.exe" (
+            call "third_party\vcpkg\bootstrap-vcpkg.bat" -disableMetrics
+            if errorlevel 1 exit /b 1
+          )
+
+      - name: Configure (MinGW)
+        shell: msys2 {0}
+        run: |
+          cmake --preset mingw-static -B build-mingw
+          test -f build-mingw/CMakeCache.txt
+
+      - name: Build (MinGW)
+        shell: msys2 {0}
+        run: cmake --build build-mingw --config Release --parallel
+
+      - name: Test (MinGW)
+        shell: msys2 {0}
+        run: ctest --test-dir build-mingw --output-on-failure -C Release

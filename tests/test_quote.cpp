@@ -11,6 +11,8 @@ void test_quote() {
   expect(shlex_quote("a b").find('\'') == 0, "space quoted");
   auto [remote, mark] = wrap_remote_command("echo hi", "/tmp", true);
   expect(remote.rfind("bash -lc ", 0) == 0, "login shell");
+  auto [sh_remote, sh_mark] = wrap_remote_command("echo hi", "", false, "sh");
+  expect(sh_remote.rfind("sh -c ", 0) == 0, "sh shell");
   expect(mark.rfind("FATTYCWD_", 0) == 0, "mark prefix");
   expect(remote.find("cd /tmp") != std::string::npos, "cwd in wrap");
   auto [home, mark_home] = wrap_remote_command("echo hi", "~/proj", false);

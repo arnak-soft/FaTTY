@@ -11,6 +11,8 @@ void test_journal();
 void test_backup();
 void test_placeholders();
 void test_updates();
+void test_config_roundtrip();
+void test_checklist();
 }  // namespace fatty::test
 
 int main() {
@@ -23,6 +25,8 @@ int main() {
     test_backup();
     test_placeholders();
     test_updates();
+    test_config_roundtrip();
+    test_checklist();
   } catch (const std::exception& exc) {
     std::fprintf(stderr, "exception: %s\n", exc.what());
     return 1;

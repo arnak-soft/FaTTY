@@ -1,0 +1,15 @@
+x64-mingw-static/
+x64-mingw-static/debug/
+x64-mingw-static/debug/lib/
+x64-mingw-static/debug/lib/pkgconfig/
+x64-mingw-static/debug/lib/pkgconfig/glu.pc
+x64-mingw-static/debug/lib/pkgconfig/opengl.pc
+x64-mingw-static/lib/
+x64-mingw-static/lib/pkgconfig/
+x64-mingw-static/lib/pkgconfig/glu.pc
+x64-mingw-static/lib/pkgconfig/opengl.pc
+x64-mingw-static/share/
+x64-mingw-static/share/opengl/
+x64-mingw-static/share/opengl/usage
+x64-mingw-static/share/opengl/vcpkg.spdx.json
+x64-mingw-static/share/opengl/vcpkg_abi_info.txt

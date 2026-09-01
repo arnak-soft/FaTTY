@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <nlohmann/json.hpp>
+#include <stdexcept>
 
 namespace fatty {
 using json = nlohmann::json;
@@ -31,8 +32,8 @@ Command Command::make_new(const std::string& server_id) {
   return c;
 }
 
-Folder Folder::make_new(const std::string& server_id, const std::string& name) {
-  Folder f;
+CommandGroup CommandGroup::make_new(const std::string& server_id, const std::string& name) {
+  CommandGroup f;
   f.id = new_uuid();
   f.server_id = server_id;
   f.name = name;
@@ -64,12 +65,48 @@ Command Command::duplicate(const std::string& new_name, const std::string& new_s
   return c;
 }
 
-std::string Command::effective_cwd(const std::string& session_cwd) const {
+std::string Command::effective_cwd(const std::string& session_cwd, std::string_view group_working_dir) const {
   if (cd_before_run) {
     auto dir = trim(working_dir);
     if (!dir.empty()) return dir;
+    dir = trim(group_working_dir);
+    if (!dir.empty()) return dir;
   }
   return session_cwd;
+}
+
+std::string command_run_working_dir(const Config& config, const Command& command) {
+  auto dir = trim(command.working_dir);
+  if (!dir.empty()) return dir;
+  if (!command.group_id.empty()) {
+    if (const auto* g = config.group_by_id(command.group_id)) {
+      return trim(g->working_dir);
+    }
+  }
+  return {};
+}
+
+std::string command_display_folder(const Config& config, const Command& command) {
+  if (!command.cd_before_run) return "—";
+  auto dir = trim(command.working_dir);
+  if (!dir.empty()) return dir;
+  if (!command.group_id.empty()) {
+    if (const auto* g = config.group_by_id(command.group_id)) {
+      dir = trim(g->working_dir);
+      if (!dir.empty()) return dir;
+    }
+  }
+  return "—";
+}
+
+std::string normalize_remote_shell(std::string_view shell) {
+  if (to_lower(trim(shell)) == "sh") return "sh";
+  return "bash";
+}
+
+std::string effective_remote_shell(const Server& server, const Command& command) {
+  if (!trim(command.remote_shell).empty()) return normalize_remote_shell(command.remote_shell);
+  return normalize_remote_shell(server.remote_shell);
 }
 
 Server* Config::server_by_id(const std::string& id) {
@@ -118,19 +155,19 @@ std::vector<Command> Config::commands_for(const std::string& server_id) const {
   return out;
 }
 
-std::vector<Command> Config::commands_for(const std::string& server_id, const std::string& folder_id) const {
+std::vector<Command> Config::commands_for(const std::string& server_id, const std::string& group_id) const {
   std::vector<Command> out;
   for (const auto& c : commands) {
-    if (c.server_id == server_id && c.folder_id == folder_id) {
+    if (c.server_id == server_id && c.group_id == group_id) {
       out.push_back(c);
     }
   }
   return out;
 }
 
-std::vector<Folder> Config::folders_for(const std::string& server_id) const {
-  std::vector<Folder> out;
-  for (const auto& f : folders) {
+std::vector<CommandGroup> Config::groups_for(const std::string& server_id) const {
+  std::vector<CommandGroup> out;
+  for (const auto& f : groups) {
     if (f.server_id == server_id) {
       out.push_back(f);
     }
@@ -138,8 +175,8 @@ std::vector<Folder> Config::folders_for(const std::string& server_id) const {
   return out;
 }
 
-Folder* Config::folder_by_id(const std::string& id) {
-  for (auto& f : folders) {
+CommandGroup* Config::group_by_id(const std::string& id) {
+  for (auto& f : groups) {
     if (f.id == id) {
       return &f;
     }
@@ -147,8 +184,8 @@ Folder* Config::folder_by_id(const std::string& id) {
   return nullptr;
 }
 
-const Folder* Config::folder_by_id(const std::string& id) const {
-  for (const auto& f : folders) {
+const CommandGroup* Config::group_by_id(const std::string& id) const {
+  for (const auto& f : groups) {
     if (f.id == id) {
       return &f;
     }
@@ -171,12 +208,12 @@ void Config::set_commands_for(const std::string& server_id, const std::vector<Co
   commands = std::move(rebuilt);
 }
 
-void Config::set_commands_for(const std::string& server_id, const std::string& folder_id,
+void Config::set_commands_for(const std::string& server_id, const std::string& group_id,
                              const std::vector<Command>& ordered) {
   std::vector<Command> remaining = ordered;
   std::vector<Command> rebuilt;
   for (const auto& cmd : commands) {
-    if (cmd.server_id != server_id || cmd.folder_id != folder_id) {
+    if (cmd.server_id != server_id || cmd.group_id != group_id) {
       rebuilt.push_back(cmd);
     } else if (!remaining.empty()) {
       rebuilt.push_back(remaining.front());
@@ -192,7 +229,7 @@ bool Config::move_command(const std::string& command_id, int delta) {
   if (!cmd || delta == 0) {
     return false;
   }
-  auto group = commands_for(cmd->server_id, cmd->folder_id);
+  auto group = commands_for(cmd->server_id, cmd->group_id);
   int idx = -1;
   for (int i = 0; i < static_cast<int>(group.size()); ++i) {
     if (group[static_cast<std::size_t>(i)].id == command_id) {
@@ -205,7 +242,7 @@ bool Config::move_command(const std::string& command_id, int delta) {
     return false;
   }
   std::swap(group[static_cast<std::size_t>(idx)], group[static_cast<std::size_t>(new_idx)]);
-  set_commands_for(cmd->server_id, cmd->folder_id, group);
+  set_commands_for(cmd->server_id, cmd->group_id, group);
   return true;
 }
 
@@ -213,13 +250,13 @@ void Config::sort_commands_for(const std::string& server_id, const std::string& 
   sort_commands_for(server_id, "", by);
 }
 
-void Config::sort_commands_for(const std::string& server_id, const std::string& folder_id, const std::string& by) {
-  auto group = commands_for(server_id, folder_id);
+void Config::sort_commands_for(const std::string& server_id, const std::string& group_id, const std::string& by) {
+  auto group = commands_for(server_id, group_id);
   auto primary = [&](const Command& c) -> std::string {
     if (by == "command") return to_lower(trim(c.command));
     if (by == "comment") return to_lower(trim(c.comment));
     if (by == "folder") {
-      if (c.cd_before_run) return to_lower(trim(c.working_dir));
+      if (c.cd_before_run) return to_lower(command_run_working_dir(*this, c));
       return {};
     }
     return to_lower(trim(c.name));
@@ -242,19 +279,19 @@ void Config::sort_commands_for(const std::string& server_id, const std::string& 
     }
     return a.id < b.id;
   });
-  set_commands_for(server_id, folder_id, group);
+  set_commands_for(server_id, group_id, group);
 }
 
-void Config::remove_folder(const std::string& folder_id) {
-  if (folder_id.empty()) return;
+void Config::remove_group(const std::string& group_id) {
+  if (group_id.empty()) return;
   for (auto& c : commands) {
-    if (c.folder_id == folder_id) {
-      c.folder_id.clear();
+    if (c.group_id == group_id) {
+      c.group_id.clear();
     }
   }
-  folders.erase(std::remove_if(folders.begin(), folders.end(),
-                               [&](const Folder& f) { return f.id == folder_id; }),
-                folders.end());
+  groups.erase(std::remove_if(groups.begin(), groups.end(),
+                               [&](const CommandGroup& f) { return f.id == group_id; }),
+                groups.end());
 }
 
 std::vector<Bundle> Config::bundles_for(const std::string& server_id) const {
@@ -405,12 +442,32 @@ std::map<std::string, std::vector<std::string>> parse_column_order(const json& r
 }  // namespace
 
 Config load_config() {
+  try {
+    return load_config_from(config_path());
+  } catch (const std::exception& exc) {
+    log_error(std::string("load_config: ") + exc.what());
+    throw;
+  }
+}
+
+Config load_config_from(const std::filesystem::path& path) {
   Config cfg;
-  if (!std::filesystem::exists(config_path())) {
+  if (!std::filesystem::exists(path)) {
     cfg.needs_migration = true;
     return cfg;
   }
-  json data = json::parse(read_text_file(config_path()), nullptr, true, true);
+  json data;
+  try {
+    data = json::parse(read_text_file(path), nullptr, true, true);
+  } catch (const std::exception& exc) {
+    log_error(std::string("load_config_from parse: ") + path.string() + ": " + exc.what());
+    throw;
+  }
+  if (!data.is_object()) {
+    const char* msg = "load_config_from: корень конфига не объект";
+    log_error(msg);
+    throw std::runtime_error(msg);
+  }
   bool vault_ok = false;
   cfg.vault = parse_vault(data.value("vault", json::object()), vault_ok);
   cfg.has_vault = vault_ok;
@@ -424,11 +481,16 @@ Config load_config() {
     s.username = raw.value("username", "root");
     s.password_blob = raw.value("password_vault", "");
     s.key_path = raw.value("key_path", "");
+    s.remote_shell = normalize_remote_shell(raw.value("remote_shell", std::string("bash")));
     const std::string legacy = raw.value("password_encrypted", "");
     if (!vault_ok && !legacy.empty()) {
       try {
         s.password = dpapi_unprotect(legacy);
+      } catch (const std::exception& exc) {
+        log_error(std::string("load_config: legacy password: ") + exc.what());
+        s.password.clear();
       } catch (...) {
+        log_error("load_config: legacy password: unknown error");
         s.password.clear();
       }
       cfg.needs_migration = true;
@@ -445,21 +507,29 @@ Config load_config() {
     c.comment = raw.value("comment", "");
     c.server_id = raw.value("server_id", "");
     c.command = raw.value("command", "");
-    c.folder_id = raw.value("folder_id", "");
+    c.group_id = raw.value("group_id", raw.value("folder_id", ""));
     c.working_dir = trim(raw.value("working_dir", ""));
     c.timeout_sec = raw.value("timeout_sec", 180);
     c.login_shell = raw.value("login_shell", true);
     c.confirm_before_run = raw.value("confirm_before_run", true);
     c.cd_before_run = raw.value("cd_before_run", true);
+    if (raw.contains("remote_shell") && raw["remote_shell"].is_string()) {
+      c.remote_shell = normalize_remote_shell(raw["remote_shell"].get<std::string>());
+    }
     cfg.commands.push_back(std::move(c));
   }
-  for (const auto& raw : data.value("folders", json::array())) {
-    Folder f;
-    f.id = raw.value("id", new_uuid());
-    f.server_id = raw.value("server_id", "");
-    f.name = trim(raw.value("name", ""));
-    if (f.name.empty() || f.server_id.empty()) continue;
-    cfg.folders.push_back(std::move(f));
+  json groups_raw =
+      data.contains("groups") ? data["groups"] : data.value("folders", json::array());
+  if (!groups_raw.is_array()) groups_raw = json::array();
+  for (const auto& raw : groups_raw) {
+    if (!raw.is_object()) continue;
+    CommandGroup g;
+    g.id = raw.value("id", new_uuid());
+    g.server_id = raw.value("server_id", "");
+    g.name = trim(raw.value("name", ""));
+    g.working_dir = trim(raw.value("working_dir", ""));
+    if (g.name.empty() || g.server_id.empty()) continue;
+    cfg.groups.push_back(std::move(g));
   }
   for (const auto& raw : data.value("bundles", json::array())) {
     if (!raw.is_object()) continue;
@@ -532,11 +602,15 @@ Config load_config() {
   } catch (...) {
     st.last_backup = 0.0;
   }
-  if (settings_raw.contains("last_folder_by_server") && settings_raw["last_folder_by_server"].is_object()) {
-    for (auto it = settings_raw["last_folder_by_server"].begin();
-         it != settings_raw["last_folder_by_server"].end(); ++it) {
+  json last_group_raw = settings_raw.value("last_group_by_server", json::object());
+  if (!last_group_raw.is_object()) last_group_raw = json::object();
+  if (last_group_raw.empty() && settings_raw.contains("last_folder_by_server")) {
+    last_group_raw = settings_raw["last_folder_by_server"];
+  }
+  if (last_group_raw.is_object()) {
+    for (auto it = last_group_raw.begin(); it != last_group_raw.end(); ++it) {
       if (it.value().is_string()) {
-        st.last_folder_by_server[it.key()] = it.value().get<std::string>();
+        st.last_group_by_server[it.key()] = it.value().get<std::string>();
       }
     }
   }
@@ -555,6 +629,10 @@ void unlock_secrets(Config& config, const SessionVault& vault) {
 }
 
 void save_config(Config& config, SessionVault& vault) {
+  save_config_to(config, vault, config_path());
+}
+
+void save_config_to(Config& config, SessionVault& vault, const std::filesystem::path& path) {
   if (!vault.unlocked() || vault.meta() == nullptr) {
     throw VaultLocked("Нельзя сохранить конфиг без мастер-пароля");
   }
@@ -575,32 +653,38 @@ void save_config(Config& config, SessionVault& vault) {
         {"username", s.username},
         {"password_vault", s.password.empty() ? "" : vault.encrypt_secret(s.password)},
         {"key_path", s.key_path},
+        {"remote_shell", normalize_remote_shell(s.remote_shell)},
     };
     payload["servers"].push_back(item);
     s.password_blob = item["password_vault"].get<std::string>();
   }
   payload["commands"] = json::array();
   for (const auto& c : config.commands) {
-    payload["commands"].push_back({
+    json cmd = {
         {"id", c.id},
         {"name", c.name},
         {"comment", c.comment},
         {"server_id", c.server_id},
         {"command", c.command},
-        {"folder_id", c.folder_id},
+        {"group_id", c.group_id},
         {"working_dir", c.working_dir},
         {"timeout_sec", c.timeout_sec},
         {"login_shell", c.login_shell},
         {"confirm_before_run", c.confirm_before_run},
         {"cd_before_run", c.cd_before_run},
-    });
+    };
+    if (!trim(c.remote_shell).empty()) {
+      cmd["remote_shell"] = normalize_remote_shell(c.remote_shell);
+    }
+    payload["commands"].push_back(std::move(cmd));
   }
-  payload["folders"] = json::array();
-  for (const auto& f : config.folders) {
-    payload["folders"].push_back({
-        {"id", f.id},
-        {"server_id", f.server_id},
-        {"name", f.name},
+  payload["groups"] = json::array();
+  for (const auto& g : config.groups) {
+    payload["groups"].push_back({
+        {"id", g.id},
+        {"server_id", g.server_id},
+        {"name", g.name},
+        {"working_dir", g.working_dir},
     });
   }
   payload["bundles"] = json::array();
@@ -642,10 +726,15 @@ void save_config(Config& config, SessionVault& vault) {
       {"show_command_folder_column", config.settings.show_command_folder_column},
       {"backup_enabled", config.settings.backup_enabled},
       {"last_backup", config.settings.last_backup},
-      {"last_folder_by_server", config.settings.last_folder_by_server},
+      {"last_group_by_server", config.settings.last_group_by_server},
   };
   payload["settings"] = settings;
-  atomic_write_text(config_path(), payload.dump(2));
+  try {
+    atomic_write_text(path, payload.dump(2));
+  } catch (const std::exception& exc) {
+    log_error(std::string("save_config_to: ") + path.string() + ": " + exc.what());
+    throw;
+  }
   config.vault = *vault.meta();
   config.has_vault = true;
   config.needs_migration = false;

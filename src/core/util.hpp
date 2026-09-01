@@ -30,6 +30,7 @@ int clamp_int(int value, int lo, int hi);
 
 void atomic_write_text(const std::filesystem::path& path, std::string_view text);
 std::string read_text_file(const std::filesystem::path& path);
+void log_error(std::string_view message);
 
 std::filesystem::path expand_user(const std::filesystem::path& path);
 std::string posix_join(const std::string& cwd, const std::string& name);

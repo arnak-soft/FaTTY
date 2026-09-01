@@ -35,6 +35,7 @@ class ServerDialog : public PositionedDialog {
   wxTextCtrl* key_{};
   wxCheckBox* show_pw_{};
   wxCheckBox* clear_pw_{};
+  wxComboBox* shell_{};
   wxStaticText* error_{};
   std::string stored_password_;
 };
@@ -59,27 +60,28 @@ class PresetDialog : public PositionedDialog {
 class CommandDialog : public PositionedDialog {
  public:
   CommandDialog(wxWindow* parent, const Command& command, const std::vector<Server>& servers,
-                const std::vector<Folder>& folders, const wxString& title);
+                const std::vector<CommandGroup>& groups, const wxString& title);
   Command result;
   bool accepted = false;
 
  private:
   void on_ok(wxCommandEvent&);
-  void fill_folders();
+  void fill_groups();
   void sync_cd_ui();
   Command command_;
   std::vector<Server> servers_;
-  std::vector<Folder> folders_;
+  std::vector<CommandGroup> groups_;
   std::vector<Preset> presets_;
-  std::vector<std::string> folder_ids_;
+  std::vector<std::string> group_ids_;
   wxTextCtrl* name_{};
   wxComboBox* server_{};
-  wxComboBox* folder_{};
+  wxComboBox* group_{};
   wxTextCtrl* working_dir_{};
   wxCheckBox* cd_before_{};
   wxTextCtrl* timeout_{};
   wxCheckBox* login_{};
   wxCheckBox* confirm_{};
+  wxComboBox* shell_{};
   wxComboBox* preset_{};
   wxTextCtrl* comment_{};
   wxTextCtrl* text_{};
@@ -115,7 +117,7 @@ class BundleDialog : public PositionedDialog {
   void duplicate_selected();
   void move_selected(int delta);
   void on_ok(wxCommandEvent&);
-  std::string folder_label(const Command& cmd) const;
+  std::string group_label(const Command& cmd) const;
   Bundle bundle_;
   Config config_;
   std::vector<std::string> available_ids_;

@@ -80,6 +80,11 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   keyrow->Add(key_, 1, wxEXPAND);
   keyrow->Add(browse, 0, wxLEFT, 8);
   grid->Add(keyrow, 1, wxEXPAND);
+  grid->Add(new wxStaticText(body, wxID_ANY, L"Shell по умолчанию"), 0, wxALIGN_CENTER_VERTICAL);
+  shell_ = new wxComboBox(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize,
+                          wxArrayString{L"bash", L"sh"}, wxCB_READONLY);
+  shell_->SetSelection(normalize_remote_shell(server.remote_shell) == "sh" ? 1 : 0);
+  grid->Add(shell_, 1, wxEXPAND);
 
   error_ = new wxStaticText(body, wxID_ANY, L"");
   error_->SetName(L"error");
@@ -185,6 +190,7 @@ void ServerDialog::on_ok(wxCommandEvent&) {
   result.username = user;
   result.password = password;
   result.key_path = key_path;
+  result.remote_shell = normalize_remote_shell(std::string(shell_->GetValue().utf8_string()));
   accepted = true;
   EndModal(wxID_OK);
 }
@@ -265,8 +271,8 @@ void PresetDialog::on_ok(wxCommandEvent&) {
 }
 
 CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std::vector<Server>& servers,
-                             const std::vector<Folder>& folders, const wxString& title)
-    : PositionedDialog(parent, title, wxSize(640, 620)), command_(command), servers_(servers), folders_(folders) {
+                             const std::vector<CommandGroup>& groups, const wxString& title)
+    : PositionedDialog(parent, title, wxSize(640, 660)), command_(command), servers_(servers), groups_(groups) {
   auto* body = new wxPanel(this);
   auto* form = new wxFlexGridSizer(10, 2, 6, 8);
   form->AddGrowableCol(1);
@@ -283,9 +289,9 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   server_ = new wxComboBox(body, wxID_ANY, current, wxDefaultPosition, wxDefaultSize, names, wxCB_READONLY);
   form->Add(server_, 1, wxEXPAND);
   form->Add(new wxStaticText(body, wxID_ANY, L"Группа"), 0, wxALIGN_CENTER_VERTICAL);
-  folder_ = new wxComboBox(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxArrayString(), wxCB_READONLY);
-  form->Add(folder_, 1, wxEXPAND);
-  fill_folders();
+  group_ = new wxComboBox(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxArrayString(), wxCB_READONLY);
+  form->Add(group_, 1, wxEXPAND);
+  fill_groups();
   working_dir_ = labeled_entry(body, form, L"Папка", wxString::FromUTF8(command.working_dir));
   working_dir_->SetHint(L"/var/www/app или относительный путь");
   form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
@@ -297,6 +303,15 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   login_ = new wxCheckBox(body, wxID_ANY, L"Login-shell (bash -lc) — подхватывает PATH из .bashrc");
   login_->SetValue(command.login_shell);
   form->Add(login_, 1);
+  form->Add(new wxStaticText(body, wxID_ANY, L"Shell"), 0, wxALIGN_CENTER_VERTICAL);
+  shell_ = new wxComboBox(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize,
+                          wxArrayString{L"как у VPS", L"bash", L"sh"}, wxCB_READONLY);
+  if (command.remote_shell.empty()) {
+    shell_->SetSelection(0);
+  } else {
+    shell_->SetSelection(normalize_remote_shell(command.remote_shell) == "sh" ? 2 : 1);
+  }
+  form->Add(shell_, 1, wxEXPAND);
   form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
   confirm_ = new wxCheckBox(body, wxID_ANY, L"Предупреждать перед запуском");
   confirm_->SetValue(command.confirm_before_run);
@@ -336,7 +351,7 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   }
   apply_dark(this);
   sync_cd_ui();
-  server_->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) { fill_folders(); });
+  server_->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) { fill_groups(); });
   cd_before_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) { sync_cd_ui(); });
   preset_->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) {
     auto chosen = std::string(preset_->GetValue().utf8_string());
@@ -359,7 +374,7 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   save->Bind(wxEVT_BUTTON, &CommandDialog::on_ok, this);
 }
 
-void CommandDialog::fill_folders() {
+void CommandDialog::fill_groups() {
   auto server_name = trim(std::string(server_->GetValue().utf8_string()));
   std::string sid;
   for (const auto& s : servers_) {
@@ -368,18 +383,18 @@ void CommandDialog::fill_folders() {
       break;
     }
   }
-  folder_->Clear();
-  folder_ids_.clear();
-  folder_->Append(L"Общее");
-  folder_ids_.push_back("");
+  group_->Clear();
+  group_ids_.clear();
+  group_->Append(L"Общее");
+  group_ids_.push_back("");
   int sel = 0;
-  for (const auto& f : folders_) {
-    if (f.server_id != sid) continue;
-    folder_->Append(wxString::FromUTF8(f.name));
-    folder_ids_.push_back(f.id);
-    if (f.id == command_.folder_id) sel = static_cast<int>(folder_ids_.size()) - 1;
+  for (const auto& g : groups_) {
+    if (g.server_id != sid) continue;
+    group_->Append(wxString::FromUTF8(g.name));
+    group_ids_.push_back(g.id);
+    if (g.id == command_.group_id) sel = static_cast<int>(group_ids_.size()) - 1;
   }
-  folder_->SetSelection(sel);
+  group_->SetSelection(sel);
 }
 
 void CommandDialog::sync_cd_ui() {
@@ -416,11 +431,19 @@ void CommandDialog::on_ok(wxCommandEvent&) {
   result.confirm_before_run = confirm_->GetValue();
   result.cd_before_run = cd_before_->GetValue();
   result.working_dir = trim(std::string(working_dir_->GetValue().utf8_string()));
-  int fsel = folder_->GetSelection();
-  if (fsel >= 0 && fsel < static_cast<int>(folder_ids_.size())) {
-    result.folder_id = folder_ids_[static_cast<std::size_t>(fsel)];
+  int fsel = group_->GetSelection();
+  if (fsel >= 0 && fsel < static_cast<int>(group_ids_.size())) {
+    result.group_id = group_ids_[static_cast<std::size_t>(fsel)];
   } else {
-    result.folder_id.clear();
+    result.group_id.clear();
+  }
+  const int shell_sel = shell_->GetSelection();
+  if (shell_sel <= 0) {
+    result.remote_shell.clear();
+  } else if (shell_sel == 2) {
+    result.remote_shell = "sh";
+  } else {
+    result.remote_shell = "bash";
   }
   accepted = true;
   EndModal(wxID_OK);
@@ -510,9 +533,9 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
   save->Bind(wxEVT_BUTTON, &BundleDialog::on_ok, this);
 }
 
-std::string BundleDialog::folder_label(const Command& cmd) const {
-  if (cmd.folder_id.empty()) return "Общее";
-  if (auto* f = config_.folder_by_id(cmd.folder_id)) return f->name;
+std::string BundleDialog::group_label(const Command& cmd) const {
+  if (cmd.group_id.empty()) return "Общее";
+  if (auto* g = config_.group_by_id(cmd.group_id)) return g->name;
   return "Общее";
 }
 
@@ -527,7 +550,7 @@ void BundleDialog::rebuild_lists() {
   for (std::size_t i = 0; i < available_ids_.size(); ++i) {
     auto* c = config_.command_by_id(available_ids_[i]);
     if (!c) continue;
-    long row = available_->InsertItem(static_cast<long>(i), wxString::FromUTF8(folder_label(*c)));
+    long row = available_->InsertItem(static_cast<long>(i), wxString::FromUTF8(group_label(*c)));
     available_->SetItem(row, 1, wxString::FromUTF8(c->name));
   }
   selected_->DeleteAllItems();
@@ -538,7 +561,7 @@ void BundleDialog::rebuild_lists() {
     kept.push_back(c->id);
     long row = selected_->InsertItem(selected_->GetItemCount(),
                                      wxString::FromUTF8(std::to_string(kept.size())));
-    selected_->SetItem(row, 1, wxString::FromUTF8(folder_label(*c)));
+    selected_->SetItem(row, 1, wxString::FromUTF8(group_label(*c)));
     selected_->SetItem(row, 2, wxString::FromUTF8(c->name));
   }
   selected_ids_ = std::move(kept);

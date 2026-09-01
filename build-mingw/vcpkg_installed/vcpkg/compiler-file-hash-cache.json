@@ -1,0 +1,14 @@
+{
+  "C:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/bin/x86_64-w64-mingw32-g++.exe" : 
+  {
+    "hash" : "36824fff80ec8f4fadc33a89466864ac20ea7d76",
+    "size" : 2414606,
+    "timestamp" : 1781080186
+  },
+  "C:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/bin/x86_64-w64-mingw32-gcc.exe" : 
+  {
+    "hash" : "7ad39dc7e43f470f55099fd1264183baa8f3f6b0",
+    "size" : 2410510,
+    "timestamp" : 1781080186
+  }
+}

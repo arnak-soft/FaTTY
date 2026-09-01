@@ -190,6 +190,7 @@ StripedListCtrl::Body::Body(StripedListCtrl* owner)
   SetRowCount(0);
   Bind(wxEVT_PAINT, &Body::on_paint, this);
   Bind(wxEVT_LEFT_DOWN, &Body::on_mouse, this);
+  Bind(wxEVT_RIGHT_UP, &Body::on_mouse, this);
   Bind(wxEVT_LEFT_DCLICK, &Body::on_dclick, this);
   Bind(wxEVT_KEY_DOWN, &Body::on_key, this);
   Bind(wxEVT_SIZE, &Body::on_size, this);
@@ -246,6 +247,15 @@ void StripedListCtrl::Body::on_mouse(wxMouseEvent& e) {
   SetFocus();
   const int row = hit_row(e.GetY());
   if (row < 0) return;
+  if (e.RightUp()) {
+    if (owner_->single_sel_ || !(e.ControlDown() || e.ShiftDown())) {
+      owner_->select_only(row, true);
+    } else if (!owner_->rows_[static_cast<std::size_t>(row)].selected) {
+      owner_->select_only(row, true);
+    }
+    owner_->emit_right_click(row);
+    return;
+  }
   if (owner_->single_sel_ || !(e.ControlDown() || e.ShiftDown())) {
     owner_->select_only(row, true);
   } else if (e.ShiftDown()) {
@@ -419,6 +429,13 @@ void StripedListCtrl::emit_selected(long row) {
 
 void StripedListCtrl::emit_activated(long row) {
   wxListEvent e(wxEVT_LIST_ITEM_ACTIVATED, GetId());
+  e.SetEventObject(this);
+  e.SetIndex(row);
+  ProcessWindowEvent(e);
+}
+
+void StripedListCtrl::emit_right_click(long row) {
+  wxListEvent e(wxEVT_LIST_ITEM_RIGHT_CLICK, GetId());
   e.SetEventObject(this);
   e.SetIndex(row);
   ProcessWindowEvent(e);

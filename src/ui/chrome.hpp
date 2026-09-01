@@ -7,8 +7,11 @@
 #include <vector>
 
 class wxBookCtrlEvent;
+class wxCommandEvent;
 
 namespace fatty {
+
+wxDECLARE_EVENT(wxEVT_TAB_RIGHT_CLICK, wxCommandEvent);
 
 class TabStrip;
 
@@ -135,6 +138,7 @@ class TabStrip : public wxPanel {
   void on_leave(wxMouseEvent&);
   void on_timer(wxTimerEvent&);
   void ensure_hover_size();
+  void emit_tab_right_click(int index);
 
   RoundedNotebook* owner_;
   std::vector<wxRect> rects_;

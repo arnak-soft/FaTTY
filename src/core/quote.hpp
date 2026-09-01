@@ -8,7 +8,7 @@ namespace fatty {
 
 std::string shlex_quote(const std::string& value);
 std::pair<std::string, std::string> wrap_remote_command(const std::string& command, const std::string& cwd,
-                                                        bool login_shell);
+                                                        bool login_shell, std::string_view shell = "bash");
 
 class CwdOutputFilter {
  public:

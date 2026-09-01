@@ -2,8 +2,10 @@
 
 #include "core/vault.hpp"
 
+#include <filesystem>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace fatty {
@@ -17,6 +19,7 @@ struct Server {
   std::string password;
   std::string password_blob;
   std::string key_path;
+  std::string remote_shell = "bash";
 
   static Server make_new();
   Server duplicate(const std::string& new_name) const;
@@ -27,26 +30,27 @@ struct Command {
   std::string name;
   std::string comment;
   std::string server_id;
-  std::string folder_id;
+  std::string group_id;
   std::string command;
   std::string working_dir;
   int timeout_sec = 180;
   bool login_shell = true;
   bool confirm_before_run = true;
   bool cd_before_run = true;
+  std::string remote_shell;
 
   static Command make_new(const std::string& server_id);
   Command duplicate(const std::string& new_name = "", const std::string& new_server_id = "") const;
-  // Если галочка «переходить в папку» включена и путь задан — этот путь, иначе текущий каталог сессии.
-  std::string effective_cwd(const std::string& session_cwd) const;
+  std::string effective_cwd(const std::string& session_cwd, std::string_view group_working_dir = {}) const;
 };
 
-struct Folder {
+struct CommandGroup {
   std::string id;
   std::string server_id;
   std::string name;
+  std::string working_dir;
 
-  static Folder make_new(const std::string& server_id, const std::string& name);
+  static CommandGroup make_new(const std::string& server_id, const std::string& name);
 };
 
 struct ExtraProgram {
@@ -97,13 +101,13 @@ struct AppSettings {
   bool show_command_folder_column = true;
   bool backup_enabled = true;
   double last_backup = 0.0;
-  std::map<std::string, std::string> last_folder_by_server;
+  std::map<std::string, std::string> last_group_by_server;
 };
 
 struct Config {
   std::vector<Server> servers;
   std::vector<Command> commands;
-  std::vector<Folder> folders;
+  std::vector<CommandGroup> groups;
   std::vector<Bundle> bundles;
   AppSettings settings;
   VaultMeta vault;
@@ -115,16 +119,16 @@ struct Config {
   Command* command_by_id(const std::string& id);
   const Command* command_by_id(const std::string& id) const;
   std::vector<Command> commands_for(const std::string& server_id) const;
-  std::vector<Command> commands_for(const std::string& server_id, const std::string& folder_id) const;
-  std::vector<Folder> folders_for(const std::string& server_id) const;
-  Folder* folder_by_id(const std::string& id);
-  const Folder* folder_by_id(const std::string& id) const;
+  std::vector<Command> commands_for(const std::string& server_id, const std::string& group_id) const;
+  std::vector<CommandGroup> groups_for(const std::string& server_id) const;
+  CommandGroup* group_by_id(const std::string& id);
+  const CommandGroup* group_by_id(const std::string& id) const;
   void set_commands_for(const std::string& server_id, const std::vector<Command>& ordered);
-  void set_commands_for(const std::string& server_id, const std::string& folder_id, const std::vector<Command>& ordered);
+  void set_commands_for(const std::string& server_id, const std::string& group_id, const std::vector<Command>& ordered);
   bool move_command(const std::string& command_id, int delta);
   void sort_commands_for(const std::string& server_id, const std::string& by);
-  void sort_commands_for(const std::string& server_id, const std::string& folder_id, const std::string& by);
-  void remove_folder(const std::string& folder_id);
+  void sort_commands_for(const std::string& server_id, const std::string& group_id, const std::string& by);
+  void remove_group(const std::string& group_id);
   std::vector<Bundle> bundles_for(const std::string& server_id) const;
   Bundle* bundle_by_id(const std::string& id);
   const Bundle* bundle_by_id(const std::string& id) const;
@@ -132,8 +136,15 @@ struct Config {
   void drop_server_bundles(const std::string& server_id);
 };
 
+std::string normalize_remote_shell(std::string_view shell);
+std::string effective_remote_shell(const Server& server, const Command& command);
+std::string command_run_working_dir(const Config& config, const Command& command);
+std::string command_display_folder(const Config& config, const Command& command);
+
 Config load_config();
+Config load_config_from(const std::filesystem::path& path);
 void unlock_secrets(Config& config, const SessionVault& vault);
 void save_config(Config& config, SessionVault& vault);
+void save_config_to(Config& config, SessionVault& vault, const std::filesystem::path& path);
 
 }  // namespace fatty

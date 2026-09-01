@@ -265,7 +265,7 @@ void SSHSession::cancel() {
 }
 
 RunResult SSHSession::run(const Server& server, const std::string& command, int timeout_sec, bool login_shell,
-                          const OutputCb& on_output, const std::string& cwd_in) {
+                          const OutputCb& on_output, const std::string& cwd_in, std::string_view shell) {
   cancel_ = false;
   std::string cwd = trim(cwd_in);
   std::string where = cwd.empty() ? "" : ("  " + cwd);
@@ -278,7 +278,7 @@ RunResult SSHSession::run(const Server& server, const std::string& command, int 
     session_.store(nullptr);
     throw;
   }
-  auto [remote, mark] = wrap_remote_command(command, cwd, login_shell);
+  auto [remote, mark] = wrap_remote_command(command, cwd, login_shell, shell);
   CwdOutputFilter filt(mark, on_output);
   on_output("$ " + trim(command) + "\n\n");
   LIBSSH2_SESSION* session = session_of(raw);

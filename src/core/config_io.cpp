@@ -119,9 +119,9 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
   for (const auto& cmd : config.commands) {
     auto* server = config.server_by_id(cmd.server_id);
     if (!server) continue;
-    std::string folder_name;
-    if (!cmd.folder_id.empty()) {
-      if (auto* f = config.folder_by_id(cmd.folder_id)) folder_name = f->name;
+    std::string group_name;
+    if (!cmd.group_id.empty()) {
+      if (auto* g = config.group_by_id(cmd.group_id)) group_name = g->name;
     }
     commands.push_back({
         {"server_name", server->name},
@@ -134,17 +134,17 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
         {"confirm_before_run", cmd.confirm_before_run},
         {"cd_before_run", cmd.cd_before_run},
         {"working_dir", cmd.working_dir},
-        {"folder", folder_name},
+        {"group", group_name},
     });
   }
-  json folders = json::array();
-  for (const auto& folder : config.folders) {
-    auto* server = config.server_by_id(folder.server_id);
+  json groups = json::array();
+  for (const auto& group : config.groups) {
+    auto* server = config.server_by_id(group.server_id);
     if (!server) continue;
-    folders.push_back({
+    groups.push_back({
         {"server_name", server->name},
         {"server_host", server->host},
-        {"name", folder.name},
+        {"name", group.name},
     });
   }
   json bundles = json::array();
@@ -155,13 +155,13 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
     for (const auto& cid : bundle.command_ids) {
       auto* cmd = config.command_by_id(cid);
       if (!cmd) continue;
-      std::string folder_name;
-      if (!cmd->folder_id.empty()) {
-        if (auto* f = config.folder_by_id(cmd->folder_id)) folder_name = f->name;
+      std::string group_name;
+      if (!cmd->group_id.empty()) {
+        if (auto* g = config.group_by_id(cmd->group_id)) group_name = g->name;
       }
       steps.push_back({
           {"name", cmd->name},
-          {"folder", folder_name},
+          {"group", group_name},
       });
     }
     if (steps.empty()) continue;
@@ -181,7 +181,8 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
       {"include_secrets", include_secrets},
       {"servers", servers},
       {"commands", commands},
-      {"folders", folders},
+      {"folders", groups},
+      {"groups", groups},
       {"bundles", bundles},
   };
   if (include_settings) {
@@ -242,7 +243,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
   struct ImpCmd {
     std::string server_name;
     std::string server_host;
-    std::string folder_name;
+    std::string group_name;
     Command cmd;
   };
   std::vector<ImpCmd> imported_commands;
@@ -252,7 +253,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       ImpCmd item;
       item.server_name = trim(raw.value("server_name", ""));
       item.server_host = trim(raw.value("server_host", ""));
-      item.folder_name = trim(raw.value("folder", raw.value("folder_name", "")));
+      item.group_name = trim(raw.value("group", raw.value("folder", raw.value("folder_name", ""))));
       item.cmd = Command::make_new("");
       item.cmd.name = trim(raw.value("name", ""));
       item.cmd.comment = trim(raw.value("comment", ""));
@@ -270,29 +271,29 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       imported_commands.push_back(std::move(item));
     }
   }
-  struct ImpFolder {
+  struct ImpGroup {
     std::string server_name;
     std::string server_host;
     std::string name;
   };
-  std::vector<ImpFolder> imported_folders;
-  json raw_folders = data.value("folders", json::array());
-  if (raw_folders.is_array()) {
-    for (const auto& raw : raw_folders) {
+  std::vector<ImpGroup> imported_groups;
+  json raw_groups = data.contains("groups") ? data["groups"] : data.value("folders", json::array());
+  if (raw_groups.is_array()) {
+    for (const auto& raw : raw_groups) {
       if (!raw.is_object()) continue;
-      ImpFolder item;
+      ImpGroup item;
       item.server_name = trim(raw.value("server_name", ""));
       item.server_host = trim(raw.value("server_host", ""));
       item.name = trim(raw.value("name", ""));
       if (item.server_name.empty() || item.server_host.empty() || item.name.empty()) continue;
-      imported_folders.push_back(std::move(item));
+      imported_groups.push_back(std::move(item));
     }
   }
   struct ImpBundle {
     std::string server_name;
     std::string server_host;
     Bundle bundle;
-    std::vector<std::pair<std::string, std::string>> steps;  // folder, name
+    std::vector<std::pair<std::string, std::string>> steps;  // group, name
   };
   std::vector<ImpBundle> imported_bundles;
   json raw_bundles = data.value("bundles", json::array());
@@ -316,7 +317,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
           if (!step.is_object()) continue;
           auto name = trim(step.value("name", ""));
           if (name.empty()) continue;
-          item.steps.emplace_back(trim(step.value("folder", step.value("folder_name", ""))), name);
+          item.steps.emplace_back(trim(step.value("group", step.value("folder", step.value("folder_name", "")))), name);
         }
       }
       if (item.server_name.empty() || item.server_host.empty() || item.bundle.name.empty() ||
@@ -327,28 +328,28 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
     }
   }
 
-  auto ensure_folder = [&](const std::string& server_id, const std::string& name) -> std::string {
+  auto ensure_group = [&](const std::string& server_id, const std::string& name) -> std::string {
     auto want = to_lower(trim(name));
     if (want.empty() || server_id.empty()) return "";
-    for (const auto& f : config.folders) {
-      if (f.server_id == server_id && to_lower(trim(f.name)) == want) return f.id;
+    for (const auto& g : config.groups) {
+      if (g.server_id == server_id && to_lower(trim(g.name)) == want) return g.id;
     }
-    auto f = Folder::make_new(server_id, trim(name));
-    auto id = f.id;
-    config.folders.push_back(std::move(f));
+    auto grp = CommandGroup::make_new(server_id, trim(name));
+    auto id = grp.id;
+    config.groups.push_back(std::move(grp));
     return id;
   };
 
   auto resolve_bundle_steps = [&](ImpBundle& item, const std::string& server_id) {
     item.bundle.server_id = server_id;
     item.bundle.command_ids.clear();
-    for (const auto& [folder_name, cmd_name] : item.steps) {
-      auto folder_id = folder_name.empty() ? std::string() : ensure_folder(server_id, folder_name);
+    for (const auto& [group_name, cmd_name] : item.steps) {
+      auto group_id = group_name.empty() ? std::string() : ensure_group(server_id, group_name);
       const Command* found = nullptr;
       for (const auto& c : config.commands) {
         if (c.server_id != server_id) continue;
         if (to_lower(trim(c.name)) != to_lower(cmd_name)) continue;
-        if (c.folder_id != folder_id) continue;
+        if (c.group_id != group_id) continue;
         found = &c;
         break;
       }
@@ -397,15 +398,15 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
     result.servers_replaced = static_cast<int>(config.servers.size());
     config.servers = imported_servers;
     config.commands.clear();
-    config.folders.clear();
+    config.groups.clear();
     config.bundles.clear();
     std::map<std::pair<std::string, std::string>, std::string> id_by_key;
     for (const auto& s : imported_servers) {
       id_by_key[server_key(s.name, s.host)] = s.id;
     }
-    for (const auto& folder : imported_folders) {
-      auto it = id_by_key.find(server_key(folder.server_name, folder.server_host));
-      if (it != id_by_key.end()) ensure_folder(it->second, folder.name);
+    for (const auto& group : imported_groups) {
+      auto it = id_by_key.find(server_key(group.server_name, group.server_host));
+      if (it != id_by_key.end()) ensure_group(it->second, group.name);
     }
     for (auto& item : imported_commands) {
       auto it = id_by_key.find(server_key(item.server_name, item.server_host));
@@ -414,7 +415,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
         continue;
       }
       item.cmd.server_id = it->second;
-      item.cmd.folder_id = ensure_folder(it->second, item.folder_name);
+      item.cmd.group_id = ensure_group(it->second, item.group_name);
       config.commands.push_back(item.cmd);
       result.commands_added++;
     }
@@ -434,9 +435,9 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       id_by_key[key] = server.id;
       result.servers_added++;
     }
-    for (const auto& folder : imported_folders) {
-      auto it = id_by_key.find(server_key(folder.server_name, folder.server_host));
-      if (it != id_by_key.end()) ensure_folder(it->second, folder.name);
+    for (const auto& group : imported_groups) {
+      auto it = id_by_key.find(server_key(group.server_name, group.server_host));
+      if (it != id_by_key.end()) ensure_group(it->second, group.name);
     }
     std::set<std::pair<std::string, std::string>> existing_cmds;
     for (const auto& cmd : config.commands) {
@@ -454,7 +455,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
         continue;
       }
       item.cmd.server_id = it->second;
-      item.cmd.folder_id = ensure_folder(it->second, item.folder_name);
+      item.cmd.group_id = ensure_group(it->second, item.group_name);
       config.commands.push_back(item.cmd);
       existing_cmds.insert(cmd_key);
       result.commands_added++;

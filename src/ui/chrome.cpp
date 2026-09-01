@@ -530,6 +530,7 @@ TabStrip::TabStrip(RoundedNotebook* owner)
   Bind(wxEVT_PAINT, &TabStrip::on_paint, this);
   Bind(wxEVT_SIZE, &TabStrip::on_size, this);
   Bind(wxEVT_LEFT_DOWN, &TabStrip::on_mouse, this);
+  Bind(wxEVT_RIGHT_UP, &TabStrip::on_mouse, this);
   Bind(wxEVT_MOTION, &TabStrip::on_mouse, this);
   Bind(wxEVT_LEAVE_WINDOW, &TabStrip::on_leave, this);
   Bind(wxEVT_TIMER, &TabStrip::on_timer, this);
@@ -693,12 +694,24 @@ void TabStrip::on_size(wxSizeEvent& e) {
   e.Skip();
 }
 
+void TabStrip::emit_tab_right_click(int index) {
+  wxCommandEvent ev(wxEVT_TAB_RIGHT_CLICK, owner_->GetId());
+  ev.SetEventObject(owner_);
+  ev.SetInt(index);
+  owner_->ProcessWindowEvent(ev);
+}
+
 void TabStrip::on_mouse(wxMouseEvent& e) {
   const int hit = hit_test(e.GetPosition());
   if (hit != hover_index_) {
     hover_index_ = hit;
     if (!timer_.IsRunning()) timer_.Start(16);
     SetCursor(hit >= 0 ? wxCURSOR_HAND : wxCURSOR_ARROW);
+  }
+  if (e.RightUp() && hit >= 0) {
+    owner_->SetSelection(hit);
+    emit_tab_right_click(hit);
+    return;
   }
   if (e.LeftDown() && hit >= 0) {
     owner_->SetSelection(hit);
@@ -818,5 +831,7 @@ void RoundedNotebook::relayout_body() {
   if (body_) body_->Layout();
   Layout();
 }
+
+wxDEFINE_EVENT(wxEVT_TAB_RIGHT_CLICK, wxCommandEvent);
 
 }  // namespace fatty

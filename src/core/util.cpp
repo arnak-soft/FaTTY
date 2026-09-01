@@ -1,6 +1,10 @@
 #include "core/util.hpp"
 
+#include "core/paths.hpp"
+
 #include <algorithm>
+#include <chrono>
+#include <ctime>
 #include <cstdlib>
 #include <cctype>
 #include <fstream>
@@ -179,6 +183,26 @@ std::string read_text_file(const std::filesystem::path& path) {
   std::ostringstream ss;
   ss << in.rdbuf();
   return ss.str();
+}
+
+void log_error(std::string_view message) {
+  try {
+    std::filesystem::create_directories(app_dir());
+    std::ofstream out(error_log_path(), std::ios::binary | std::ios::app);
+    if (!out) return;
+    const auto now = std::chrono::system_clock::now();
+    const std::time_t t = std::chrono::system_clock::to_time_t(now);
+    std::tm tm{};
+#ifdef _WIN32
+    localtime_s(&tm, &t);
+#else
+    localtime_r(&t, &tm);
+#endif
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &tm);
+    out << buf << " " << message << "\n";
+  } catch (...) {
+  }
 }
 
 std::filesystem::path expand_user(const std::filesystem::path& path) {

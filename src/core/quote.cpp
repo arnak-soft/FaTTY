@@ -1,5 +1,6 @@
 #include "core/quote.hpp"
 
+#include "core/store.hpp"
 #include "core/util.hpp"
 
 #include <algorithm>
@@ -35,7 +36,7 @@ std::string shlex_quote(const std::string& value) {
 }
 
 std::pair<std::string, std::string> wrap_remote_command(const std::string& command, const std::string& cwd_in,
-                                                        bool login_shell) {
+                                                        bool login_shell, std::string_view shell) {
   std::string mark = "FATTYCWD_" + new_uuid();
   // uuid has dashes; Python uses uuid4().hex (no dashes)
   mark.erase(std::remove(mark.begin(), mark.end(), '-'), mark.end());
@@ -59,7 +60,8 @@ std::pair<std::string, std::string> wrap_remote_command(const std::string& comma
   lines += "\nprintf '\\n" + mark + "%s\\n' \"$(pwd 2>/dev/null || true)\"";
   lines += "\nexit $_fatty_st";
   std::string flag = login_shell ? "-lc" : "-c";
-  return {"bash " + flag + " " + shlex_quote(lines), mark};
+  const std::string sh = normalize_remote_shell(shell);
+  return {sh + " " + flag + " " + shlex_quote(lines), mark};
 }
 
 CwdOutputFilter::CwdOutputFilter(std::string mark, std::function<void(const std::string&)> on_output)
