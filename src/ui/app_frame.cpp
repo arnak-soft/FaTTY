@@ -114,6 +114,18 @@ AppFrame::AppFrame(Config config, SessionVault vault)
   if (!config_.settings.window_geometry.empty() && geometry_on_screen(config_.settings.window_geometry)) {
     restore_window_geometry(this, config_.settings.window_geometry, true);
   }
+  // Размеры оконного режима и признак «развёрнуто» храним отдельно, чтобы
+  // максимизация не перезатирала последнюю оконную геометрию.
+  window_maximized_ = config_.settings.window_state == "zoomed";
+  normal_geometry_ = window_geometry(this);
+  Bind(wxEVT_SIZE, [this](wxSizeEvent& e) {
+    track_window_state();
+    e.Skip();
+  });
+  Bind(wxEVT_MOVE, [this](wxMoveEvent& e) {
+    track_window_state();
+    e.Skip();
+  });
   apply_dark(this);
   register_window(GetHWND());
   refresh_servers(config_.settings.last_server_id);
@@ -1216,9 +1228,19 @@ void AppFrame::request_close_for_install() {
   Close(true);
 }
 
+// Габариты запоминаем только в оконном режиме: в развёрнутом и свёрнутом
+// состоянии актуальные размеры окна не отражают оконный режим.
+void AppFrame::track_window_state() {
+  if (IsIconized()) return;
+  window_maximized_ = IsMaximized();
+  if (window_maximized_ || IsFullScreen()) return;
+  normal_geometry_ = window_geometry(this);
+}
+
 void AppFrame::persist() {
-  config_.settings.window_geometry = window_geometry(this);
-  config_.settings.window_state = IsMaximized() ? "zoomed" : "normal";
+  track_window_state();
+  if (!normal_geometry_.empty()) config_.settings.window_geometry = normal_geometry_;
+  config_.settings.window_state = window_maximized_ ? "zoomed" : "normal";
   if (hsplit_) config_.settings.sash_pos = hsplit_->GetSashPosition();
   if (vsplit_) config_.settings.vsash_pos = vsplit_->GetSashPosition();
   store_list_columns(servers_, config_.settings, "servers", server_column_ids());

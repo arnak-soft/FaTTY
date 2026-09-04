@@ -76,6 +76,7 @@ class AppFrame : public wxFrame {
   void check_updates_async(bool interactive);
   void open_settings();
   void restore_columns();
+  void track_window_state();
   void rebuild_extra_tools();
   void show_servers_context_menu(long row);
   void show_commands_context_menu(long row);
@@ -100,6 +101,8 @@ class AppFrame : public wxFrame {
   bool restoring_ = true;
   bool updating_groups_ = false;
   bool checking_updates_ = false;
+  bool window_maximized_ = false;
+  std::string normal_geometry_;
   std::string server_filter_;
   std::string busy_label_;
   std::chrono::steady_clock::time_point run_start_{};
