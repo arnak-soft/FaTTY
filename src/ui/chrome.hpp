@@ -8,6 +8,8 @@
 
 class wxBookCtrlEvent;
 class wxCommandEvent;
+class wxMouseCaptureLostEvent;
+class wxMouseEvent;
 
 namespace fatty {
 
@@ -77,7 +79,11 @@ class RoundButton : public wxControl {
  private:
   void on_paint(wxPaintEvent&);
   void on_size(wxSizeEvent&);
+  void on_mouse(wxMouseEvent&);
+  void on_capture_lost(wxMouseCaptureLostEvent&);
   void fire();
+  void fire_async();
+  void sync_hover();
   BtnIcon icon_ = BtnIcon::None;
   bool hovered_ = false;
   bool pressed_ = false;

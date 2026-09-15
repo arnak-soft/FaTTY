@@ -6,11 +6,13 @@
 #include <wx/dcbuffer.h>
 #include <wx/dcclient.h>
 #include <wx/dcgraph.h>
+#include <wx/event.h>
 #include <wx/graphics.h>
 #include <wx/notebook.h>
 #include <wx/sizer.h>
 #include <wx/textctrl.h>
 #include <wx/toplevel.h>
+#include <wx/utils.h>
 #include <wx/window.h>
 #include <algorithm>
 #include <cmath>
@@ -363,29 +365,13 @@ RoundButton::RoundButton(wxWindow* parent, wxWindowID id, const wxString& label,
   SetCursor(wxCURSOR_HAND);
   Bind(wxEVT_PAINT, &RoundButton::on_paint, this);
   Bind(wxEVT_SIZE, &RoundButton::on_size, this);
-  Bind(wxEVT_ENTER_WINDOW, [this](wxMouseEvent&) {
-    hovered_ = true;
-    Refresh();
-  });
-  Bind(wxEVT_LEAVE_WINDOW, [this](wxMouseEvent&) {
-    hovered_ = false;
-    pressed_ = false;
-    Refresh();
-  });
-  Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent&) {
-    if (!IsEnabled()) return;
-    pressed_ = true;
-    CaptureMouse();
-    Refresh();
-  });
-  Bind(wxEVT_LEFT_UP, [this](wxMouseEvent& e) {
-    if (HasCapture()) ReleaseMouse();
-    const bool inside = GetClientRect().Contains(e.GetPosition());
-    const bool was = pressed_;
-    pressed_ = false;
-    Refresh();
-    if (was && inside && IsEnabled()) fire();
-  });
+  Bind(wxEVT_ENTER_WINDOW, &RoundButton::on_mouse, this);
+  Bind(wxEVT_LEAVE_WINDOW, &RoundButton::on_mouse, this);
+  Bind(wxEVT_LEFT_DOWN, &RoundButton::on_mouse, this);
+  Bind(wxEVT_LEFT_DCLICK, &RoundButton::on_mouse, this);
+  Bind(wxEVT_LEFT_UP, &RoundButton::on_mouse, this);
+  Bind(wxEVT_MOTION, &RoundButton::on_mouse, this);
+  Bind(wxEVT_MOUSE_CAPTURE_LOST, &RoundButton::on_capture_lost, this);
   Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
     if (IsEnabled() && (e.GetKeyCode() == WXK_RETURN || e.GetKeyCode() == WXK_SPACE)) {
       fire();
@@ -402,6 +388,11 @@ void RoundButton::on_size(wxSizeEvent& e) {
 
 bool RoundButton::Enable(bool enable) {
   const bool changed = wxControl::Enable(enable);
+  if (!enable) {
+    if (HasCapture()) ReleaseMouse();
+    hovered_ = false;
+    pressed_ = false;
+  }
   Refresh();
   return changed;
 }
@@ -458,6 +449,61 @@ void RoundButton::fire() {
   ProcessWindowEvent(ev);
 }
 
+void RoundButton::fire_async() {
+  CallAfter([this] {
+    if (IsBeingDeleted() || !IsEnabled()) return;
+    fire();
+    if (!IsBeingDeleted()) sync_hover();
+  });
+}
+
+void RoundButton::sync_hover() {
+  const wxPoint pt = ScreenToClient(wxGetMousePosition());
+  const bool inside = IsEnabled() && IsShown() && GetClientRect().Contains(pt);
+  if (hovered_ == inside && (HasCapture() || !pressed_)) return;
+  hovered_ = inside;
+  if (!HasCapture()) pressed_ = false;
+  Refresh();
+}
+
+void RoundButton::on_capture_lost(wxMouseCaptureLostEvent&) {
+  pressed_ = false;
+  sync_hover();
+}
+
+void RoundButton::on_mouse(wxMouseEvent& e) {
+  const bool inside = GetClientRect().Contains(e.GetPosition());
+  const wxEventType t = e.GetEventType();
+  if (t == wxEVT_LEFT_DOWN || t == wxEVT_LEFT_DCLICK) {
+    if (!IsEnabled()) return;
+    pressed_ = true;
+    hovered_ = true;
+    if (!HasCapture()) CaptureMouse();
+    Refresh();
+    return;
+  }
+  if (t == wxEVT_LEFT_UP) {
+    const bool click = pressed_ && inside && IsEnabled();
+    pressed_ = false;
+    if (HasCapture()) ReleaseMouse();
+    hovered_ = inside;
+    Refresh();
+    Update();
+    if (click) fire_async();
+    return;
+  }
+  if (t == wxEVT_LEAVE_WINDOW) {
+    hovered_ = false;
+    if (!HasCapture()) pressed_ = false;
+    Refresh();
+    return;
+  }
+  if (hovered_ != inside) {
+    hovered_ = inside;
+    Refresh();
+  }
+}
+
 void RoundButton::on_paint(wxPaintEvent&) {
   wxAutoBufferedPaintDC dc(this);
   const wxColour parent_bg = GetParent() ? GetParent()->GetBackgroundColour() : Theme::bg();
@@ -468,7 +514,7 @@ void RoundButton::on_paint(wxPaintEvent&) {
   if (!IsEnabled()) {
     fill = Theme::chrome();
     fg = Theme::muted();
-  } else if (pressed_) {
+  } else if (pressed_ && hovered_) {
     fill = shift(fill, theme_is_dark() ? -18 : -22);
   } else if (hovered_) {
     fill = accent ? shift(fill, 16) : Theme::hover();
