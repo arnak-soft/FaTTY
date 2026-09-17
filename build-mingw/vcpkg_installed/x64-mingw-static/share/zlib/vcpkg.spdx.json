@@ -3,13 +3,13 @@
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "documentNamespace": "https://spdx.org/spdxdocs/zlib-x64-mingw-static-1.3.2#2-054901e4-4730-4c8f-be89-d9df1a459f40",
-  "name": "zlib:x64-mingw-static@1.3.2#2 26bb13cae0d3d4309287be88d8397fe51f03262875a1cc7a7053390fc2eab564",
+  "documentNamespace": "https://spdx.org/spdxdocs/zlib-x64-mingw-static-1.3.2#2-343f3d79-7033-431c-adf5-8de2560c508b",
+  "name": "zlib:x64-mingw-static@1.3.2#2 dd2b95dea985a760e52a103bc110c16ced359cf88bea4e195e6e6518244298cc",
   "creationInfo": {
     "creators": [
       "Tool: vcpkg-2026-07-27-98d7cb0cf1f4686a3e43aa5672b6230c1d56bce8"
     ],
-    "created": "2026-09-16T21:25:48Z"
+    "created": "2026-09-17T10:46:21Z"
   },
   "relationships": [
     {
@@ -196,7 +196,7 @@
     {
       "name": "zlib:x64-mingw-static",
       "SPDXID": "SPDXRef-binary",
-      "versionInfo": "26bb13cae0d3d4309287be88d8397fe51f03262875a1cc7a7053390fc2eab564",
+      "versionInfo": "dd2b95dea985a760e52a103bc110c16ced359cf88bea4e195e6e6518244298cc",
       "downloadLocation": "NONE",
       "licenseConcluded": "Zlib",
       "licenseDeclared": "NOASSERTION",
@@ -297,7 +297,7 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "a17e85d2ddc07812356bd023f2635ba7d704283cff6a0bfcd3784afa2df1a9d9"
+          "checksumValue": "2d4778083202148cf9373f7870ca1748d143ef1b37fce27466c0ffd97b0effa7"
         }
       ],
       "licenseConcluded": "NOASSERTION",
@@ -345,7 +345,7 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "f2587605f75ba2322928f0a7330f431440d17653da39b0eccd0aa2845b3842d2"
+          "checksumValue": "a8ea4f60c6e29dcabaaf4d5a69c8666776b90dc7b89f6bbd009fa9d4b5fbc3bc"
         }
       ],
       "licenseConcluded": "NOASSERTION",

@@ -3,13 +3,13 @@
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "documentNamespace": "https://spdx.org/spdxdocs/egl-registry-x64-mingw-static-2025-05-27-dfb6ad76-eb12-4e90-b7b8-58cfeecdac39",
-  "name": "egl-registry:x64-mingw-static@2025-05-27 5b3348d8003991b6d762f19f894f4c3a4f42c76a249a002428bc362aa0b51abd",
+  "documentNamespace": "https://spdx.org/spdxdocs/egl-registry-x64-mingw-static-2025-05-27-1e43f0bf-d7a2-40ab-a1a0-2a3b3ac02116",
+  "name": "egl-registry:x64-mingw-static@2025-05-27 115d5a98ad9a4f9e7fc8cf86b28253e34301e72e960f138927bf921ee57566c8",
   "creationInfo": {
     "creators": [
       "Tool: vcpkg-2026-07-27-98d7cb0cf1f4686a3e43aa5672b6230c1d56bce8"
     ],
-    "created": "2026-09-16T21:43:12Z"
+    "created": "2026-09-17T10:59:21Z"
   },
   "relationships": [
     {
@@ -106,7 +106,7 @@
     {
       "name": "egl-registry:x64-mingw-static",
       "SPDXID": "SPDXRef-binary",
-      "versionInfo": "5b3348d8003991b6d762f19f894f4c3a4f42c76a249a002428bc362aa0b51abd",
+      "versionInfo": "115d5a98ad9a4f9e7fc8cf86b28253e34301e72e960f138927bf921ee57566c8",
       "downloadLocation": "NONE",
       "licenseConcluded": "Apache-2.0",
       "licenseDeclared": "NOASSERTION",

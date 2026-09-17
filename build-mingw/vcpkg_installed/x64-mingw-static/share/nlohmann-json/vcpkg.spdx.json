@@ -3,13 +3,13 @@
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "documentNamespace": "https://spdx.org/spdxdocs/nlohmann-json-x64-mingw-static-3.12.0#2-6e643244-e0fc-4896-a7c2-d7ae48ff0728",
-  "name": "nlohmann-json:x64-mingw-static@3.12.0#2 4be996d80f7682e9b2e8f6bd77bf9df2b8f0890de7a792229ab19f7e591ba123",
+  "documentNamespace": "https://spdx.org/spdxdocs/nlohmann-json-x64-mingw-static-3.12.0#2-720560b1-5def-40ee-8385-b8e9496c248f",
+  "name": "nlohmann-json:x64-mingw-static@3.12.0#2 77df66ab78ae0e6f8a31ee6bf974a8a02fb3903488ea02c296869f53dac6b330",
   "creationInfo": {
     "creators": [
       "Tool: vcpkg-2026-07-27-98d7cb0cf1f4686a3e43aa5672b6230c1d56bce8"
     ],
-    "created": "2026-09-16T21:38:25Z"
+    "created": "2026-09-17T10:56:18Z"
   },
   "relationships": [
     {
@@ -346,7 +346,7 @@
     {
       "name": "nlohmann-json:x64-mingw-static",
       "SPDXID": "SPDXRef-binary",
-      "versionInfo": "4be996d80f7682e9b2e8f6bd77bf9df2b8f0890de7a792229ab19f7e591ba123",
+      "versionInfo": "77df66ab78ae0e6f8a31ee6bf974a8a02fb3903488ea02c296869f53dac6b330",
       "downloadLocation": "NONE",
       "licenseConcluded": "MIT",
       "licenseDeclared": "NOASSERTION",

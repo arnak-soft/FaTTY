@@ -3,13 +3,13 @@
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "documentNamespace": "https://spdx.org/spdxdocs/liblzma-x64-mingw-static-5.8.3-c6112945-6194-4fb8-8170-6602ea5647e0",
-  "name": "liblzma:x64-mingw-static@5.8.3 3fb7212b313509cb9683e664658fdd6c7b1ec3c2b0712cf768b704044275245d",
+  "documentNamespace": "https://spdx.org/spdxdocs/liblzma-x64-mingw-static-5.8.3-d31a4c73-81e3-4be9-8536-3749403bdc87",
+  "name": "liblzma:x64-mingw-static@5.8.3 ef66a937ead1a2fcedead1ce705b2cd3a3d2fb711403a800f7f9ecd7137702ff",
   "creationInfo": {
     "creators": [
       "Tool: vcpkg-2026-07-27-98d7cb0cf1f4686a3e43aa5672b6230c1d56bce8"
     ],
-    "created": "2026-09-16T21:39:48Z"
+    "created": "2026-09-17T10:57:13Z"
   },
   "relationships": [
     {
@@ -311,7 +311,7 @@
     {
       "name": "liblzma:x64-mingw-static",
       "SPDXID": "SPDXRef-binary",
-      "versionInfo": "3fb7212b313509cb9683e664658fdd6c7b1ec3c2b0712cf768b704044275245d",
+      "versionInfo": "ef66a937ead1a2fcedead1ce705b2cd3a3d2fb711403a800f7f9ecd7137702ff",
       "downloadLocation": "NONE",
       "licenseConcluded": "LicenseRef-vcpkg-null",
       "licenseDeclared": "NOASSERTION",
@@ -412,7 +412,7 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "c346660969abc26e753443d1aac96697bf52b039ee67eda242bbf8240ad173f0"
+          "checksumValue": "60425df23cfbbfcc3a627d6eb1a7b1ce85b032af20aa22cbee5da2ec7310b180"
         }
       ],
       "licenseConcluded": "NOASSERTION",
@@ -616,7 +616,7 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "74f54bccc9de66d861a38147db827d3dfb5b4607a50e3a1d83d2f6bf314ac14c"
+          "checksumValue": "092dac961738d993fcb3f16835b5189dcd7339040433ddb34fc77fda80b5862c"
         }
       ],
       "licenseConcluded": "NOASSERTION",
