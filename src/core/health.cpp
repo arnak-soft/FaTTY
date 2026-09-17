@@ -282,6 +282,11 @@ std::string health_remote_script(const HealthCollect& collect) {
     s += "  fs=$1; total=$2; used=$3; mp=$6;\n";
     s += "  if (fs ~ /^(tmpfs|devtmpfs|devfs|squashfs|proc|sysfs|cgroup)/) next;\n";
     s += "  if (mp ~ /^(\\/run|\\/sys|\\/proc|\\/dev)(\\/|$)/) next;\n";
+    if (!collect.docker_disks) {
+      s += "  if (fs ~ /^(overlay|fuse\\.overlayfs)/) next;\n";
+      s += "  if (mp ~ /\\/overlay2\\//) next;\n";
+      s += "  if (mp ~ /^(\\/var\\/lib\\/containerd|\\/var\\/lib\\/containers\\/storage\\/overlay|\\/run\\/containerd|\\/snap)(\\/|$)/) next;\n";
+    }
     s += "  if (mp==\"\") next;\n";
     s += "  printf \"disk=%s %s %s\\n\", mp, used, total;\n";
     s += "}'\n";
@@ -314,6 +319,34 @@ const HealthDisk* health_root_or_worst(const HealthSnapshot& snap) {
   }
   if (root) return root;
   return worst;
+}
+
+bool health_mount_is_virtual(std::string_view mount) {
+  if (mount.find("/overlay2/") != std::string_view::npos) return true;
+  if (mount.find("/overlay/") != std::string_view::npos &&
+      (mount.find("docker") != std::string_view::npos || mount.find("container") != std::string_view::npos)) {
+    return true;
+  }
+  const std::string_view prefixes[] = {
+      "/var/lib/docker/overlay", "/var/lib/containerd", "/var/lib/containers/storage/overlay",
+      "/run/containerd",         "/snap",
+  };
+  for (auto prefix : prefixes) {
+    if (mount.size() < prefix.size()) continue;
+    if (mount.substr(0, prefix.size()) != prefix) continue;
+    if (mount.size() == prefix.size() || mount[prefix.size()] == '/') return true;
+  }
+  return false;
+}
+
+void health_apply_virtual_disks(HealthSnapshot& snap, bool show_virtual, const HealthThresholds& thresholds) {
+  if (show_virtual) return;
+  const auto before = snap.disks.size();
+  snap.disks.erase(std::remove_if(snap.disks.begin(), snap.disks.end(),
+                                  [](const HealthDisk& d) { return health_mount_is_virtual(d.mount); }),
+                   snap.disks.end());
+  if (snap.disks.size() == before) return;
+  apply_health_thresholds(snap, thresholds);
 }
 
 std::string health_level_id(HealthLevel level) {

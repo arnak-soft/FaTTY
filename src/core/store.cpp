@@ -628,6 +628,7 @@ Config load_config_from(const std::filesystem::path& path) {
   st.health_show_ram = settings_raw.value("health_show_ram", true);
   st.health_show_disk = settings_raw.value("health_show_disk", true);
   st.health_show_load = settings_raw.value("health_show_load", true);
+  st.health_show_docker_disks = settings_raw.value("health_show_docker_disks", false);
   return cfg;
 }
 
@@ -755,6 +756,7 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"health_show_ram", config.settings.health_show_ram},
       {"health_show_disk", config.settings.health_show_disk},
       {"health_show_load", config.settings.health_show_load},
+      {"health_show_docker_disks", config.settings.health_show_docker_disks},
   };
   payload["settings"] = settings;
   try {

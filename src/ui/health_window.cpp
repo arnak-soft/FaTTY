@@ -34,6 +34,22 @@ wxColour health_colour(HealthLevel level) {
 
 HealthLevel bar_level(double pct, int warn, int crit) { return level_from_pct(pct, warn, crit); }
 
+HealthThresholds thresholds_of(const AppSettings& st) {
+  HealthThresholds t;
+  t.disk_warn = st.health_disk_warn;
+  t.disk_crit = st.health_disk_crit;
+  t.ram_warn = st.health_ram_warn;
+  t.ram_crit = st.health_ram_crit;
+  t.cpu_warn = st.health_cpu_warn;
+  t.cpu_crit = st.health_cpu_crit;
+  return t;
+}
+
+HealthSnapshot view_snap(HealthSnapshot snap, const AppSettings& st) {
+  health_apply_virtual_disks(snap, st.health_show_docker_disks, thresholds_of(st));
+  return snap;
+}
+
 void draw_h_bar(wxGraphicsContext* gfx, const wxRect& r, double pct, const wxColour& fill, const wxColour& track) {
   if (!gfx) return;
   gfx->SetAntialiasMode(wxANTIALIAS_DEFAULT);
@@ -490,7 +506,7 @@ void HealthWindow::rebuild_cards() {
   const auto st = settings_ ? *settings_ : AppSettings{};
   for (const auto& server : config_->servers) {
     auto* card = new HostCard(list_, this);
-    auto snap = monitor_->snapshot(server.id);
+    auto snap = view_snap(monitor_->snapshot(server.id), st);
     snap.server_id = server.id;
     snap.server_name = server.name;
     if (monitor_->checking_id() == server.id) {
@@ -517,12 +533,12 @@ void HealthWindow::show_detail() {
     detail_->Layout();
     return;
   }
-  auto snap = monitor_->snapshot(s->id);
+  const auto st = settings_ ? *settings_ : AppSettings{};
+  auto snap = view_snap(monitor_->snapshot(s->id), st);
   if (monitor_->checking_id() == s->id) {
     snap.checking = true;
     snap.level = HealthLevel::Checking;
   }
-  const auto st = settings_ ? *settings_ : AppSettings{};
 
   auto* title = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(s->name));
   title->SetFont(Theme::ui_title());

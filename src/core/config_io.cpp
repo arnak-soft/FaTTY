@@ -75,6 +75,7 @@ json portable_settings(const AppSettings& settings) {
       {"health_show_ram", settings.health_show_ram},
       {"health_show_disk", settings.health_show_disk},
       {"health_show_load", settings.health_show_load},
+      {"health_show_docker_disks", settings.health_show_docker_disks},
   };
 }
 
@@ -119,6 +120,7 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   settings.health_show_ram = raw.value("health_show_ram", settings.health_show_ram);
   settings.health_show_disk = raw.value("health_show_disk", settings.health_show_disk);
   settings.health_show_load = raw.value("health_show_load", settings.health_show_load);
+  settings.health_show_docker_disks = raw.value("health_show_docker_disks", settings.health_show_docker_disks);
 }
 
 std::pair<std::string, std::string> server_key(const std::string& name, const std::string& host) {

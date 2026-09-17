@@ -66,6 +66,9 @@ FATTYCWD_abc:/root
   expect(script.find("FATTYHEALTH v1") != std::string::npos, "script marker");
   expect(script.find("/proc/stat") != std::string::npos, "script cpu");
   expect(script.find("df -Pk") != std::string::npos, "script df");
+  expect(script.find("overlay2") != std::string::npos, "skip overlay by default");
+  auto with_docker = health_remote_script({true, true, true, true, true});
+  expect(with_docker.find("overlay2") == std::string::npos, "keep overlay when enabled");
   auto slim = health_remote_script({false, false, false, false});
   expect(slim.find("/proc/stat") == std::string::npos, "cpu off");
   expect(slim.find("df -Pk") == std::string::npos, "disk off");
@@ -76,6 +79,28 @@ FATTYCWD_abc:/root
   expect(format_uptime_sec(90061).find("д") != std::string::npos, "uptime days");
   expect(format_interval_label(86400) == "1 день", "interval day");
   expect(health_level_from_id(health_level_id(HealthLevel::Offline)) == HealthLevel::Offline, "level id roundtrip");
+
+  expect(health_mount_is_virtual("/var/lib/docker/overlay2/abc/merged"), "docker overlay2");
+  expect(health_mount_is_virtual("/mnt/data/docker/overlay2/xyz/merged"), "custom docker root");
+  expect(health_mount_is_virtual("/snap/core/123"), "snap");
+  expect(!health_mount_is_virtual("/"), "root is real");
+  expect(!health_mount_is_virtual("/boot"), "boot is real");
+  expect(!health_mount_is_virtual("/var/lib/docker/volumes/db/_data"), "named volume stays");
+  HealthSnapshot virt;
+  virt.checked_at = 1;
+  virt.cpu_pct = 4;
+  virt.disks.push_back({"/", 830, 1000});
+  virt.disks.push_back({"/var/lib/docker/overlay2/a/merged", 830, 1000});
+  virt.disks.push_back({"/boot", 13, 100});
+  HealthThresholds warn80;
+  warn80.disk_warn = 80;
+  warn80.disk_crit = 90;
+  apply_health_thresholds(virt, warn80);
+  expect(virt.level == HealthLevel::Warn, "overlay kept in status");
+  health_apply_virtual_disks(virt, false, warn80);
+  expect(virt.disks.size() == 2, "overlay dropped");
+  expect(virt.disks[0].mount == "/" && virt.disks[1].mount == "/boot", "kept real mounts");
+  expect(virt.level == HealthLevel::Warn, "root 83% still warn");
 
   const auto dir = std::filesystem::temp_directory_path() / ("fatty-health-" + new_uuid());
   std::error_code ec;

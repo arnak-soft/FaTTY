@@ -65,6 +65,7 @@ class SettingsDialog : public PositionedDialog {
   wxCheckBox* health_ram_{};
   wxCheckBox* health_disk_{};
   wxCheckBox* health_load_{};
+  wxCheckBox* health_docker_disks_{};
 };
 
 }  // namespace fatty

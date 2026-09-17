@@ -84,7 +84,8 @@ HealthThresholds HealthMonitor::thresholds_from(const AppSettings& st) const {
 }
 
 HealthCollect HealthMonitor::collect_from(const AppSettings& st) const {
-  return {st.health_show_cpu, st.health_show_ram, st.health_show_disk, st.health_show_load};
+  return {st.health_show_cpu, st.health_show_ram, st.health_show_disk, st.health_show_load,
+          st.health_show_docker_disks};
 }
 
 void HealthMonitor::tick() {

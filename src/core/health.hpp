@@ -46,6 +46,7 @@ struct HealthCollect {
   bool ram = true;
   bool disk = true;
   bool load = true;
+  bool docker_disks = false;
 };
 
 struct HealthSnapshot {
@@ -78,6 +79,8 @@ bool health_is_due(const HealthSnapshot& snap, int interval_sec, double now_unix
 double unix_now();
 
 const HealthDisk* health_root_or_worst(const HealthSnapshot& snap);
+bool health_mount_is_virtual(std::string_view mount);
+void health_apply_virtual_disks(HealthSnapshot& snap, bool show_virtual, const HealthThresholds& thresholds);
 
 std::string health_level_id(HealthLevel level);
 HealthLevel health_level_from_id(std::string_view id);

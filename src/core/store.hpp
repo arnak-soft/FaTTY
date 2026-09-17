@@ -116,6 +116,7 @@ struct AppSettings {
   bool health_show_ram = true;
   bool health_show_disk = true;
   bool health_show_load = true;
+  bool health_show_docker_disks = false;
 };
 
 struct Config {

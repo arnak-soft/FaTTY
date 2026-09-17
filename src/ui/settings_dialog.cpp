@@ -232,6 +232,11 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   health_disk_->SetValue(st.health_show_disk);
   health_load_ = new wxCheckBox(health_page, wxID_ANY, L"Нагрузка (load average)");
   health_load_->SetValue(st.health_show_load);
+  health_docker_disks_ = new wxCheckBox(health_page, wxID_ANY, L"Тома Docker overlay / snap");
+  health_docker_disks_->SetValue(st.health_show_docker_disks);
+  health_docker_disks_->SetToolTip(
+      L"Слои контейнеров на том же диске, что и /. Снятая галочка прячет их с графика. "
+      L"После включения нажмите «Обновить» в окне Состояние.");
   auto* mrow = new wxBoxSizer(wxHORIZONTAL);
   mrow->Add(health_cpu_, 0, wxRIGHT, 12);
   mrow->Add(health_ram_, 0, wxRIGHT, 12);
@@ -263,6 +268,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   hsz->Add(trow_h, 0, wxALL, 8);
   hsz->Add(metrics_label, 0, wxLEFT | wxRIGHT | wxTOP, 8);
   hsz->Add(mrow, 0, wxALL, 8);
+  hsz->Add(health_docker_disks_, 0, wxLEFT | wxRIGHT | wxBOTTOM, 8);
   hsz->Add(color_label, 0, wxLEFT | wxRIGHT | wxTOP, 8);
   hsz->Add(color_hint, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
   hsz->Add(disk_row, 0, wxALL, 8);
@@ -276,6 +282,11 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
       health_interval_sec_->SetValue(std::to_wstring(kHealthIntervalChoices[sel]));
     }
   });
+  auto sync_docker_disks = [this] {
+    health_docker_disks_->Enable(health_disk_->GetValue());
+  };
+  health_disk_->Bind(wxEVT_CHECKBOX, [sync_docker_disks](wxCommandEvent&) { sync_docker_disks(); });
+  sync_docker_disks();
 
   extra_programs_ = st.extra_programs;
   auto* programs = new wxPanel(nb);
@@ -529,6 +540,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.health_show_ram = health_ram_->GetValue();
   config_.settings.health_show_disk = health_disk_->GetValue();
   config_.settings.health_show_load = health_load_->GetValue();
+  config_.settings.health_show_docker_disks = health_docker_disks_->GetValue();
   if (on_apply_) on_apply_();
   EndModal(wxID_OK);
 }
