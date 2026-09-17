@@ -20,6 +20,7 @@ struct Server {
   std::string password_blob;
   std::string key_path;
   std::string remote_shell = "bash";
+  bool health_enabled = true;
 
   static Server make_new();
   Server duplicate(const std::string& new_name) const;
@@ -102,6 +103,19 @@ struct AppSettings {
   bool backup_enabled = true;
   double last_backup = 0.0;
   std::map<std::string, std::string> last_group_by_server;
+  bool health_auto = false;
+  int health_interval_sec = 86400;
+  int health_timeout_sec = 20;
+  int health_disk_warn = 80;
+  int health_disk_crit = 90;
+  int health_ram_warn = 80;
+  int health_ram_crit = 90;
+  int health_cpu_warn = 80;
+  int health_cpu_crit = 95;
+  bool health_show_cpu = true;
+  bool health_show_ram = true;
+  bool health_show_disk = true;
+  bool health_show_load = true;
 };
 
 struct Config {

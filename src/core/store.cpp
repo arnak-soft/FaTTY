@@ -482,6 +482,7 @@ Config load_config_from(const std::filesystem::path& path) {
     s.password_blob = raw.value("password_vault", "");
     s.key_path = raw.value("key_path", "");
     s.remote_shell = normalize_remote_shell(raw.value("remote_shell", std::string("bash")));
+    s.health_enabled = raw.value("health_enabled", true);
     const std::string legacy = raw.value("password_encrypted", "");
     if (!vault_ok && !legacy.empty()) {
       try {
@@ -614,6 +615,19 @@ Config load_config_from(const std::filesystem::path& path) {
       }
     }
   }
+  st.health_auto = settings_raw.value("health_auto", false);
+  st.health_interval_sec = json_int(settings_raw, "health_interval_sec", 86400, 300, 30 * 24 * 3600);
+  st.health_timeout_sec = json_int(settings_raw, "health_timeout_sec", 20, 5, 120);
+  st.health_disk_warn = json_int(settings_raw, "health_disk_warn", 80, 1, 100);
+  st.health_disk_crit = json_int(settings_raw, "health_disk_crit", 90, 1, 100);
+  st.health_ram_warn = json_int(settings_raw, "health_ram_warn", 80, 1, 100);
+  st.health_ram_crit = json_int(settings_raw, "health_ram_crit", 90, 1, 100);
+  st.health_cpu_warn = json_int(settings_raw, "health_cpu_warn", 80, 1, 100);
+  st.health_cpu_crit = json_int(settings_raw, "health_cpu_crit", 95, 1, 100);
+  st.health_show_cpu = settings_raw.value("health_show_cpu", true);
+  st.health_show_ram = settings_raw.value("health_show_ram", true);
+  st.health_show_disk = settings_raw.value("health_show_disk", true);
+  st.health_show_load = settings_raw.value("health_show_load", true);
   return cfg;
 }
 
@@ -654,6 +668,7 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
         {"password_vault", s.password.empty() ? "" : vault.encrypt_secret(s.password)},
         {"key_path", s.key_path},
         {"remote_shell", normalize_remote_shell(s.remote_shell)},
+        {"health_enabled", s.health_enabled},
     };
     payload["servers"].push_back(item);
     s.password_blob = item["password_vault"].get<std::string>();
@@ -727,6 +742,19 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"backup_enabled", config.settings.backup_enabled},
       {"last_backup", config.settings.last_backup},
       {"last_group_by_server", config.settings.last_group_by_server},
+      {"health_auto", config.settings.health_auto},
+      {"health_interval_sec", config.settings.health_interval_sec},
+      {"health_timeout_sec", config.settings.health_timeout_sec},
+      {"health_disk_warn", config.settings.health_disk_warn},
+      {"health_disk_crit", config.settings.health_disk_crit},
+      {"health_ram_warn", config.settings.health_ram_warn},
+      {"health_ram_crit", config.settings.health_ram_crit},
+      {"health_cpu_warn", config.settings.health_cpu_warn},
+      {"health_cpu_crit", config.settings.health_cpu_crit},
+      {"health_show_cpu", config.settings.health_show_cpu},
+      {"health_show_ram", config.settings.health_show_ram},
+      {"health_show_disk", config.settings.health_show_disk},
+      {"health_show_load", config.settings.health_show_load},
   };
   payload["settings"] = settings;
   try {

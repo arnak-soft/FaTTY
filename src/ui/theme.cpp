@@ -2,6 +2,7 @@
 
 #include "ui/chrome.hpp"
 #include "ui/striped_list.hpp"
+#include "ui/terminal_view.hpp"
 
 #include <wx/button.h>
 #include <wx/checkbox.h>
@@ -170,6 +171,10 @@ void apply_theme(wxWindow* window) {
     window->SetForegroundColour(Theme::meta());
   } else if (auto* tc = dynamic_cast<wxTextCtrl*>(window)) {
     style_text(tc, name == L"terminal");
+  } else if (auto* term = dynamic_cast<TerminalView*>(window)) {
+    term->SetBackgroundColour(Theme::terminal());
+    term->SetForegroundColour(Theme::text());
+    term->SetFont(Theme::mono());
   } else if (auto* list = dynamic_cast<StripedListCtrl*>(window)) {
     list->restyle();
   } else if (dynamic_cast<wxListCtrl*>(window)) {

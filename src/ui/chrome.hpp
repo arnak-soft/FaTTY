@@ -43,6 +43,7 @@ enum class BtnIcon {
   WinSCP,
   App,
   Network,
+  Pulse,
   ArrowUp,
   ArrowDown,
   Sort,

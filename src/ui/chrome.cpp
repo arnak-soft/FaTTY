@@ -184,6 +184,13 @@ void draw_btn_icon(wxGraphicsContext* gfx, BtnIcon icon, double x, double y, dou
       rrect(9.0, 5.6, 4.6, 4.6, 1.4);
       line(7.0, 8.0, 9.0, 8.0);
       break;
+    case BtnIcon::Pulse:
+      line(2.0, 8.0, 5.0, 8.0);
+      line(5.0, 8.0, 6.6, 3.2);
+      line(6.6, 3.2, 8.4, 13.0);
+      line(8.4, 13.0, 10.2, 8.0);
+      line(10.2, 8.0, 14.0, 8.0);
+      break;
     case BtnIcon::ArrowUp:
       line(8, 12.8, 8, 3.6);
       line(4.4, 7.4, 8, 3.4);

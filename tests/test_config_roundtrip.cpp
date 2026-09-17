@@ -48,6 +48,12 @@ void test_config_roundtrip() {
   tool.args = "{sftp_url}";
   cfg.settings.extra_programs.push_back(tool);
   cfg.settings.last_group_by_server[s.id] = grp.id;
+  cfg.settings.health_auto = true;
+  cfg.settings.health_interval_sec = 3600;
+  cfg.settings.health_timeout_sec = 25;
+  cfg.settings.health_disk_warn = 70;
+  cfg.settings.health_show_load = false;
+  cfg.servers[0].health_enabled = false;
 
   SessionVault vault;
   vault.create("roundtrip-password");
@@ -67,6 +73,12 @@ void test_config_roundtrip() {
   expect(loaded.bundles[0].interval_sec == 7, "roundtrip bundle pause");
   expect(loaded.settings.extra_programs.size() == 1, "roundtrip extra program");
   expect(loaded.settings.last_group_by_server[s.id] == grp.id, "roundtrip last group");
+  expect(!loaded.servers[0].health_enabled, "roundtrip server health off");
+  expect(loaded.settings.health_auto, "roundtrip health_auto");
+  expect(loaded.settings.health_interval_sec == 3600, "roundtrip health interval");
+  expect(loaded.settings.health_timeout_sec == 25, "roundtrip health timeout");
+  expect(loaded.settings.health_disk_warn == 70, "roundtrip disk warn");
+  expect(!loaded.settings.health_show_load, "roundtrip hide load");
 
   nlohmann::json legacy = nlohmann::json::parse(R"({
     "vault": {},

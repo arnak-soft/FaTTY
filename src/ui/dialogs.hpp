@@ -36,6 +36,7 @@ class ServerDialog : public PositionedDialog {
   wxCheckBox* show_pw_{};
   wxCheckBox* clear_pw_{};
   wxComboBox* shell_{};
+  wxCheckBox* health_{};
   wxStaticText* error_{};
   std::string stored_password_;
 };

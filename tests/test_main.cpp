@@ -12,6 +12,7 @@ void test_backup();
 void test_placeholders();
 void test_updates();
 void test_config_roundtrip();
+void test_health();
 void test_checklist();
 void test_smoke();
 }  // namespace fatty::test
@@ -27,6 +28,7 @@ int main() {
     test_placeholders();
     test_updates();
     test_config_roundtrip();
+    test_health();
     test_checklist();
     test_smoke();
   } catch (const std::exception& exc) {

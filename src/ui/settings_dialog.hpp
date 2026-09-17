@@ -51,6 +51,20 @@ class SettingsDialog : public PositionedDialog {
   wxCheckBox* short_pw_{};
   wxTextCtrl* lockout_attempts_{};
   wxTextCtrl* lockout_minutes_{};
+  wxCheckBox* health_auto_{};
+  wxChoice* health_interval_{};
+  wxTextCtrl* health_interval_sec_{};
+  wxTextCtrl* health_timeout_{};
+  wxTextCtrl* health_disk_warn_{};
+  wxTextCtrl* health_disk_crit_{};
+  wxTextCtrl* health_ram_warn_{};
+  wxTextCtrl* health_ram_crit_{};
+  wxTextCtrl* health_cpu_warn_{};
+  wxTextCtrl* health_cpu_crit_{};
+  wxCheckBox* health_cpu_{};
+  wxCheckBox* health_ram_{};
+  wxCheckBox* health_disk_{};
+  wxCheckBox* health_load_{};
 };
 
 }  // namespace fatty

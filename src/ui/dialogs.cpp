@@ -37,10 +37,10 @@ wxTextCtrl* labeled_entry(wxWindow* parent, wxFlexGridSizer* grid, const wxStrin
 }  // namespace
 
 ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxString& title, bool is_new)
-    : PositionedDialog(parent, title, wxSize(520, 420)), server_(server), is_new_(is_new) {
+    : PositionedDialog(parent, title, wxSize(520, 480)), server_(server), is_new_(is_new) {
   stored_password_ = is_new ? "" : server.password;
   auto* body = new wxPanel(this);
-  auto* grid = new wxFlexGridSizer(8, 2, 8, 8);
+  auto* grid = new wxFlexGridSizer(9, 2, 8, 8);
   grid->AddGrowableCol(1);
   name_ = labeled_entry(body, grid, L"Имя", wxString::FromUTF8(server.name));
   host_ = labeled_entry(body, grid, L"Хост / IP", wxString::FromUTF8(server.host));
@@ -85,6 +85,10 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
                           wxArrayString{L"bash", L"sh"}, wxCB_READONLY);
   shell_->SetSelection(normalize_remote_shell(server.remote_shell) == "sh" ? 1 : 0);
   grid->Add(shell_, 1, wxEXPAND);
+  grid->Add(new wxStaticText(body, wxID_ANY, L""), 0);
+  health_ = new wxCheckBox(body, wxID_ANY, L"Учитывать в окне «Состояние VPS»");
+  health_->SetValue(server.health_enabled);
+  grid->Add(health_, 1, wxEXPAND);
 
   error_ = new wxStaticText(body, wxID_ANY, L"");
   error_->SetName(L"error");
@@ -191,6 +195,7 @@ void ServerDialog::on_ok(wxCommandEvent&) {
   result.password = password;
   result.key_path = key_path;
   result.remote_shell = normalize_remote_shell(std::string(shell_->GetValue().utf8_string()));
+  result.health_enabled = health_->GetValue();
   accepted = true;
   EndModal(wxID_OK);
 }
@@ -456,7 +461,7 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
   auto* form = new wxFlexGridSizer(2, 2, 6, 8);
   form->AddGrowableCol(1);
   name_ = labeled_entry(body, form, L"Название", wxString::FromUTF8(bundle.name));
-  interval_ = labeled_entry(body, form, L"Пауза по умолчанию, с",
+  interval_ = labeled_entry(body, form, L"Пауза между командами, с",
                             wxString::FromUTF8(std::to_string(bundle.interval_sec)));
 
   auto* lists = new wxBoxSizer(wxHORIZONTAL);

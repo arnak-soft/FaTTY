@@ -51,11 +51,13 @@ set(FATTY_CORE_SOURCES
   src/core/presets.cpp
   src/core/quote.cpp
   src/core/placeholders.cpp
+  src/core/health.cpp
   src/app/version.cpp
 )
 
 set(FATTY_NET_SOURCES
   src/net/ssh_session.cpp
+  src/net/shell_session.cpp
   src/net/sftp_session.cpp
   src/net/updates.cpp
   src/putty/ppk.cpp
@@ -74,6 +76,9 @@ set(FATTY_UI_SOURCES
   src/ui/journal_window.cpp
   src/ui/bundle_steps_window.cpp
   src/ui/help_window.cpp
+  src/ui/health_monitor.cpp
+  src/ui/health_window.cpp
+  src/ui/terminal_view.cpp
   src/ui/splash.cpp
   src/ui/app_frame.cpp
   src/app/single_instance.cpp
@@ -99,7 +104,8 @@ add_library(fatty_net STATIC ${FATTY_NET_SOURCES})
 target_include_directories(fatty_net PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(fatty_net PUBLIC fatty_core Libssh2::libssh2 OpenSSL::SSL OpenSSL::Crypto)
 if(WIN32)
-  target_link_libraries(fatty_net PUBLIC ws2_32 bcrypt winhttp)
+  # crypt32 после OpenSSL: иначе при static MinGW undefined Cert* из libcrypto
+  target_link_libraries(fatty_net PUBLIC ws2_32 bcrypt winhttp crypt32)
 endif()
 
 add_executable(fatty WIN32 ${FATTY_UI_SOURCES} src/app/fatty.rc)
@@ -116,7 +122,7 @@ target_link_libraries(fatty PRIVATE
   wx::base
 )
 if(WIN32)
-  target_link_libraries(fatty PRIVATE dwmapi uxtheme user32 gdi32 comctl32 ole32 uuid advapi32)
+  target_link_libraries(fatty PRIVATE dwmapi uxtheme user32 gdi32 comctl32 ole32 uuid advapi32 crypt32)
 endif()
 
 if(MSVC)
@@ -173,6 +179,7 @@ add_executable(fatty_tests
   tests/test_placeholders.cpp
   tests/test_updates.cpp
   tests/test_config_roundtrip.cpp
+  tests/test_health.cpp
   tests/test_checklist.cpp
   tests/test_smoke.cpp
 )

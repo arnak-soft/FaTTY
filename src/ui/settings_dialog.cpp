@@ -9,6 +9,7 @@
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
+#include <algorithm>
 #include <wx/checkbox.h>
 #include <wx/choice.h>
 #include <wx/dialog.h>
@@ -17,6 +18,7 @@
 #include <wx/listctrl.h>
 #include <wx/msgdlg.h>
 #include <wx/panel.h>
+#include <wx/scrolwin.h>
 #include <wx/sizer.h>
 #include <wx/statbox.h>
 #include <wx/stattext.h>
@@ -117,12 +119,14 @@ class ExtraProgramDialog : public wxDialog {
   wxStaticText* error_{};
 };
 
+constexpr int kHealthIntervalChoices[] = {300, 900, 3600, 6 * 3600, 12 * 3600, 86400, 3 * 86400, 7 * 86400};
+
 }  // namespace
 
 SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& vault, std::function<void()> on_apply,
                                std::function<void()> on_change_master, std::function<void()> on_check_updates,
                                std::function<void()> on_import_done)
-    : PositionedDialog(parent, L"Настройки", wxSize(600, 640)),
+    : PositionedDialog(parent, L"Настройки", wxSize(620, 680)),
       config_(config),
       vault_(vault),
       on_apply_(std::move(on_apply)),
@@ -173,6 +177,105 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   gsz->Add(jrow, 0, wxALL, 8);
   general->SetSizer(gsz);
   nb->AddPage(general, L"Общие");
+
+  auto* health_page = new wxScrolledWindow(nb, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
+  health_page->SetName(L"card-page");
+  health_page->SetScrollRate(0, 16);
+  auto* hsz = new wxBoxSizer(wxVERTICAL);
+  health_auto_ = new wxCheckBox(health_page, wxID_ANY, L"Автоматически опрашивать VPS по расписанию");
+  health_auto_->SetValue(st.health_auto);
+  auto* health_hint = new wxStaticText(
+      health_page, wxID_ANY,
+      L"По умолчанию выключено: окно «Состояние VPS» показывает последний замер, "
+      L"обновить можно вручную. Автоопрос — не чаще выбранного интервала, по одному хосту за раз.");
+  health_hint->SetName(L"muted");
+  health_hint->SetForegroundColour(Theme::muted());
+  health_hint->Wrap(FromDIP(520));
+  auto* irow = new wxBoxSizer(wxHORIZONTAL);
+  irow->Add(new wxStaticText(health_page, wxID_ANY, L"Интервал"), 0, wxALIGN_CENTER_VERTICAL);
+  wxArrayString intervals;
+  intervals.Add(L"5 минут");
+  intervals.Add(L"15 минут");
+  intervals.Add(L"1 час");
+  intervals.Add(L"6 часов");
+  intervals.Add(L"12 часов");
+  intervals.Add(L"1 день");
+  intervals.Add(L"3 дня");
+  intervals.Add(L"7 дней");
+  intervals.Add(L"свой…");
+  health_interval_ = new wxChoice(health_page, wxID_ANY, wxDefaultPosition, wxDefaultSize, intervals);
+  int interval_sel = 8;
+  for (int i = 0; i < 8; ++i) {
+    if (kHealthIntervalChoices[i] == st.health_interval_sec) {
+      interval_sel = i;
+      break;
+    }
+  }
+  health_interval_->SetSelection(interval_sel);
+  irow->Add(health_interval_, 0, wxLEFT, 8);
+  irow->Add(new wxStaticText(health_page, wxID_ANY, L"секунд"), 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 12);
+  health_interval_sec_ = new wxTextCtrl(health_page, wxID_ANY, std::to_wstring(st.health_interval_sec),
+                                        wxDefaultPosition, FromDIP(wxSize(80, -1)));
+  irow->Add(health_interval_sec_, 0, wxLEFT, 8);
+  auto* trow_h = new wxBoxSizer(wxHORIZONTAL);
+  trow_h->Add(new wxStaticText(health_page, wxID_ANY, L"Таймаут SSH, с"), 0, wxALIGN_CENTER_VERTICAL);
+  health_timeout_ = new wxTextCtrl(health_page, wxID_ANY, std::to_wstring(st.health_timeout_sec), wxDefaultPosition,
+                                   FromDIP(wxSize(64, -1)));
+  trow_h->Add(health_timeout_, 0, wxLEFT, 8);
+  auto* metrics_label = new wxStaticText(health_page, wxID_ANY, L"Что собирать и показывать");
+  metrics_label->SetName(L"section");
+  health_cpu_ = new wxCheckBox(health_page, wxID_ANY, L"CPU");
+  health_cpu_->SetValue(st.health_show_cpu);
+  health_ram_ = new wxCheckBox(health_page, wxID_ANY, L"RAM");
+  health_ram_->SetValue(st.health_show_ram);
+  health_disk_ = new wxCheckBox(health_page, wxID_ANY, L"Диск");
+  health_disk_->SetValue(st.health_show_disk);
+  health_load_ = new wxCheckBox(health_page, wxID_ANY, L"Нагрузка (load average)");
+  health_load_->SetValue(st.health_show_load);
+  auto* mrow = new wxBoxSizer(wxHORIZONTAL);
+  mrow->Add(health_cpu_, 0, wxRIGHT, 12);
+  mrow->Add(health_ram_, 0, wxRIGHT, 12);
+  mrow->Add(health_disk_, 0, wxRIGHT, 12);
+  mrow->Add(health_load_);
+  auto* color_label = new wxStaticText(health_page, wxID_ANY, L"Цвета шкал: жёлтый с … %, красный с … %");
+  color_label->SetName(L"section");
+  auto* color_hint = new wxStaticText(
+      health_page, wxID_ANY, L"Это только окраска диаграмм, не уведомления. Можно подогнать под свои серверы.");
+  color_hint->SetName(L"muted");
+  color_hint->SetForegroundColour(Theme::muted());
+  color_hint->Wrap(FromDIP(520));
+  auto thresh_row = [&](const wxString& name, int warn, int crit, wxTextCtrl** warn_ctrl, wxTextCtrl** crit_ctrl) {
+    auto* row = new wxBoxSizer(wxHORIZONTAL);
+    row->Add(new wxStaticText(health_page, wxID_ANY, name), 0, wxALIGN_CENTER_VERTICAL);
+    *warn_ctrl = new wxTextCtrl(health_page, wxID_ANY, std::to_wstring(warn), wxDefaultPosition, FromDIP(wxSize(48, -1)));
+    *crit_ctrl = new wxTextCtrl(health_page, wxID_ANY, std::to_wstring(crit), wxDefaultPosition, FromDIP(wxSize(48, -1)));
+    row->Add(*warn_ctrl, 0, wxLEFT, 8);
+    row->Add(new wxStaticText(health_page, wxID_ANY, L"/"), 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 4);
+    row->Add(*crit_ctrl, 0, wxLEFT, 4);
+    return row;
+  };
+  auto* disk_row = thresh_row(L"Диск", st.health_disk_warn, st.health_disk_crit, &health_disk_warn_, &health_disk_crit_);
+  auto* ram_row = thresh_row(L"RAM", st.health_ram_warn, st.health_ram_crit, &health_ram_warn_, &health_ram_crit_);
+  auto* cpu_row = thresh_row(L"CPU", st.health_cpu_warn, st.health_cpu_crit, &health_cpu_warn_, &health_cpu_crit_);
+  hsz->Add(health_auto_, 0, wxALL, 8);
+  hsz->Add(health_hint, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
+  hsz->Add(irow, 0, wxALL, 8);
+  hsz->Add(trow_h, 0, wxALL, 8);
+  hsz->Add(metrics_label, 0, wxLEFT | wxRIGHT | wxTOP, 8);
+  hsz->Add(mrow, 0, wxALL, 8);
+  hsz->Add(color_label, 0, wxLEFT | wxRIGHT | wxTOP, 8);
+  hsz->Add(color_hint, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
+  hsz->Add(disk_row, 0, wxALL, 8);
+  hsz->Add(ram_row, 0, wxALL, 8);
+  hsz->Add(cpu_row, 0, wxALL, 8);
+  health_page->SetSizer(hsz);
+  nb->AddPage(health_page, L"Состояние");
+  health_interval_->Bind(wxEVT_CHOICE, [this](wxCommandEvent&) {
+    const int sel = health_interval_->GetSelection();
+    if (sel >= 0 && sel < 8) {
+      health_interval_sec_->SetValue(std::to_wstring(kHealthIntervalChoices[sel]));
+    }
+  });
 
   extra_programs_ = st.extra_programs;
   auto* programs = new wxPanel(nb);
@@ -267,14 +370,14 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   arow->Add(new wxStaticText(sec, wxID_ANY, L"Попыток до блокировки"), 0, wxALIGN_CENTER_VERTICAL);
   lockout_attempts_ = new wxTextCtrl(sec, wxID_ANY, std::to_wstring(st.master_password_max_attempts));
   arow->Add(lockout_attempts_, 0, wxLEFT, 8);
-  auto* mrow = new wxBoxSizer(wxHORIZONTAL);
-  mrow->Add(new wxStaticText(sec, wxID_ANY, L"Минут блокировки"), 0, wxALIGN_CENTER_VERTICAL);
+  auto* lock_min_row = new wxBoxSizer(wxHORIZONTAL);
+  lock_min_row->Add(new wxStaticText(sec, wxID_ANY, L"Минут блокировки"), 0, wxALIGN_CENTER_VERTICAL);
   lockout_minutes_ = new wxTextCtrl(sec, wxID_ANY, std::to_wstring(st.master_password_lockout_minutes));
-  mrow->Add(lockout_minutes_, 0, wxLEFT, 8);
+  lock_min_row->Add(lockout_minutes_, 0, wxLEFT, 8);
   auto* chpw = make_button(sec, L"Сменить мастер-пароль…", BtnIcon::Key);
   ssz->Add(short_pw_, 0, wxALL, 8);
   ssz->Add(arow, 0, wxALL, 8);
-  ssz->Add(mrow, 0, wxALL, 8);
+  ssz->Add(lock_min_row, 0, wxALL, 8);
   ssz->Add(chpw, 0, wxALL, 8);
   sec->SetSizer(ssz);
   nb->AddPage(sec, L"Безопасность");
@@ -397,6 +500,35 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.allow_short_master_password = short_pw_->GetValue();
   config_.settings.master_password_max_attempts = clamp_int(attempts, 0, 100);
   config_.settings.master_password_lockout_minutes = clamp_int(minutes, 1, 24 * 60);
+  config_.settings.health_auto = health_auto_->GetValue();
+  int health_interval = config_.settings.health_interval_sec;
+  int health_timeout = config_.settings.health_timeout_sec;
+  int disk_warn = config_.settings.health_disk_warn;
+  int disk_crit = config_.settings.health_disk_crit;
+  int ram_warn = config_.settings.health_ram_warn;
+  int ram_crit = config_.settings.health_ram_crit;
+  int cpu_warn = config_.settings.health_cpu_warn;
+  int cpu_crit = config_.settings.health_cpu_crit;
+  parse_int(std::string(health_interval_sec_->GetValue().utf8_string()), health_interval);
+  parse_int(std::string(health_timeout_->GetValue().utf8_string()), health_timeout);
+  parse_int(std::string(health_disk_warn_->GetValue().utf8_string()), disk_warn);
+  parse_int(std::string(health_disk_crit_->GetValue().utf8_string()), disk_crit);
+  parse_int(std::string(health_ram_warn_->GetValue().utf8_string()), ram_warn);
+  parse_int(std::string(health_ram_crit_->GetValue().utf8_string()), ram_crit);
+  parse_int(std::string(health_cpu_warn_->GetValue().utf8_string()), cpu_warn);
+  parse_int(std::string(health_cpu_crit_->GetValue().utf8_string()), cpu_crit);
+  config_.settings.health_interval_sec = clamp_int(health_interval, 300, 30 * 24 * 3600);
+  config_.settings.health_timeout_sec = clamp_int(health_timeout, 5, 120);
+  config_.settings.health_disk_warn = clamp_int(disk_warn, 1, 100);
+  config_.settings.health_disk_crit = clamp_int(std::max(disk_crit, config_.settings.health_disk_warn), 1, 100);
+  config_.settings.health_ram_warn = clamp_int(ram_warn, 1, 100);
+  config_.settings.health_ram_crit = clamp_int(std::max(ram_crit, config_.settings.health_ram_warn), 1, 100);
+  config_.settings.health_cpu_warn = clamp_int(cpu_warn, 1, 100);
+  config_.settings.health_cpu_crit = clamp_int(std::max(cpu_crit, config_.settings.health_cpu_warn), 1, 100);
+  config_.settings.health_show_cpu = health_cpu_->GetValue();
+  config_.settings.health_show_ram = health_ram_->GetValue();
+  config_.settings.health_show_disk = health_disk_->GetValue();
+  config_.settings.health_show_load = health_load_->GetValue();
   if (on_apply_) on_apply_();
   EndModal(wxID_OK);
 }

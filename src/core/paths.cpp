@@ -69,6 +69,11 @@ const std::filesystem::path& lockout_path() {
   return path;
 }
 
+const std::filesystem::path& health_cache_path() {
+  static const auto path = app_dir() / "health.json";
+  return path;
+}
+
 const std::filesystem::path& error_log_path() {
   static const auto path = app_dir() / "fatty.log";
   return path;

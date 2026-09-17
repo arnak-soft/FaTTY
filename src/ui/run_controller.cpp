@@ -67,6 +67,7 @@ void RunController::start_ssh_run(Server server, std::string command, int timeou
     host_.output->Clear();
   }
   if (host_.busy_label) *host_.busy_label = "Выполняется: " + title + " → " + server.name;
+  if (host_.busy_server_id) *host_.busy_server_id = server.id;
   if (!chained && host_.set_busy) host_.set_busy(true);
   std::string cwd;
   if (host_.remote_cwd) cwd = (*host_.remote_cwd)[server.id];

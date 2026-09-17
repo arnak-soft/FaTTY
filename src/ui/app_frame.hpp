@@ -3,11 +3,14 @@
 #include "core/journal.hpp"
 #include "core/store.hpp"
 #include "core/vault.hpp"
+#include "net/shell_session.hpp"
 #include "net/ssh_session.hpp"
 #include "ui/bundle_controller.hpp"
 #include "ui/chrome.hpp"
+#include "ui/health_monitor.hpp"
 #include "ui/run_controller.hpp"
 #include "ui/striped_list.hpp"
+#include "ui/terminal_view.hpp"
 
 #include <wx/button.h>
 #include <wx/frame.h>
@@ -28,6 +31,7 @@ namespace fatty {
 class FilesWindow;
 class JournalWindow;
 class HelpWindow;
+class HealthWindow;
 class BundleStepsWindow;
 
 class AppFrame : public wxFrame {
@@ -41,6 +45,7 @@ class AppFrame : public wxFrame {
   void build_menu();
   void build_ui();
   void init_run_controllers();
+  void init_health_monitor();
   void persist();
   void maybe_run_backup();
   void apply_ui_theme();
@@ -70,7 +75,11 @@ class AppFrame : public wxFrame {
   void set_busy(bool busy);
   void update_cwd_label();
   void update_busy_indicator();
+  void shell_connect();
+  void shell_disconnect();
+  void update_shell_ui();
   void show_journal();
+  void show_health(const std::string& select_id = {});
   void show_help(const std::string& tab = {});
   void check_updates_interactive();
   void check_updates_async(bool interactive);
@@ -94,9 +103,11 @@ class AppFrame : public wxFrame {
   std::shared_ptr<SSHSession> session_;
   std::unique_ptr<RunController> runs_;
   std::unique_ptr<BundleController> bundle_run_;
+  std::unique_ptr<HealthMonitor> health_;
   std::map<std::string, std::string> remote_cwd_;
   std::map<std::string, CommandRunStats> command_stats_;
   bool busy_ = false;
+  std::string busy_server_id_;
   bool closing_for_install_ = false;
   bool restoring_ = true;
   bool updating_groups_ = false;
@@ -117,7 +128,14 @@ class AppFrame : public wxFrame {
   StripedListCtrl* commands_{};
   StripedListCtrl* bundles_{};
   std::vector<std::string> group_tab_ids_;
+  RoundedNotebook* bottom_nb_{};
   wxTextCtrl* output_{};
+  TerminalView* terminal_{};
+  RoundButton* shell_connect_btn_{};
+  RoundButton* shell_disconnect_btn_{};
+  wxStaticText* shell_status_{};
+  std::unique_ptr<ShellSession> shell_;
+  std::string shell_server_id_;
   wxTextCtrl* quick_{};
   wxStaticText* cwd_label_{};
   RoundButton* cwd_reset_{};
@@ -133,6 +151,7 @@ class AppFrame : public wxFrame {
   wxStaticText* status_{};
   std::map<std::string, FilesWindow*> files_windows_;
   JournalWindow* journal_window_ = nullptr;
+  HealthWindow* health_window_ = nullptr;
   HelpWindow* help_window_ = nullptr;
   BundleStepsWindow* bundle_steps_window_ = nullptr;
 };

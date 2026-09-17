@@ -13,6 +13,8 @@
 #include "ui/dialogs.hpp"
 #include "ui/files_window.hpp"
 #include "ui/help_window.hpp"
+#include "ui/health_monitor.hpp"
+#include "ui/health_window.hpp"
 #include "ui/journal_window.hpp"
 #include "ui/bundle_steps_window.hpp"
 #include "ui/bundle_controller.hpp"
@@ -31,7 +33,6 @@
 #include <wx/filedlg.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
-#include <wx/numdlg.h>
 #include <wx/panel.h>
 #include <wx/window.h>
 #include <wx/sizer.h>
@@ -111,6 +112,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
   build_menu();
   build_ui();
   init_run_controllers();
+  init_health_monitor();
   if (!config_.settings.window_geometry.empty() && geometry_on_screen(config_.settings.window_geometry)) {
     restore_window_geometry(this, config_.settings.window_geometry, true);
   }
@@ -139,6 +141,8 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     if (busy_ && session_) session_->cancel();
     if (bundle_run_) bundle_run_->cancel();
     if (runs_) runs_->clear_run_queue();
+    if (health_) health_->stop();
+    if (shell_) shell_->stop();
     // Закрытие подтверждено: гасим живой-токен, чтобы фоновые задачи не трогали окно.
     alive_->store(false);
     busy_timer_.Stop();
@@ -148,12 +152,19 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     for (int waited = 0; worker_running_->load() && waited < 3000; waited += 20) {
       std::this_thread::sleep_for(std::chrono::milliseconds(20));
     }
+    for (int waited = 0; health_ && health_->worker_busy() && waited < 3000; waited += 20) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
     persist();
     e.Skip();
   });
   Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
     if (auto* focus = wxWindow::FindFocus()) {
       if (auto* tlw = wxGetTopLevelParent(focus); tlw && tlw != this) {
+        e.Skip();
+        return;
+      }
+      if (terminal_ && (focus == terminal_ || terminal_->IsDescendant(focus))) {
         e.Skip();
         return;
       }
@@ -211,6 +222,7 @@ void AppFrame::build_menu() {
   auto* file = new wxMenu();
   file->Append(1001, L"Открыть папку конфига");
   file->Append(1002, L"Журнал команд…\tCtrl+J");
+  file->Append(1005, L"Состояние VPS…\tCtrl+H");
   file->AppendSeparator();
   file->Append(1003, L"Экспорт…");
   file->Append(1004, L"Импорт…");
@@ -233,6 +245,7 @@ void AppFrame::build_menu() {
   SetMenuBar(bar);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { open_directory(app_dir()); }, 1001);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_journal(); }, 1002);
+  Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_health(); }, 1005);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     bool secrets = wxMessageBox(L"Включить пароли VPS в файл?", L"Экспорт", wxYES_NO, this) == wxYES;
     if (secrets && wxMessageBox(L"Файл будет содержать пароли в открытом виде. Продолжить?", L"Экспорт", wxYES_NO, this) !=
@@ -321,11 +334,13 @@ void AppFrame::build_ui() {
   auto* putty = make_button(left, L"PuTTY", BtnIcon::Putty);
   auto* winscp = make_button(left, L"WinSCP", BtnIcon::WinSCP);
   auto* test = make_button(left, L"Проверить связь", BtnIcon::Network);
+  auto* health_btn = make_button(left, L"Состояние", BtnIcon::Pulse);
   add_btn(sact, files);
   add_btn(sact, cons);
   add_btn(sact, putty);
   add_btn(sact, winscp);
   add_btn(sact, test);
+  add_btn(sact, health_btn);
   extra_tools_parent_ = left;
   extra_tools_sizer_ = new wxWrapSizer(wxHORIZONTAL);
   auto* ls = new wxBoxSizer(wxVERTICAL);
@@ -454,7 +469,10 @@ void AppFrame::build_ui() {
   ts->Add(hsplit_, 1, wxEXPAND);
   top->SetSizer(ts);
 
-  auto* outp = new wxPanel(vsplit_);
+  auto* bottom = new wxPanel(vsplit_);
+  bottom_nb_ = new RoundedNotebook(bottom);
+
+  auto* outp = new wxPanel(bottom_nb_);
   cwd_label_ = new wxStaticText(outp, wxID_ANY, L"Папка: ~");
   cwd_label_->SetName(L"muted");
   cwd_reset_ = make_button(outp, L"Сбросить в ~", BtnIcon::Home);
@@ -479,10 +497,49 @@ void AppFrame::build_ui() {
   ot->Add(jbtn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
   ot->Add(clear, 0, wxALIGN_CENTER_VERTICAL);
   auto* os = new wxBoxSizer(wxVERTICAL);
-  os->Add(ot, 0, wxEXPAND);
-  os->Add(out_card, 1, wxEXPAND | wxTOP, gap);
+  os->Add(ot, 0, wxEXPAND | wxALL, pad);
+  os->Add(out_card, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, pad);
   outp->SetSizer(os);
-  vsplit_->SplitHorizontally(top, outp, FromDIP(420));
+
+  auto* shellp = new wxPanel(bottom_nb_);
+  shell_connect_btn_ = make_button(shellp, L"Подключить", BtnIcon::Terminal);
+  shell_disconnect_btn_ = make_button(shellp, L"Отключить", BtnIcon::Stop);
+  shell_disconnect_btn_->Enable(false);
+  shell_status_ = new wxStaticText(shellp, wxID_ANY, L"Выберите VPS и нажмите «Подключить»");
+  shell_status_->SetName(L"muted");
+  auto* shell_card = new RoundedCard(shellp);
+  terminal_ = new TerminalView(shell_card);
+  auto* shell_card_sz = new wxBoxSizer(wxVERTICAL);
+  shell_card_sz->Add(terminal_, 1, wxEXPAND);
+  shell_card->SetSizer(shell_card_sz);
+  auto* st = new wxBoxSizer(wxHORIZONTAL);
+  st->Add(shell_connect_btn_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
+  st->Add(shell_disconnect_btn_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, pad);
+  st->Add(shell_status_, 1, wxALIGN_CENTER_VERTICAL);
+  auto* ss = new wxBoxSizer(wxVERTICAL);
+  ss->Add(st, 0, wxEXPAND | wxALL, pad);
+  ss->Add(shell_card, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, pad);
+  shellp->SetSizer(ss);
+
+  bottom_nb_->AddPage(outp, L"Вывод", true);
+  bottom_nb_->AddPage(shellp, L"Shell", false);
+  auto* bottom_sz = new wxBoxSizer(wxVERTICAL);
+  bottom_sz->Add(bottom_nb_, 1, wxEXPAND);
+  bottom->SetSizer(bottom_sz);
+  vsplit_->SplitHorizontally(top, bottom, FromDIP(420));
+
+  terminal_->set_write_callback([this](const std::string& data) {
+    if (shell_ && shell_->running()) shell_->write(data);
+  });
+  terminal_->set_resize_callback([this](int cols, int rows) {
+    if (shell_ && shell_->running()) shell_->resize(cols, rows);
+  });
+  shell_connect_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { shell_connect(); });
+  shell_disconnect_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { shell_disconnect(); });
+  bottom_nb_->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
+    if (e.GetSelection() == 1 && terminal_) terminal_->SetFocus();
+    e.Skip();
+  });
 
   auto* status_bar = new wxPanel(panel);
   status_bar->SetName(L"chrome");
@@ -728,6 +785,10 @@ void AppFrame::build_ui() {
   test->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (s) run_command(*s, "echo OK && hostname && whoami && pwd", 30, true, "Проверка " + s->name, "", "test");
+  });
+  health_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    auto* s = selected_server();
+    show_health(s ? s->id : std::string{});
   });
   up->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* c = selected_command();
@@ -1077,6 +1138,28 @@ void AppFrame::show_journal() {
   journal_window_->Raise();
 }
 
+void AppFrame::show_health(const std::string& select_id) {
+  if (!health_window_) {
+    health_window_ = new HealthWindow(
+        this, health_.get(), &config_,
+        [this](const std::string& id) {
+          if (health_) health_->refresh(id);
+        },
+        [this] {
+          if (health_) health_->refresh_all();
+        },
+        &config_.settings, [this] { persist(); });
+    health_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
+      health_window_ = nullptr;
+      ev.Skip();
+    });
+  }
+  if (!select_id.empty()) health_window_->select_server(select_id);
+  health_window_->reload();
+  health_window_->Show();
+  health_window_->Raise();
+}
+
 void AppFrame::show_help(const std::string& tab) {
   if (!help_window_) {
     help_window_ = new HelpWindow(this, [this](const std::string& cmd) { quick_->SetValue(wxString::FromUTF8(cmd)); },
@@ -1198,6 +1281,8 @@ void AppFrame::open_settings() {
                        apply_ui_theme();
                        rebuild_extra_tools();
                        persist();
+                       if (health_) health_->wake();
+                       if (health_window_) health_window_->reload();
                      },
                      [this] {
                        ChangeMasterDialog d(this, vault_, config_.settings.allow_short_master_password);
@@ -1219,6 +1304,7 @@ bool AppFrame::files_busy() const {
 void AppFrame::request_close_for_install() {
   closing_for_install_ = true;
   if (session_) session_->cancel();
+  if (health_) health_->stop();
   wxWindowList top = wxTopLevelWindows;
   for (wxWindow* w : top) {
     if (auto* dlg = wxDynamicCast(w, wxDialog); dlg && dlg->IsModal()) {
@@ -1347,6 +1433,7 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
   if (sel >= 0) servers_->SetItemState(sel, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
   rebuild_group_tabs();
   refresh_commands();
+  if (health_window_) health_window_->reload();
 }
 
 void AppFrame::restore_columns() {
@@ -1362,6 +1449,7 @@ void AppFrame::apply_ui_theme() {
   style_list(commands_);
   if (bundles_) style_list(bundles_);
   if (journal_window_) apply_theme(journal_window_);
+  if (health_window_) apply_theme(health_window_);
   if (help_window_) apply_theme(help_window_);
   if (bundle_steps_window_) apply_theme(bundle_steps_window_);
   for (auto& [id, win] : files_windows_) {
@@ -1609,6 +1697,66 @@ void AppFrame::append_output(const std::string& text, const wxColour* colour) {
   output_->AppendText(wxString::FromUTF8(text));
 }
 
+void AppFrame::update_shell_ui() {
+  const bool on = shell_ && shell_->running();
+  if (shell_connect_btn_) shell_connect_btn_->Enable(!on);
+  if (shell_disconnect_btn_) shell_disconnect_btn_->Enable(on);
+}
+
+void AppFrame::shell_connect() {
+  auto* s = selected_server();
+  if (!s) {
+    wxMessageBox(L"Сначала выберите VPS.", L"Shell", wxOK | wxICON_INFORMATION, this);
+    return;
+  }
+  if (shell_ && shell_->running()) {
+    shell_disconnect();
+  }
+  terminal_->reset();
+  shell_server_id_ = s->id;
+  shell_status_->SetLabel(wxString::FromUTF8("Подключение к " + s->name + "…"));
+  update_shell_ui();
+  if (bottom_nb_) bottom_nb_->SetSelection(1);
+
+  shell_ = std::make_unique<ShellSession>();
+  auto alive = alive_;
+  Server srv = *s;
+  const int cols = terminal_->cols();
+  const int rows = terminal_->rows();
+  shell_->start(
+      srv, cols, rows,
+      [this, alive](const std::string& chunk) {
+        wxTheApp->CallAfter([this, alive, chunk] {
+          if (!alive->load() || !terminal_) return;
+          terminal_->feed(chunk);
+        });
+      },
+      [this, alive](const std::string& reason) {
+        wxTheApp->CallAfter([this, alive, reason] {
+          if (!alive->load()) return;
+          shell_server_id_.clear();
+          update_shell_ui();
+          if (shell_status_) {
+            shell_status_->SetLabel(wxString::FromUTF8(reason.empty() ? "Отключено" : reason));
+          }
+          if (status_) status_->SetLabel(wxString::FromUTF8("Shell: " + reason));
+        });
+      });
+  shell_status_->SetLabel(wxString::FromUTF8("Shell → " + s->name + " (" + s->host + ")"));
+  status_->SetLabel(wxString::FromUTF8("Shell подключён → " + s->name));
+  update_shell_ui();
+  terminal_->SetFocus();
+}
+
+void AppFrame::shell_disconnect() {
+  if (shell_) shell_->stop();
+  shell_.reset();
+  shell_server_id_.clear();
+  update_shell_ui();
+  if (shell_status_) shell_status_->SetLabel(L"Отключено");
+  if (status_) status_->SetLabel(L"Shell отключён");
+}
+
 void AppFrame::set_busy(bool busy) {
   busy_ = busy;
   stop_btn_->Enable(busy);
@@ -1625,9 +1773,11 @@ void AppFrame::set_busy(bool busy) {
     busy_gauge_->Pulse();
     busy_timer_.Start(250);
   } else {
+    busy_server_id_.clear();
     busy_timer_.Stop();
     busy_gauge_->Hide();
     if (auto* sizer = busy_gauge_->GetContainingSizer()) sizer->Layout();
+    if (health_) health_->wake();
   }
 }
 
@@ -1641,6 +1791,7 @@ void AppFrame::init_run_controllers() {
   rh.worker_running = worker_running_;
   rh.output = output_;
   rh.busy = &busy_;
+  rh.busy_server_id = &busy_server_id_;
   rh.busy_label = &busy_label_;
   rh.bundle_active = [this] { return bundle_run_ && bundle_run_->active(); };
   rh.append_output = [this](const std::string& text, const wxColour* colour) { append_output(text, colour); };
@@ -1663,6 +1814,20 @@ void AppFrame::init_run_controllers() {
                 command_run_working_dir(config_, cmd), cmd.cd_before_run, effective_remote_shell(srv, cmd));
   };
   bundle_run_ = std::make_unique<BundleController>(std::move(bh));
+}
+
+void AppFrame::init_health_monitor() {
+  HealthMonitor::Deps d;
+  d.servers = [this] { return config_.servers; };
+  d.settings = [this] { return config_.settings; };
+  d.busy_server_id = [this] { return busy_server_id_; };
+  d.alive = alive_;
+  d.on_change = [this, alive = alive_] {
+    if (!alive->load()) return;
+    if (health_window_) health_window_->reload();
+  };
+  health_ = std::make_unique<HealthMonitor>(std::move(d));
+  health_->start();
 }
 
 void AppFrame::update_busy_indicator() {
@@ -1791,17 +1956,9 @@ void AppFrame::start_bundle(const std::string& bundle_id_override) {
     wxMessageBox(L"В связке нет доступных команд (их удалили?).", L"Связка");
     return;
   }
-  long pause = wxGetNumberFromUser(
-      L"Пауза между командами, секунд.\n0 — запускать следующую сразу после предыдущей.\nСтоп прервёт очередь.",
-      L"Интервал", L"Запуск связки", b->interval_sec, 0, 3600, this);
-  if (pause < 0) return;
-  if (pause != b->interval_sec) {
-    b->interval_sec = static_cast<int>(pause);
-    persist();
-    refresh_bundles();
-  }
+  const int pause = b->interval_sec;
   auto msg = wxString::Format(L"Запустить связку «%s»?\n%d команд, пауза %d с.", wxString::FromUTF8(b->name),
-                              static_cast<int>(cmds.size()), static_cast<int>(pause));
+                              static_cast<int>(cmds.size()), pause);
   if (wxMessageBox(msg, L"Связка", wxYES_NO, this) != wxYES) return;
   if (busy_) {
     for (const auto& c : cmds) {
@@ -1810,7 +1967,7 @@ void AppFrame::start_bundle(const std::string& bundle_id_override) {
     }
     return;
   }
-  if (bundle_run_) bundle_run_->start(*s, b->name, std::move(cmds), static_cast<int>(pause));
+  if (bundle_run_) bundle_run_->start(*s, b->name, std::move(cmds), pause);
 }
 
 void AppFrame::add_group() {
@@ -1898,6 +2055,7 @@ void AppFrame::show_servers_context_menu(long row) {
   menu.Append(2006, L"WinSCP");
   menu.AppendSeparator();
   menu.Append(2007, L"Проверить связь");
+  menu.Append(2009, L"Состояние VPS…");
   menu.AppendSeparator();
   menu.Append(2008, L"Удалить");
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
@@ -2031,6 +2189,10 @@ void AppFrame::show_servers_context_menu(long row) {
     auto* s = selected_server();
     if (s) run_command(*s, "echo OK && hostname && whoami && pwd", 30, true, "Проверка " + s->name, "", "test");
   }, 2007);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto* s = selected_server();
+    show_health(s ? s->id : std::string{});
+  }, 2009);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) return;

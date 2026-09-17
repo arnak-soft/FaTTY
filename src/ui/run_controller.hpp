@@ -10,6 +10,7 @@
 #include <chrono>
 #include <deque>
 #include <functional>
+#include <map>
 #include <memory>
 #include <string>
 
@@ -42,6 +43,7 @@ class RunController {
     std::shared_ptr<std::atomic<bool>> worker_running;
     wxTextCtrl* output = nullptr;
     bool* busy = nullptr;
+    std::string* busy_server_id = nullptr;
     std::string* busy_label = nullptr;
     std::function<bool()> bundle_active;
     std::function<void(const std::string&, const wxColour*)> append_output;

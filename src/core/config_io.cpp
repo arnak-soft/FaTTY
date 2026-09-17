@@ -62,6 +62,19 @@ json portable_settings(const AppSettings& settings) {
       {"theme", settings.theme},
       {"show_command_folder_column", settings.show_command_folder_column},
       {"backup_enabled", settings.backup_enabled},
+      {"health_auto", settings.health_auto},
+      {"health_interval_sec", settings.health_interval_sec},
+      {"health_timeout_sec", settings.health_timeout_sec},
+      {"health_disk_warn", settings.health_disk_warn},
+      {"health_disk_crit", settings.health_disk_crit},
+      {"health_ram_warn", settings.health_ram_warn},
+      {"health_ram_crit", settings.health_ram_crit},
+      {"health_cpu_warn", settings.health_cpu_warn},
+      {"health_cpu_crit", settings.health_cpu_crit},
+      {"health_show_cpu", settings.health_show_cpu},
+      {"health_show_ram", settings.health_show_ram},
+      {"health_show_disk", settings.health_show_disk},
+      {"health_show_load", settings.health_show_load},
   };
 }
 
@@ -92,6 +105,20 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   settings.show_command_folder_column =
       raw.value("show_command_folder_column", settings.show_command_folder_column);
   settings.backup_enabled = raw.value("backup_enabled", settings.backup_enabled);
+  settings.health_auto = raw.value("health_auto", settings.health_auto);
+  settings.health_interval_sec =
+      clamp_int(raw.value("health_interval_sec", settings.health_interval_sec), 300, 30 * 24 * 3600);
+  settings.health_timeout_sec = clamp_int(raw.value("health_timeout_sec", settings.health_timeout_sec), 5, 120);
+  settings.health_disk_warn = clamp_int(raw.value("health_disk_warn", settings.health_disk_warn), 1, 100);
+  settings.health_disk_crit = clamp_int(raw.value("health_disk_crit", settings.health_disk_crit), 1, 100);
+  settings.health_ram_warn = clamp_int(raw.value("health_ram_warn", settings.health_ram_warn), 1, 100);
+  settings.health_ram_crit = clamp_int(raw.value("health_ram_crit", settings.health_ram_crit), 1, 100);
+  settings.health_cpu_warn = clamp_int(raw.value("health_cpu_warn", settings.health_cpu_warn), 1, 100);
+  settings.health_cpu_crit = clamp_int(raw.value("health_cpu_crit", settings.health_cpu_crit), 1, 100);
+  settings.health_show_cpu = raw.value("health_show_cpu", settings.health_show_cpu);
+  settings.health_show_ram = raw.value("health_show_ram", settings.health_show_ram);
+  settings.health_show_disk = raw.value("health_show_disk", settings.health_show_disk);
+  settings.health_show_load = raw.value("health_show_load", settings.health_show_load);
 }
 
 std::pair<std::string, std::string> server_key(const std::string& name, const std::string& host) {
@@ -109,6 +136,7 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
         {"port", server.port},
         {"username", server.username},
         {"key_path", server.key_path},
+        {"health_enabled", server.health_enabled},
     };
     if (include_secrets) {
       item["password"] = server.password;
@@ -237,6 +265,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       if (s.username.empty()) s.username = "root";
       s.password = raw.value("password", "");
       s.key_path = raw.value("key_path", "");
+      s.health_enabled = raw.value("health_enabled", true);
       imported_servers.push_back(std::move(s));
     }
   }

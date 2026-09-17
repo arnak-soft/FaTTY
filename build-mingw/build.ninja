@@ -57,6 +57,8 @@ build CMakeFiles/fatty_core.dir/src/core/util.cpp.obj: CXX_COMPILER__fatty_core_
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/paths.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/paths.cpp || cmake_object_order_depends_target_fatty_core
@@ -67,6 +69,8 @@ build CMakeFiles/fatty_core.dir/src/core/paths.cpp.obj: CXX_COMPILER__fatty_core
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/vault.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/vault.cpp || cmake_object_order_depends_target_fatty_core
@@ -77,6 +81,8 @@ build CMakeFiles/fatty_core.dir/src/core/vault.cpp.obj: CXX_COMPILER__fatty_core
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/dpapi.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/dpapi.cpp || cmake_object_order_depends_target_fatty_core
@@ -87,6 +93,8 @@ build CMakeFiles/fatty_core.dir/src/core/dpapi.cpp.obj: CXX_COMPILER__fatty_core
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/store.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/store.cpp || cmake_object_order_depends_target_fatty_core
@@ -97,6 +105,8 @@ build CMakeFiles/fatty_core.dir/src/core/store.cpp.obj: CXX_COMPILER__fatty_core
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/lockout.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/lockout.cpp || cmake_object_order_depends_target_fatty_core
@@ -107,6 +117,8 @@ build CMakeFiles/fatty_core.dir/src/core/lockout.cpp.obj: CXX_COMPILER__fatty_co
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/journal.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/journal.cpp || cmake_object_order_depends_target_fatty_core
@@ -117,6 +129,8 @@ build CMakeFiles/fatty_core.dir/src/core/journal.cpp.obj: CXX_COMPILER__fatty_co
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/config_io.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/config_io.cpp || cmake_object_order_depends_target_fatty_core
@@ -127,6 +141,8 @@ build CMakeFiles/fatty_core.dir/src/core/config_io.cpp.obj: CXX_COMPILER__fatty_
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/backup.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/backup.cpp || cmake_object_order_depends_target_fatty_core
@@ -137,6 +153,8 @@ build CMakeFiles/fatty_core.dir/src/core/backup.cpp.obj: CXX_COMPILER__fatty_cor
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/presets.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/presets.cpp || cmake_object_order_depends_target_fatty_core
@@ -147,6 +165,8 @@ build CMakeFiles/fatty_core.dir/src/core/presets.cpp.obj: CXX_COMPILER__fatty_co
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/quote.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/quote.cpp || cmake_object_order_depends_target_fatty_core
@@ -157,6 +177,8 @@ build CMakeFiles/fatty_core.dir/src/core/quote.cpp.obj: CXX_COMPILER__fatty_core
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/core/placeholders.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/placeholders.cpp || cmake_object_order_depends_target_fatty_core
@@ -167,6 +189,20 @@ build CMakeFiles/fatty_core.dir/src/core/placeholders.cpp.obj: CXX_COMPILER__fat
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
+  TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
+
+build CMakeFiles/fatty_core.dir/src/core/health.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/core/health.cpp || cmake_object_order_depends_target_fatty_core
+  CONFIG = Release
+  DEFINES = -DFATTY_SOURCE_DIR=\"D:/Tmap/_lab/_kursor/FaTTY\" -DNOMINMAX -DUNICODE -DWIN32_LEAN_AND_MEAN -D_UNICODE
+  DEP_FILE = CMakeFiles\fatty_core.dir\src\core\health.cpp.obj.d
+  FLAGS = -O3 -DNDEBUG -std=c++20 -Wall -Wextra -Wno-unused-parameter
+  INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
+  OBJECT_DIR = CMakeFiles\fatty_core.dir
+  OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\core
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 build CMakeFiles/fatty_core.dir/src/app/version.cpp.obj: CXX_COMPILER__fatty_core_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/app/version.cpp || cmake_object_order_depends_target_fatty_core
@@ -177,6 +213,8 @@ build CMakeFiles/fatty_core.dir/src/app/version.cpp.obj: CXX_COMPILER__fatty_cor
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_core.dir\src\app
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 
@@ -187,14 +225,15 @@ build CMakeFiles/fatty_core.dir/src/app/version.cpp.obj: CXX_COMPILER__fatty_cor
 #############################################
 # Link the static library libfatty_core.a
 
-build libfatty_core.a: CXX_STATIC_LIBRARY_LINKER__fatty_core_Release CMakeFiles/fatty_core.dir/src/core/util.cpp.obj CMakeFiles/fatty_core.dir/src/core/paths.cpp.obj CMakeFiles/fatty_core.dir/src/core/vault.cpp.obj CMakeFiles/fatty_core.dir/src/core/dpapi.cpp.obj CMakeFiles/fatty_core.dir/src/core/store.cpp.obj CMakeFiles/fatty_core.dir/src/core/lockout.cpp.obj CMakeFiles/fatty_core.dir/src/core/journal.cpp.obj CMakeFiles/fatty_core.dir/src/core/config_io.cpp.obj CMakeFiles/fatty_core.dir/src/core/backup.cpp.obj CMakeFiles/fatty_core.dir/src/core/presets.cpp.obj CMakeFiles/fatty_core.dir/src/core/quote.cpp.obj CMakeFiles/fatty_core.dir/src/core/placeholders.cpp.obj CMakeFiles/fatty_core.dir/src/app/version.cpp.obj
+build libfatty_core.a: CXX_STATIC_LIBRARY_LINKER__fatty_core_Release CMakeFiles/fatty_core.dir/src/core/util.cpp.obj CMakeFiles/fatty_core.dir/src/core/paths.cpp.obj CMakeFiles/fatty_core.dir/src/core/vault.cpp.obj CMakeFiles/fatty_core.dir/src/core/dpapi.cpp.obj CMakeFiles/fatty_core.dir/src/core/store.cpp.obj CMakeFiles/fatty_core.dir/src/core/lockout.cpp.obj CMakeFiles/fatty_core.dir/src/core/journal.cpp.obj CMakeFiles/fatty_core.dir/src/core/config_io.cpp.obj CMakeFiles/fatty_core.dir/src/core/backup.cpp.obj CMakeFiles/fatty_core.dir/src/core/presets.cpp.obj CMakeFiles/fatty_core.dir/src/core/quote.cpp.obj CMakeFiles/fatty_core.dir/src/core/placeholders.cpp.obj CMakeFiles/fatty_core.dir/src/core/health.cpp.obj CMakeFiles/fatty_core.dir/src/app/version.cpp.obj
   CONFIG = Release
   LANGUAGE_COMPILE_FLAGS = -O3 -DNDEBUG
   OBJECT_DIR = CMakeFiles\fatty_core.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_core.dir\fatty_core.pdb
   TARGET_FILE = libfatty_core.a
-  TARGET_PDB = fatty_core.a.dbg
+  TARGET_PDB = libfatty_core.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_core.dir
 
 # =============================================================================
@@ -214,6 +253,20 @@ build CMakeFiles/fatty_net.dir/src/net/ssh_session.cpp.obj: CXX_COMPILER__fatty_
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_net.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_net.dir\src\net
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_net.dir\fatty_net.pdb
+  TARGET_PDB = libfatty_net.pdb
+  TARGET_SUPPORT_DIR = CMakeFiles\fatty_net.dir
+
+build CMakeFiles/fatty_net.dir/src/net/shell_session.cpp.obj: CXX_COMPILER__fatty_net_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/net/shell_session.cpp || cmake_object_order_depends_target_fatty_net
+  CONFIG = Release
+  DEFINES = -DFATTY_SOURCE_DIR=\"D:/Tmap/_lab/_kursor/FaTTY\" -DNOMINMAX -DUNICODE -DWIN32_LEAN_AND_MEAN -D_UNICODE
+  DEP_FILE = CMakeFiles\fatty_net.dir\src\net\shell_session.cpp.obj.d
+  FLAGS = -O3 -DNDEBUG -std=c++20 -Wall -Wextra -Wno-unused-parameter
+  INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
+  OBJECT_DIR = CMakeFiles\fatty_net.dir
+  OBJECT_FILE_DIR = CMakeFiles\fatty_net.dir\src\net
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_net.dir\fatty_net.pdb
+  TARGET_PDB = libfatty_net.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_net.dir
 
 build CMakeFiles/fatty_net.dir/src/net/sftp_session.cpp.obj: CXX_COMPILER__fatty_net_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/net/sftp_session.cpp || cmake_object_order_depends_target_fatty_net
@@ -224,6 +277,8 @@ build CMakeFiles/fatty_net.dir/src/net/sftp_session.cpp.obj: CXX_COMPILER__fatty
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_net.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_net.dir\src\net
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_net.dir\fatty_net.pdb
+  TARGET_PDB = libfatty_net.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_net.dir
 
 build CMakeFiles/fatty_net.dir/src/net/updates.cpp.obj: CXX_COMPILER__fatty_net_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/net/updates.cpp || cmake_object_order_depends_target_fatty_net
@@ -234,6 +289,8 @@ build CMakeFiles/fatty_net.dir/src/net/updates.cpp.obj: CXX_COMPILER__fatty_net_
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_net.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_net.dir\src\net
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_net.dir\fatty_net.pdb
+  TARGET_PDB = libfatty_net.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_net.dir
 
 build CMakeFiles/fatty_net.dir/src/putty/ppk.cpp.obj: CXX_COMPILER__fatty_net_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/putty/ppk.cpp || cmake_object_order_depends_target_fatty_net
@@ -244,6 +301,8 @@ build CMakeFiles/fatty_net.dir/src/putty/ppk.cpp.obj: CXX_COMPILER__fatty_net_un
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_net.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_net.dir\src\putty
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_net.dir\fatty_net.pdb
+  TARGET_PDB = libfatty_net.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_net.dir
 
 build CMakeFiles/fatty_net.dir/src/putty/putty.cpp.obj: CXX_COMPILER__fatty_net_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/putty/putty.cpp || cmake_object_order_depends_target_fatty_net
@@ -254,6 +313,8 @@ build CMakeFiles/fatty_net.dir/src/putty/putty.cpp.obj: CXX_COMPILER__fatty_net_
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_net.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_net.dir\src\putty
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_net.dir\fatty_net.pdb
+  TARGET_PDB = libfatty_net.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_net.dir
 
 
@@ -264,14 +325,15 @@ build CMakeFiles/fatty_net.dir/src/putty/putty.cpp.obj: CXX_COMPILER__fatty_net_
 #############################################
 # Link the static library libfatty_net.a
 
-build libfatty_net.a: CXX_STATIC_LIBRARY_LINKER__fatty_net_Release CMakeFiles/fatty_net.dir/src/net/ssh_session.cpp.obj CMakeFiles/fatty_net.dir/src/net/sftp_session.cpp.obj CMakeFiles/fatty_net.dir/src/net/updates.cpp.obj CMakeFiles/fatty_net.dir/src/putty/ppk.cpp.obj CMakeFiles/fatty_net.dir/src/putty/putty.cpp.obj || libfatty_core.a
+build libfatty_net.a: CXX_STATIC_LIBRARY_LINKER__fatty_net_Release CMakeFiles/fatty_net.dir/src/net/ssh_session.cpp.obj CMakeFiles/fatty_net.dir/src/net/shell_session.cpp.obj CMakeFiles/fatty_net.dir/src/net/sftp_session.cpp.obj CMakeFiles/fatty_net.dir/src/net/updates.cpp.obj CMakeFiles/fatty_net.dir/src/putty/ppk.cpp.obj CMakeFiles/fatty_net.dir/src/putty/putty.cpp.obj || libfatty_core.a
   CONFIG = Release
   LANGUAGE_COMPILE_FLAGS = -O3 -DNDEBUG
   OBJECT_DIR = CMakeFiles\fatty_net.dir
   POST_BUILD = cd .
   PRE_LINK = cd .
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_net.dir\fatty_net.pdb
   TARGET_FILE = libfatty_net.a
-  TARGET_PDB = fatty_net.a.dbg
+  TARGET_PDB = libfatty_net.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_net.dir
 
 # =============================================================================
@@ -291,6 +353,8 @@ build CMakeFiles/fatty.dir/src/ui/theme.cpp.obj: CXX_COMPILER__fatty_unscanned_R
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/striped_list.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/striped_list.cpp || cmake_object_order_depends_target_fatty
@@ -301,6 +365,8 @@ build CMakeFiles/fatty.dir/src/ui/striped_list.cpp.obj: CXX_COMPILER__fatty_unsc
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/chrome.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/chrome.cpp || cmake_object_order_depends_target_fatty
@@ -311,6 +377,8 @@ build CMakeFiles/fatty.dir/src/ui/chrome.cpp.obj: CXX_COMPILER__fatty_unscanned_
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/layout.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/layout.cpp || cmake_object_order_depends_target_fatty
@@ -321,6 +389,8 @@ build CMakeFiles/fatty.dir/src/ui/layout.cpp.obj: CXX_COMPILER__fatty_unscanned_
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/widgets.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/widgets.cpp || cmake_object_order_depends_target_fatty
@@ -331,6 +401,8 @@ build CMakeFiles/fatty.dir/src/ui/widgets.cpp.obj: CXX_COMPILER__fatty_unscanned
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/dialogs.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/dialogs.cpp || cmake_object_order_depends_target_fatty
@@ -341,6 +413,8 @@ build CMakeFiles/fatty.dir/src/ui/dialogs.cpp.obj: CXX_COMPILER__fatty_unscanned
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/settings_dialog.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/settings_dialog.cpp || cmake_object_order_depends_target_fatty
@@ -351,6 +425,8 @@ build CMakeFiles/fatty.dir/src/ui/settings_dialog.cpp.obj: CXX_COMPILER__fatty_u
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/files_window.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/files_window.cpp || cmake_object_order_depends_target_fatty
@@ -361,6 +437,8 @@ build CMakeFiles/fatty.dir/src/ui/files_window.cpp.obj: CXX_COMPILER__fatty_unsc
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/journal_window.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/journal_window.cpp || cmake_object_order_depends_target_fatty
@@ -371,6 +449,8 @@ build CMakeFiles/fatty.dir/src/ui/journal_window.cpp.obj: CXX_COMPILER__fatty_un
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/bundle_steps_window.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/bundle_steps_window.cpp || cmake_object_order_depends_target_fatty
@@ -381,6 +461,8 @@ build CMakeFiles/fatty.dir/src/ui/bundle_steps_window.cpp.obj: CXX_COMPILER__fat
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/help_window.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/help_window.cpp || cmake_object_order_depends_target_fatty
@@ -391,6 +473,44 @@ build CMakeFiles/fatty.dir/src/ui/help_window.cpp.obj: CXX_COMPILER__fatty_unsca
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
+  TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
+
+build CMakeFiles/fatty.dir/src/ui/health_monitor.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/health_monitor.cpp || cmake_object_order_depends_target_fatty
+  CONFIG = Release
+  DEFINES = -DFATTY_SOURCE_DIR=\"D:/Tmap/_lab/_kursor/FaTTY\" -DNOMINMAX -DUNICODE -DWIN32_LEAN_AND_MEAN -D_UNICODE -D__WXMSW__ -DwxNO_IMPLICIT_WXSTRING_ENCODING -DwxUSE_GUI=1
+  DEP_FILE = CMakeFiles\fatty.dir\src\ui\health_monitor.cpp.obj.d
+  FLAGS = -O3 -DNDEBUG -std=c++20 -Wall -Wextra -Wno-unused-parameter
+  INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
+  OBJECT_DIR = CMakeFiles\fatty.dir
+  OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
+  TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
+
+build CMakeFiles/fatty.dir/src/ui/health_window.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/health_window.cpp || cmake_object_order_depends_target_fatty
+  CONFIG = Release
+  DEFINES = -DFATTY_SOURCE_DIR=\"D:/Tmap/_lab/_kursor/FaTTY\" -DNOMINMAX -DUNICODE -DWIN32_LEAN_AND_MEAN -D_UNICODE -D__WXMSW__ -DwxNO_IMPLICIT_WXSTRING_ENCODING -DwxUSE_GUI=1
+  DEP_FILE = CMakeFiles\fatty.dir\src\ui\health_window.cpp.obj.d
+  FLAGS = -O3 -DNDEBUG -std=c++20 -Wall -Wextra -Wno-unused-parameter
+  INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
+  OBJECT_DIR = CMakeFiles\fatty.dir
+  OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
+  TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
+
+build CMakeFiles/fatty.dir/src/ui/terminal_view.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/terminal_view.cpp || cmake_object_order_depends_target_fatty
+  CONFIG = Release
+  DEFINES = -DFATTY_SOURCE_DIR=\"D:/Tmap/_lab/_kursor/FaTTY\" -DNOMINMAX -DUNICODE -DWIN32_LEAN_AND_MEAN -D_UNICODE -D__WXMSW__ -DwxNO_IMPLICIT_WXSTRING_ENCODING -DwxUSE_GUI=1
+  DEP_FILE = CMakeFiles\fatty.dir\src\ui\terminal_view.cpp.obj.d
+  FLAGS = -O3 -DNDEBUG -std=c++20 -Wall -Wextra -Wno-unused-parameter
+  INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
+  OBJECT_DIR = CMakeFiles\fatty.dir
+  OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/splash.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/splash.cpp || cmake_object_order_depends_target_fatty
@@ -401,6 +521,8 @@ build CMakeFiles/fatty.dir/src/ui/splash.cpp.obj: CXX_COMPILER__fatty_unscanned_
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/app_frame.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/app_frame.cpp || cmake_object_order_depends_target_fatty
@@ -411,6 +533,8 @@ build CMakeFiles/fatty.dir/src/ui/app_frame.cpp.obj: CXX_COMPILER__fatty_unscann
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/app/single_instance.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/app/single_instance.cpp || cmake_object_order_depends_target_fatty
@@ -421,6 +545,8 @@ build CMakeFiles/fatty.dir/src/app/single_instance.cpp.obj: CXX_COMPILER__fatty_
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\app
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/app/main.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/app/main.cpp || cmake_object_order_depends_target_fatty
@@ -431,6 +557,8 @@ build CMakeFiles/fatty.dir/src/app/main.cpp.obj: CXX_COMPILER__fatty_unscanned_R
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\app
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/run_controller.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/run_controller.cpp || cmake_object_order_depends_target_fatty
@@ -441,6 +569,8 @@ build CMakeFiles/fatty.dir/src/ui/run_controller.cpp.obj: CXX_COMPILER__fatty_un
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/ui/bundle_controller.cpp.obj: CXX_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/ui/bundle_controller.cpp || cmake_object_order_depends_target_fatty
@@ -451,6 +581,8 @@ build CMakeFiles/fatty.dir/src/ui/bundle_controller.cpp.obj: CXX_COMPILER__fatty
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\ui
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 build CMakeFiles/fatty.dir/src/app/fatty.rc.obj: RC_COMPILER__fatty_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/src/app/fatty.rc || cmake_object_order_depends_target_fatty
@@ -460,6 +592,8 @@ build CMakeFiles/fatty.dir/src/app/fatty.rc.obj: RC_COMPILER__fatty_unscanned_Re
   INCLUDES = -I D:/Tmap/_lab/_kursor/FaTTY/src -I D:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -I D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include -I D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/lib/mswu
   OBJECT_DIR = CMakeFiles\fatty.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty.dir\src\app
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 
@@ -470,17 +604,18 @@ build CMakeFiles/fatty.dir/src/app/fatty.rc.obj: RC_COMPILER__fatty_unscanned_Re
 #############################################
 # Link the executable FaTTY.exe
 
-build FaTTY.exe: CXX_EXECUTABLE_LINKER__fatty_Release CMakeFiles/fatty.dir/src/ui/theme.cpp.obj CMakeFiles/fatty.dir/src/ui/striped_list.cpp.obj CMakeFiles/fatty.dir/src/ui/chrome.cpp.obj CMakeFiles/fatty.dir/src/ui/layout.cpp.obj CMakeFiles/fatty.dir/src/ui/widgets.cpp.obj CMakeFiles/fatty.dir/src/ui/dialogs.cpp.obj CMakeFiles/fatty.dir/src/ui/settings_dialog.cpp.obj CMakeFiles/fatty.dir/src/ui/files_window.cpp.obj CMakeFiles/fatty.dir/src/ui/journal_window.cpp.obj CMakeFiles/fatty.dir/src/ui/bundle_steps_window.cpp.obj CMakeFiles/fatty.dir/src/ui/help_window.cpp.obj CMakeFiles/fatty.dir/src/ui/splash.cpp.obj CMakeFiles/fatty.dir/src/ui/app_frame.cpp.obj CMakeFiles/fatty.dir/src/app/single_instance.cpp.obj CMakeFiles/fatty.dir/src/app/main.cpp.obj CMakeFiles/fatty.dir/src/ui/run_controller.cpp.obj CMakeFiles/fatty.dir/src/ui/bundle_controller.cpp.obj CMakeFiles/fatty.dir/src/app/fatty.rc.obj | libfatty_core.a libfatty_net.a vcpkg_installed/x64-mingw-static/lib/wxmsw33u_core.a vcpkg_installed/x64-mingw-static/lib/wxbase33u.a libfatty_core.a vcpkg_installed/x64-mingw-static/lib/libssh2.a vcpkg_installed/x64-mingw-static/lib/libzs.a vcpkg_installed/x64-mingw-static/lib/libssl.a vcpkg_installed/x64-mingw-static/lib/libcrypto.a vcpkg_installed/x64-mingw-static/lib/libpcre2-16.a vcpkg_installed/x64-mingw-static/lib/libjpeg.a vcpkg_installed/x64-mingw-static/lib/libpng16.a vcpkg_installed/x64-mingw-static/lib/libtiff.a vcpkg_installed/x64-mingw-static/lib/liblzma.a vcpkg_installed/x64-mingw-static/lib/libjpeg.a vcpkg_installed/x64-mingw-static/lib/libpng16.a vcpkg_installed/x64-mingw-static/lib/libtiff.a vcpkg_installed/x64-mingw-static/lib/liblzma.a vcpkg_installed/x64-mingw-static/lib/libnanosvgrast.a vcpkg_installed/x64-mingw-static/lib/libnanosvg.a vcpkg_installed/x64-mingw-static/lib/libwebpdecoder.a vcpkg_installed/x64-mingw-static/lib/libwebp.a vcpkg_installed/x64-mingw-static/lib/libwebpdemux.a vcpkg_installed/x64-mingw-static/lib/libwebpmux.a vcpkg_installed/x64-mingw-static/lib/libsharpyuv.a vcpkg_installed/x64-mingw-static/lib/libzs.a || libfatty_core.a libfatty_net.a
+build FaTTY.exe: CXX_EXECUTABLE_LINKER__fatty_Release CMakeFiles/fatty.dir/src/ui/theme.cpp.obj CMakeFiles/fatty.dir/src/ui/striped_list.cpp.obj CMakeFiles/fatty.dir/src/ui/chrome.cpp.obj CMakeFiles/fatty.dir/src/ui/layout.cpp.obj CMakeFiles/fatty.dir/src/ui/widgets.cpp.obj CMakeFiles/fatty.dir/src/ui/dialogs.cpp.obj CMakeFiles/fatty.dir/src/ui/settings_dialog.cpp.obj CMakeFiles/fatty.dir/src/ui/files_window.cpp.obj CMakeFiles/fatty.dir/src/ui/journal_window.cpp.obj CMakeFiles/fatty.dir/src/ui/bundle_steps_window.cpp.obj CMakeFiles/fatty.dir/src/ui/help_window.cpp.obj CMakeFiles/fatty.dir/src/ui/health_monitor.cpp.obj CMakeFiles/fatty.dir/src/ui/health_window.cpp.obj CMakeFiles/fatty.dir/src/ui/terminal_view.cpp.obj CMakeFiles/fatty.dir/src/ui/splash.cpp.obj CMakeFiles/fatty.dir/src/ui/app_frame.cpp.obj CMakeFiles/fatty.dir/src/app/single_instance.cpp.obj CMakeFiles/fatty.dir/src/app/main.cpp.obj CMakeFiles/fatty.dir/src/ui/run_controller.cpp.obj CMakeFiles/fatty.dir/src/ui/bundle_controller.cpp.obj CMakeFiles/fatty.dir/src/app/fatty.rc.obj | libfatty_core.a libfatty_net.a vcpkg_installed/x64-mingw-static/lib/wxmsw33u_core.a vcpkg_installed/x64-mingw-static/lib/wxbase33u.a libfatty_core.a vcpkg_installed/x64-mingw-static/lib/libssh2.a vcpkg_installed/x64-mingw-static/lib/libzs.a vcpkg_installed/x64-mingw-static/lib/libssl.a vcpkg_installed/x64-mingw-static/lib/libcrypto.a vcpkg_installed/x64-mingw-static/lib/libpcre2-16.a vcpkg_installed/x64-mingw-static/lib/libjpeg.a vcpkg_installed/x64-mingw-static/lib/libpng16.a vcpkg_installed/x64-mingw-static/lib/libtiff.a vcpkg_installed/x64-mingw-static/lib/liblzma.a vcpkg_installed/x64-mingw-static/lib/libjpeg.a vcpkg_installed/x64-mingw-static/lib/libpng16.a vcpkg_installed/x64-mingw-static/lib/libtiff.a vcpkg_installed/x64-mingw-static/lib/liblzma.a vcpkg_installed/x64-mingw-static/lib/libnanosvgrast.a vcpkg_installed/x64-mingw-static/lib/libnanosvg.a vcpkg_installed/x64-mingw-static/lib/libwebpdecoder.a vcpkg_installed/x64-mingw-static/lib/libwebp.a vcpkg_installed/x64-mingw-static/lib/libwebpdemux.a vcpkg_installed/x64-mingw-static/lib/libwebpmux.a vcpkg_installed/x64-mingw-static/lib/libsharpyuv.a vcpkg_installed/x64-mingw-static/lib/libzs.a || libfatty_core.a libfatty_net.a
   CONFIG = Release
   FLAGS = -O3 -DNDEBUG
   LINK_FLAGS = -mwindows -static -static-libgcc -static-libstdc++ -BD:/Tmap/_lab/_kursor/FaTTY/build-mingw/mingw-manifest-shim
-  LINK_LIBRARIES = libfatty_core.a  libfatty_net.a  vcpkg_installed/x64-mingw-static/lib/wxmsw33u_core.a  vcpkg_installed/x64-mingw-static/lib/wxbase33u.a  -ldwmapi  -luxtheme  -luser32  -lgdi32  -lcomctl32  -lole32  -luuid  -ladvapi32  libfatty_core.a  vcpkg_installed/x64-mingw-static/lib/libssh2.a  vcpkg_installed/x64-mingw-static/lib/libzs.a  vcpkg_installed/x64-mingw-static/lib/libssl.a  vcpkg_installed/x64-mingw-static/lib/libcrypto.a  -lcrypt32  -lbcrypt  -lwinhttp  vcpkg_installed/x64-mingw-static/lib/libpcre2-16.a  -lkernel32  -lgdiplus  -lmsimg32  -lcomdlg32  -lwinspool  vcpkg_installed/x64-mingw-static/lib/libjpeg.a  vcpkg_installed/x64-mingw-static/lib/libpng16.a  vcpkg_installed/x64-mingw-static/lib/libtiff.a  vcpkg_installed/x64-mingw-static/lib/liblzma.a  vcpkg_installed/x64-mingw-static/lib/libjpeg.a  vcpkg_installed/x64-mingw-static/lib/libpng16.a  vcpkg_installed/x64-mingw-static/lib/libtiff.a  vcpkg_installed/x64-mingw-static/lib/liblzma.a  vcpkg_installed/x64-mingw-static/lib/libnanosvgrast.a  vcpkg_installed/x64-mingw-static/lib/libnanosvg.a  vcpkg_installed/x64-mingw-static/lib/libwebpdecoder.a  vcpkg_installed/x64-mingw-static/lib/libwebp.a  vcpkg_installed/x64-mingw-static/lib/libwebpdemux.a  vcpkg_installed/x64-mingw-static/lib/libwebpmux.a  vcpkg_installed/x64-mingw-static/lib/libsharpyuv.a  -lwinmm  -lshell32  -lshlwapi  -loleaut32  -lrpcrt4  -lversion  -lws2_32  -lwininet  -loleacc  vcpkg_installed/x64-mingw-static/lib/libzs.a  -luxtheme  -luser32  -lgdi32  -lcomctl32  -lole32  -luuid  -ladvapi32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
+  LINK_LIBRARIES = libfatty_core.a  libfatty_net.a  vcpkg_installed/x64-mingw-static/lib/wxmsw33u_core.a  vcpkg_installed/x64-mingw-static/lib/wxbase33u.a  -ldwmapi  -luxtheme  -luser32  -lgdi32  -lcomctl32  -lole32  -luuid  -ladvapi32  -lcrypt32  libfatty_core.a  vcpkg_installed/x64-mingw-static/lib/libssh2.a  vcpkg_installed/x64-mingw-static/lib/libzs.a  vcpkg_installed/x64-mingw-static/lib/libssl.a  vcpkg_installed/x64-mingw-static/lib/libcrypto.a  -lbcrypt  -lwinhttp  vcpkg_installed/x64-mingw-static/lib/libpcre2-16.a  -lkernel32  -lgdiplus  -lmsimg32  -lcomdlg32  -lwinspool  vcpkg_installed/x64-mingw-static/lib/libjpeg.a  vcpkg_installed/x64-mingw-static/lib/libpng16.a  vcpkg_installed/x64-mingw-static/lib/libtiff.a  vcpkg_installed/x64-mingw-static/lib/liblzma.a  vcpkg_installed/x64-mingw-static/lib/libjpeg.a  vcpkg_installed/x64-mingw-static/lib/libpng16.a  vcpkg_installed/x64-mingw-static/lib/libtiff.a  vcpkg_installed/x64-mingw-static/lib/liblzma.a  vcpkg_installed/x64-mingw-static/lib/libnanosvgrast.a  vcpkg_installed/x64-mingw-static/lib/libnanosvg.a  vcpkg_installed/x64-mingw-static/lib/libwebpdecoder.a  vcpkg_installed/x64-mingw-static/lib/libwebp.a  vcpkg_installed/x64-mingw-static/lib/libwebpdemux.a  vcpkg_installed/x64-mingw-static/lib/libwebpmux.a  vcpkg_installed/x64-mingw-static/lib/libsharpyuv.a  -lwinmm  -lshell32  -lshlwapi  -loleaut32  -lrpcrt4  -lversion  -lws2_32  -lwininet  -loleacc  vcpkg_installed/x64-mingw-static/lib/libzs.a  -luxtheme  -luser32  -lgdi32  -lcomctl32  -lole32  -luuid  -ladvapi32  -lcrypt32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = CMakeFiles\fatty.dir
   POST_BUILD = C:\WINDOWS\system32\cmd.exe /C "cd /D D:\Tmap\_lab\_kursor\FaTTY\build-mingw && D:\Tmap\_lab\_kursor\FaTTY\third_party\vcpkg\vcpkg.exe z-applocal --target-binary=D:/Tmap/_lab/_kursor/FaTTY/build-mingw/FaTTY.exe --installed-bin-dir=D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/bin"
   PRE_LINK = cd .
+  TARGET_COMPILE_PDB = CMakeFiles\fatty.dir\
   TARGET_FILE = FaTTY.exe
   TARGET_IMPLIB = libFaTTY.dll.a
-  TARGET_PDB = FaTTY.exe.dbg
+  TARGET_PDB = FaTTY.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty.dir
 
 # =============================================================================
@@ -500,6 +635,8 @@ build CMakeFiles/fatty_tests.dir/tests/test_main.cpp.obj: CXX_COMPILER__fatty_te
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 build CMakeFiles/fatty_tests.dir/tests/test_vault.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_vault.cpp || cmake_object_order_depends_target_fatty_tests
@@ -510,6 +647,8 @@ build CMakeFiles/fatty_tests.dir/tests/test_vault.cpp.obj: CXX_COMPILER__fatty_t
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 build CMakeFiles/fatty_tests.dir/tests/test_store.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_store.cpp || cmake_object_order_depends_target_fatty_tests
@@ -520,6 +659,8 @@ build CMakeFiles/fatty_tests.dir/tests/test_store.cpp.obj: CXX_COMPILER__fatty_t
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 build CMakeFiles/fatty_tests.dir/tests/test_quote.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_quote.cpp || cmake_object_order_depends_target_fatty_tests
@@ -530,6 +671,8 @@ build CMakeFiles/fatty_tests.dir/tests/test_quote.cpp.obj: CXX_COMPILER__fatty_t
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 build CMakeFiles/fatty_tests.dir/tests/test_journal.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_journal.cpp || cmake_object_order_depends_target_fatty_tests
@@ -540,6 +683,8 @@ build CMakeFiles/fatty_tests.dir/tests/test_journal.cpp.obj: CXX_COMPILER__fatty
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 build CMakeFiles/fatty_tests.dir/tests/test_backup.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_backup.cpp || cmake_object_order_depends_target_fatty_tests
@@ -550,6 +695,8 @@ build CMakeFiles/fatty_tests.dir/tests/test_backup.cpp.obj: CXX_COMPILER__fatty_
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 build CMakeFiles/fatty_tests.dir/tests/test_placeholders.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_placeholders.cpp || cmake_object_order_depends_target_fatty_tests
@@ -560,6 +707,8 @@ build CMakeFiles/fatty_tests.dir/tests/test_placeholders.cpp.obj: CXX_COMPILER__
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 build CMakeFiles/fatty_tests.dir/tests/test_updates.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_updates.cpp || cmake_object_order_depends_target_fatty_tests
@@ -570,6 +719,8 @@ build CMakeFiles/fatty_tests.dir/tests/test_updates.cpp.obj: CXX_COMPILER__fatty
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 build CMakeFiles/fatty_tests.dir/tests/test_config_roundtrip.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_config_roundtrip.cpp || cmake_object_order_depends_target_fatty_tests
@@ -580,6 +731,20 @@ build CMakeFiles/fatty_tests.dir/tests/test_config_roundtrip.cpp.obj: CXX_COMPIL
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
+  TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
+
+build CMakeFiles/fatty_tests.dir/tests/test_health.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_health.cpp || cmake_object_order_depends_target_fatty_tests
+  CONFIG = Release
+  DEFINES = -DFATTY_SOURCE_DIR=\"D:/Tmap/_lab/_kursor/FaTTY\" -DNOMINMAX -DUNICODE -DWIN32_LEAN_AND_MEAN -D_UNICODE
+  DEP_FILE = CMakeFiles\fatty_tests.dir\tests\test_health.cpp.obj.d
+  FLAGS = -O3 -DNDEBUG -std=c++20 -Wall -Wextra -Wno-unused-parameter
+  INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
+  OBJECT_DIR = CMakeFiles\fatty_tests.dir
+  OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 build CMakeFiles/fatty_tests.dir/tests/test_checklist.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_checklist.cpp || cmake_object_order_depends_target_fatty_tests
@@ -590,6 +755,8 @@ build CMakeFiles/fatty_tests.dir/tests/test_checklist.cpp.obj: CXX_COMPILER__fat
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 build CMakeFiles/fatty_tests.dir/tests/test_smoke.cpp.obj: CXX_COMPILER__fatty_tests_unscanned_Release D$:/Tmap/_lab/_kursor/FaTTY/tests/test_smoke.cpp || cmake_object_order_depends_target_fatty_tests
@@ -600,6 +767,8 @@ build CMakeFiles/fatty_tests.dir/tests/test_smoke.cpp.obj: CXX_COMPILER__fatty_t
   INCLUDES = -ID:/Tmap/_lab/_kursor/FaTTY -ID:/Tmap/_lab/_kursor/FaTTY/src -ID:/Tmap/_lab/_kursor/FaTTY/build-mingw/generated -isystem D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/include
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   OBJECT_FILE_DIR = CMakeFiles\fatty_tests.dir\tests
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 
@@ -610,16 +779,17 @@ build CMakeFiles/fatty_tests.dir/tests/test_smoke.cpp.obj: CXX_COMPILER__fatty_t
 #############################################
 # Link the executable fatty_tests.exe
 
-build fatty_tests.exe: CXX_EXECUTABLE_LINKER__fatty_tests_Release CMakeFiles/fatty_tests.dir/tests/test_main.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_vault.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_store.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_quote.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_journal.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_backup.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_placeholders.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_updates.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_config_roundtrip.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_checklist.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_smoke.cpp.obj | libfatty_core.a libfatty_net.a libfatty_core.a vcpkg_installed/x64-mingw-static/lib/libssh2.a vcpkg_installed/x64-mingw-static/lib/libzs.a vcpkg_installed/x64-mingw-static/lib/libssl.a vcpkg_installed/x64-mingw-static/lib/libcrypto.a || libfatty_core.a libfatty_net.a
+build fatty_tests.exe: CXX_EXECUTABLE_LINKER__fatty_tests_Release CMakeFiles/fatty_tests.dir/tests/test_main.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_vault.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_store.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_quote.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_journal.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_backup.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_placeholders.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_updates.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_config_roundtrip.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_health.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_checklist.cpp.obj CMakeFiles/fatty_tests.dir/tests/test_smoke.cpp.obj | libfatty_core.a libfatty_net.a libfatty_core.a vcpkg_installed/x64-mingw-static/lib/libssh2.a vcpkg_installed/x64-mingw-static/lib/libzs.a vcpkg_installed/x64-mingw-static/lib/libssl.a vcpkg_installed/x64-mingw-static/lib/libcrypto.a || libfatty_core.a libfatty_net.a
   CONFIG = Release
   FLAGS = -O3 -DNDEBUG
-  LINK_LIBRARIES = libfatty_core.a  libfatty_net.a  libfatty_core.a  -lrpcrt4  -lshell32  -lole32  vcpkg_installed/x64-mingw-static/lib/libssh2.a  vcpkg_installed/x64-mingw-static/lib/libzs.a  vcpkg_installed/x64-mingw-static/lib/libssl.a  vcpkg_installed/x64-mingw-static/lib/libcrypto.a  -lcrypt32  -lws2_32  -lbcrypt  -lwinhttp  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
+  LINK_LIBRARIES = libfatty_core.a  libfatty_net.a  libfatty_core.a  -lrpcrt4  -lshell32  -lole32  vcpkg_installed/x64-mingw-static/lib/libssh2.a  vcpkg_installed/x64-mingw-static/lib/libzs.a  vcpkg_installed/x64-mingw-static/lib/libssl.a  vcpkg_installed/x64-mingw-static/lib/libcrypto.a  -lws2_32  -lbcrypt  -lwinhttp  -lcrypt32  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   OBJECT_DIR = CMakeFiles\fatty_tests.dir
   POST_BUILD = C:\WINDOWS\system32\cmd.exe /C "cd /D D:\Tmap\_lab\_kursor\FaTTY\build-mingw && D:\Tmap\_lab\_kursor\FaTTY\third_party\vcpkg\vcpkg.exe z-applocal --target-binary=D:/Tmap/_lab/_kursor/FaTTY/build-mingw/fatty_tests.exe --installed-bin-dir=D:/Tmap/_lab/_kursor/FaTTY/build-mingw/vcpkg_installed/x64-mingw-static/bin"
   PRE_LINK = cd .
+  TARGET_COMPILE_PDB = CMakeFiles\fatty_tests.dir\
   TARGET_FILE = fatty_tests.exe
   TARGET_IMPLIB = libfatty_tests.dll.a
-  TARGET_PDB = fatty_tests.exe.dbg
+  TARGET_PDB = fatty_tests.pdb
   TARGET_SUPPORT_DIR = CMakeFiles\fatty_tests.dir
 
 
@@ -687,6 +857,18 @@ build CMakeFiles/install/local.util: CUSTOM_COMMAND all
 
 build install/local: phony CMakeFiles/install/local.util
 
+
+#############################################
+# Utility command for install/strip
+
+build CMakeFiles/install/strip.util: CUSTOM_COMMAND all
+  COMMAND = C:\WINDOWS\system32\cmd.exe /C "cd /D D:\Tmap\_lab\_kursor\FaTTY\build-mingw && C:\Users\Master\AppData\Local\Microsoft\WinGet\Packages\BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe\mingw64\bin\cmake.exe -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake"
+  DESC = Installing the project stripped...
+  pool = console
+  restat = 1
+
+build install/strip: phony CMakeFiles/install/strip.util
+
 # =============================================================================
 # Target aliases.
 
@@ -715,14 +897,14 @@ build all: phony libfatty_core.a libfatty_net.a FaTTY.exe fatty_tests.exe
 #############################################
 # Re-run CMake if any of its inputs changed.
 
-build build.ninja D$:/Tmap/_lab/_kursor/FaTTY/build-mingw/cmake_install.cmake D$:/Tmap/_lab/_kursor/FaTTY/build-mingw/CTestTestfile.cmake: RERUN_CMAKE | C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCXXInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCommonLanguageInclude.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDependentOption.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeFindDependencyMacro.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeGenericSystem.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeInitializeConfigs.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeLanguageInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeRCInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeSystemSpecificInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeSystemSpecificInitialize.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckCXXSourceCompiles.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckIncludeFileCXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckLibraryExists.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/CMakeCommonCompilerMacros.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindOpenGL.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindOpenSSL.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindPackageHandleStandardArgs.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindPackageMessage.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindThreads.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindZLIB.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeCXXLinkerInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeCommonLinkerInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CheckSourceCompiles.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU-CXX-ABI.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-Initialize.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-windres.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/WindowsPaths.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/SelectLibraryConfigurations.cmake CMakeCache.txt CMakeFiles/4.3.3/CMakeCXXCompiler.cmake CMakeFiles/4.3.3/CMakeRCCompiler.cmake CMakeFiles/4.3.3/CMakeSystem.cmake D$:/Tmap/_lab/_kursor/FaTTY/CMakeLists.txt D$:/Tmap/_lab/_kursor/FaTTY/cmake/GitVersion.cmake D$:/Tmap/_lab/_kursor/FaTTY/src/app/version_generated.hpp.in D$:/Tmap/_lab/_kursor/FaTTY/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake D$:/Tmap/_lab/_kursor/FaTTY/vcpkg.json vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-config-version.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-config.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets-debug.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets-release.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGConfig.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets-debug.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets-release.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonConfig.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonTargets.cmake vcpkg_installed/x64-mingw-static/share/openssl/vcpkg-cmake-wrapper.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/vcpkg-cmake-wrapper.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsConfig.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets-debug.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets-release.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets.cmake vcpkg_installed/x64-mingw-static/share/zlib/vcpkg-cmake-wrapper.cmake
+build build.ninja D$:/Tmap/_lab/_kursor/FaTTY/build-mingw/cmake_install.cmake D$:/Tmap/_lab/_kursor/FaTTY/build-mingw/CTestTestfile.cmake: RERUN_CMAKE | C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCXXCompiler.cmake.in C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCXXCompilerABI.cpp C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCXXInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCommonLanguageInclude.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCompilerIdDetection.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDependentOption.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDetermineCXXCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDetermineCompilerABI.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDetermineCompilerSupport.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeFindDependencyMacro.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeGenericSystem.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeInitializeConfigs.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeLanguageInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeParseImplicitIncludeInfo.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeParseImplicitLinkInfo.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeParseLibraryArchitecture.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeRCInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeSystemSpecificInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeSystemSpecificInitialize.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeTestCXXCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeTestCompilerCommon.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckCXXSourceCompiles.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckIncludeFileCXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckLibraryExists.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/ADSP-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/ARMCC-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/ARMClang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/AppleClang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Borland-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/CMakeCommonCompilerMacros.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Clang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Clang-DetermineCompilerInternal.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Compaq-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Cray-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/CrayClang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Diab-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Embarcadero-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Fujitsu-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/FujitsuClang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GHS-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU-CXX-CXXImportStd.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU-FindBinUtils.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/HP-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/IAR-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/IBMCPP-CXX-DetermineVersionInternal.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/IBMClang-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Intel-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/IntelLLVM-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/LCC-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/MSVC-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/NVHPC-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/NVIDIA-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/OpenWatcom-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/OrangeC-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/PGI-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/PathScale-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Renesas-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/SCO-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/SunPro-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/TI-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/TIClang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Tasking-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/VisualAge-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Watcom-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/XL-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/XLClang-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/zOS-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindOpenGL.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindOpenSSL.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindPackageHandleStandardArgs.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindPackageMessage.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindThreads.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindZLIB.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeCXXLinkerInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeCommonLinkerInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeDetermineLinkerId.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeInspectCXXLinker.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CheckSourceCompiles.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/FeatureTesting.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-Determine-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU-CXX-ABI.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-Initialize.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-windres.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/WindowsPaths.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/SelectLibraryConfigurations.cmake CMakeCache.txt CMakeFiles/4.3.3/CMakeCXXCompiler.cmake CMakeFiles/4.3.3/CMakeRCCompiler.cmake CMakeFiles/4.3.3/CMakeSystem.cmake D$:/Tmap/_lab/_kursor/FaTTY/CMakeLists.txt D$:/Tmap/_lab/_kursor/FaTTY/cmake/GitVersion.cmake D$:/Tmap/_lab/_kursor/FaTTY/src/app/version_generated.hpp.in D$:/Tmap/_lab/_kursor/FaTTY/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake D$:/Tmap/_lab/_kursor/FaTTY/vcpkg.json vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-config-version.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-config.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets-debug.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets-release.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGConfig.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets-debug.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets-release.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonConfig.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonTargets.cmake vcpkg_installed/x64-mingw-static/share/openssl/vcpkg-cmake-wrapper.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/vcpkg-cmake-wrapper.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsConfig.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets-debug.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets-release.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets.cmake vcpkg_installed/x64-mingw-static/share/zlib/vcpkg-cmake-wrapper.cmake
   pool = console
 
 
 #############################################
 # A missing CMake input file is not an error.
 
-build C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCXXInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCommonLanguageInclude.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDependentOption.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeFindDependencyMacro.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeGenericSystem.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeInitializeConfigs.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeLanguageInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeRCInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeSystemSpecificInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeSystemSpecificInitialize.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckCXXSourceCompiles.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckIncludeFileCXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckLibraryExists.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/CMakeCommonCompilerMacros.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindOpenGL.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindOpenSSL.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindPackageHandleStandardArgs.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindPackageMessage.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindThreads.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindZLIB.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeCXXLinkerInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeCommonLinkerInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CheckSourceCompiles.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU-CXX-ABI.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-Initialize.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-windres.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/WindowsPaths.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/SelectLibraryConfigurations.cmake CMakeCache.txt CMakeFiles/4.3.3/CMakeCXXCompiler.cmake CMakeFiles/4.3.3/CMakeRCCompiler.cmake CMakeFiles/4.3.3/CMakeSystem.cmake D$:/Tmap/_lab/_kursor/FaTTY/CMakeLists.txt D$:/Tmap/_lab/_kursor/FaTTY/cmake/GitVersion.cmake D$:/Tmap/_lab/_kursor/FaTTY/src/app/version_generated.hpp.in D$:/Tmap/_lab/_kursor/FaTTY/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake D$:/Tmap/_lab/_kursor/FaTTY/vcpkg.json vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-config-version.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-config.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets-debug.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets-release.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGConfig.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets-debug.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets-release.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonConfig.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonTargets.cmake vcpkg_installed/x64-mingw-static/share/openssl/vcpkg-cmake-wrapper.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/vcpkg-cmake-wrapper.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsConfig.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets-debug.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets-release.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets.cmake vcpkg_installed/x64-mingw-static/share/zlib/vcpkg-cmake-wrapper.cmake: phony
+build C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCXXCompiler.cmake.in C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCXXCompilerABI.cpp C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCXXInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCommonLanguageInclude.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeCompilerIdDetection.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDependentOption.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDetermineCXXCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDetermineCompilerABI.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDetermineCompilerId.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeDetermineCompilerSupport.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeFindBinUtils.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeFindDependencyMacro.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeGenericSystem.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeInitializeConfigs.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeLanguageInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeParseImplicitIncludeInfo.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeParseImplicitLinkInfo.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeParseLibraryArchitecture.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeRCInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeSystemSpecificInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeSystemSpecificInitialize.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeTestCXXCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CMakeTestCompilerCommon.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckCXXSourceCompiles.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckIncludeFileCXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/CheckLibraryExists.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/ADSP-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/ARMCC-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/ARMClang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/AppleClang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Borland-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/CMakeCommonCompilerMacros.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Clang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Clang-DetermineCompilerInternal.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Compaq-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Cray-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/CrayClang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Diab-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Embarcadero-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Fujitsu-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/FujitsuClang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GHS-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU-CXX-CXXImportStd.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU-FindBinUtils.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/HP-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/IAR-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/IBMCPP-CXX-DetermineVersionInternal.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/IBMClang-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Intel-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/IntelLLVM-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/LCC-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/MSVC-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/NVHPC-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/NVIDIA-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/OpenWatcom-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/OrangeC-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/PGI-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/PathScale-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Renesas-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/SCO-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/SunPro-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/TI-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/TIClang-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Tasking-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/VisualAge-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/Watcom-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/XL-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/XLClang-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Compiler/zOS-CXX-DetermineCompiler.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindOpenGL.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindOpenSSL.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindPackageHandleStandardArgs.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindPackageMessage.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindThreads.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/FindZLIB.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeCXXLinkerInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeCommonLinkerInformation.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeDetermineLinkerId.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CMakeInspectCXXLinker.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/CheckSourceCompiles.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Internal/FeatureTesting.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Linker/Windows-GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-Determine-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU-CXX-ABI.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU-CXX.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-GNU.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-Initialize.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows-windres.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/Windows.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/Platform/WindowsPaths.cmake C$:/Users/Master/AppData/Local/Microsoft/WinGet/Packages/BrechtSanders.WinLibs.POSIX.UCRT_Microsoft.Winget.Source_8wekyb3d8bbwe/mingw64/share/cmake-4.3/Modules/SelectLibraryConfigurations.cmake CMakeCache.txt CMakeFiles/4.3.3/CMakeCXXCompiler.cmake CMakeFiles/4.3.3/CMakeRCCompiler.cmake CMakeFiles/4.3.3/CMakeSystem.cmake D$:/Tmap/_lab/_kursor/FaTTY/CMakeLists.txt D$:/Tmap/_lab/_kursor/FaTTY/cmake/GitVersion.cmake D$:/Tmap/_lab/_kursor/FaTTY/src/app/version_generated.hpp.in D$:/Tmap/_lab/_kursor/FaTTY/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake D$:/Tmap/_lab/_kursor/FaTTY/vcpkg.json vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-config-version.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-config.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets-debug.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets-release.cmake vcpkg_installed/x64-mingw-static/share/libssh2/libssh2-targets.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGConfig.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets-debug.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets-release.cmake vcpkg_installed/x64-mingw-static/share/nanosvg/NanoSVGTargets.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonConfig.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/nlohmann_json/nlohmann_jsonTargets.cmake vcpkg_installed/x64-mingw-static/share/openssl/vcpkg-cmake-wrapper.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/vcpkg-cmake-wrapper.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsConfig.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsConfigVersion.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets-debug.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets-release.cmake vcpkg_installed/x64-mingw-static/share/wxwidgets/wxWidgetsTargets.cmake vcpkg_installed/x64-mingw-static/share/zlib/vcpkg-cmake-wrapper.cmake: phony
 
 
 #############################################
