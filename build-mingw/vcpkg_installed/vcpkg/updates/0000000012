@@ -1,0 +1,6 @@
+Package: libwebp
+Feature: unicode
+Architecture: x64-mingw-static
+Multi-Arch: same
+Description: Build Unicode executables. (Adds definition UNICODE and _UNICODE)
+Status: purge ok not-installed

@@ -1,0 +1,7 @@
+Package: egl-registry
+Version: 2025-05-27
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 5b3348d8003991b6d762f19f894f4c3a4f42c76a249a002428bc362aa0b51abd
+Description: EGL API and Extension Registry
+Status: install ok half-installed

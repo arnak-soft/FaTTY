@@ -52,6 +52,7 @@ set(FATTY_CORE_SOURCES
   src/core/quote.cpp
   src/core/placeholders.cpp
   src/core/health.cpp
+  src/core/remote_profile.cpp
   src/app/version.cpp
 )
 
@@ -180,6 +181,7 @@ add_executable(fatty_tests
   tests/test_updates.cpp
   tests/test_config_roundtrip.cpp
   tests/test_health.cpp
+  tests/test_remote_profile.cpp
   tests/test_checklist.cpp
   tests/test_smoke.cpp
 )

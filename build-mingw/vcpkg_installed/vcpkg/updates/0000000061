@@ -1,0 +1,6 @@
+Package: vcpkg-cmake-config
+Version: 2026-07-21
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: b74843ef59263c525d8d69edcc447411f382aea33210b786509088e474cec69c
+Status: install ok installed

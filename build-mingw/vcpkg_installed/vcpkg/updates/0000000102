@@ -1,0 +1,8 @@
+Package: nanosvg
+Version: 2023-12-29
+Depends: vcpkg-cmake, vcpkg-cmake-config
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 4928e1e19ad5f50b8e4fc87e5f649df6ba8448e553c2a6b83668ac922fc6724e
+Description: NanoSVG is a simple stupid single-header-file SVG parser. It is accompanied by a simple SVG rasterizer.
+Status: install ok half-installed

@@ -1,0 +1,12 @@
+Package: wxwidgets
+Version: 3.3.3
+Port-Version: 1
+Depends: expat, libjpeg-turbo, libpng, libwebp, nanosvg, opengl, pcre2, tiff, vcpkg-cmake, vcpkg-cmake-config, zlib
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 9e16a73fb561908c6e781e8df1aada193381c592001bdd82f8539d32b5525d37
+Description: Widget toolkit and tools library for creating graphical user interfaces (GUIs) for cross-platform applications.
+    Set WXWIDGETS_USE_STL in a custom triplet to build with the wxUSE_STL build option.
+    Set WXWIDGETS_USE_STD_CONTAINERS in a custom triplet to build with the wxUSE_STD_CONTAINERS build option.
+Default-Features: debug-support, sound
+Status: purge ok not-installed

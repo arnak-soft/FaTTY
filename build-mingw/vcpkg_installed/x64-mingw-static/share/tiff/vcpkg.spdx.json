@@ -3,13 +3,13 @@
   "spdxVersion": "SPDX-2.3",
   "dataLicense": "CC0-1.0",
   "SPDXID": "SPDXRef-DOCUMENT",
-  "documentNamespace": "https://spdx.org/spdxdocs/tiff-x64-mingw-static-4.7.2-220be19f-aa6e-464d-835f-fd09db13faa3",
-  "name": "tiff:x64-mingw-static@4.7.2 4995096cfcae3327eb6874fe3ef103d800c04c3b545bbf984c319728b721fe73",
+  "documentNamespace": "https://spdx.org/spdxdocs/tiff-x64-mingw-static-4.7.2-841d9da1-80fa-42b4-b58d-00e8bcb2f84b",
+  "name": "tiff:x64-mingw-static@4.7.2 d337bed9b927fc4978b3a7ef1e87748c92ac0b97e391e24f86f7194fe21d6c1b",
   "creationInfo": {
     "creators": [
       "Tool: vcpkg-2026-07-27-98d7cb0cf1f4686a3e43aa5672b6230c1d56bce8"
     ],
-    "created": "2026-09-17T00:27:27Z"
+    "created": "2026-09-16T21:42:05Z"
   },
   "relationships": [
     {
@@ -151,7 +151,7 @@
     {
       "name": "tiff:x64-mingw-static",
       "SPDXID": "SPDXRef-binary",
-      "versionInfo": "4995096cfcae3327eb6874fe3ef103d800c04c3b545bbf984c319728b721fe73",
+      "versionInfo": "d337bed9b927fc4978b3a7ef1e87748c92ac0b97e391e24f86f7194fe21d6c1b",
       "downloadLocation": "NONE",
       "licenseConcluded": "libtiff",
       "licenseDeclared": "NOASSERTION",
@@ -276,7 +276,7 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "1f99268c65f61c7fbc39fc8d3393ef8b6fb52491cc50e180f52c0ca6a36acdd4"
+          "checksumValue": "4257b0fe1ffa1d35dcd2fcd2ff365260522d0e5695d61b14699ab2486e1f64eb"
         }
       ],
       "licenseConcluded": "NOASSERTION",
@@ -348,7 +348,7 @@
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "059f5a162123925648e3993f6b1022f1cb005eadab4139db0fa1a80a40df0b59"
+          "checksumValue": "ab3482a765c60faf2a023333a96e8c1dcfecb488653a9de95493b5ebb54207d9"
         }
       ],
       "licenseConcluded": "NOASSERTION",

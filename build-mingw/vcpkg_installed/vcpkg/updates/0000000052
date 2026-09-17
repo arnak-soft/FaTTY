@@ -1,0 +1,7 @@
+Package: vcpkg-cmake-get-vars
+Version: 2025-05-29
+Depends: vcpkg-cmake
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 68c1044ba2e5c6cd6da95a76d326497138755cfc2a033570b860a208e0090d6c
+Status: purge ok half-installed

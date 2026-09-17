@@ -1,0 +1,8 @@
+Package: opengl-registry
+Version: 2026-08-03
+Depends: egl-registry
+Architecture: x64-mingw-static
+Multi-Arch: same
+Abi: 8026faf7ebaab4d7929197ddfa0d291b89ef922eb3cfcc253a61263635b02b43
+Description: OpenGL, OpenGL ES, and OpenGL ES-SC API and Extension Registry
+Status: install ok installed
