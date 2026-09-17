@@ -67,6 +67,11 @@ std::tm local_from_unix(double unix_ts) {
   return tm;
 }
 
+bool health_has_readings(const HealthSnapshot& snap) {
+  return snap.nproc > 0 || snap.cpu_pct >= 0 || snap.mem_pct >= 0 || snap.mem_total_kb > 0 || !snap.disks.empty() ||
+         snap.load1 >= 0 || snap.uptime_sec >= 0;
+}
+
 }  // namespace
 
 double HealthDisk::pct() const {
@@ -117,7 +122,7 @@ void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thres
   for (const auto& disk : snap.disks) {
     lvl = worse_health(lvl, level_from_pct(disk.pct(), thresholds.disk_warn, thresholds.disk_crit));
   }
-  if (lvl == HealthLevel::Unknown && snap.checked_at > 0 && snap.error.empty()) {
+  if (lvl == HealthLevel::Unknown && snap.checked_at > 0 && snap.error.empty() && health_has_readings(snap)) {
     lvl = HealthLevel::Ok;
   }
   snap.level = lvl;
@@ -125,22 +130,53 @@ void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thres
 
 HealthSnapshot parse_health_output(std::string_view text) {
   HealthSnapshot snap;
-  const std::string data(text);
-  const auto begin = data.find("FATTYHEALTH v1");
-  if (begin == std::string::npos) {
-    snap.error = "нет метки FATTYHEALTH";
-    snap.level = HealthLevel::Unknown;
-    return snap;
+  std::vector<std::string> lines;
+  std::string cur;
+  for (char ch : text) {
+    if (ch == '\n') {
+      lines.push_back(std::move(cur));
+      cur.clear();
+    } else {
+      cur += ch;
+    }
   }
-  auto end = data.find("FATTYHEALTH_END", begin);
-  std::string block = data.substr(begin, end == std::string::npos ? std::string::npos : end - begin);
-  std::istringstream in(block);
-  std::string line;
-  bool other_os = false;
-  while (std::getline(in, line)) {
+  if (!cur.empty() || (!text.empty() && text.back() != '\n')) {
+    lines.push_back(std::move(cur));
+  }
+
+  auto line_text = [](const std::string& raw) {
+    std::string line = raw;
     if (!line.empty() && line.back() == '\r') line.pop_back();
-    line = trim(line);
-    if (line.empty() || line == "FATTYHEALTH v1") continue;
+    return trim(line);
+  };
+
+  int start = -1;
+  int last_start = -1;
+  int last_end = -1;
+  for (int i = 0; i < static_cast<int>(lines.size()); ++i) {
+    const auto t = line_text(lines[static_cast<std::size_t>(i)]);
+    if (t == "FATTYHEALTH v1") {
+      start = i;
+    } else if (t == "FATTYHEALTH_END" && start >= 0) {
+      last_start = start;
+      last_end = i;
+    }
+  }
+  if (last_start < 0) {
+    if (start >= 0) {
+      last_start = start;
+      last_end = static_cast<int>(lines.size());
+    } else {
+      snap.error = "нет метки FATTYHEALTH";
+      snap.level = HealthLevel::Unknown;
+      return snap;
+    }
+  }
+
+  bool other_os = false;
+  for (int i = last_start; i < last_end; ++i) {
+    auto line = line_text(lines[static_cast<std::size_t>(i)]);
+    if (line.empty() || line == "FATTYHEALTH v1" || line == "FATTYHEALTH_END") continue;
     if (line == "os=other") {
       other_os = true;
       continue;
@@ -173,9 +209,9 @@ HealthSnapshot parse_health_output(std::string_view text) {
       if (!parse_ll(parts[parts.size() - 2], disk.used_kb)) continue;
       if (!parse_ll(parts.back(), disk.total_kb)) continue;
       disk.mount.clear();
-      for (std::size_t i = 0; i + 2 < parts.size(); ++i) {
+      for (std::size_t j = 0; j + 2 < parts.size(); ++j) {
         if (!disk.mount.empty()) disk.mount += " ";
-        disk.mount += parts[i];
+        disk.mount += parts[j];
       }
       if (disk.mount.empty()) continue;
       snap.disks.push_back(std::move(disk));
@@ -433,6 +469,9 @@ HealthSnapshot snapshot_from_json(const json& raw, const std::string& id) {
       disk.total_kb = d.value("total", 0LL);
       if (!disk.mount.empty()) snap.disks.push_back(std::move(disk));
     }
+  }
+  if (snap.level == HealthLevel::Ok && !health_has_readings(snap)) {
+    snap.level = HealthLevel::Unknown;
   }
   return snap;
 }

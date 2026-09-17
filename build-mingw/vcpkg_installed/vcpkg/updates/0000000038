@@ -1,8 +1,0 @@
-Package: libjpeg-turbo
-Version: 3.2.0
-Depends: vcpkg-cmake, vcpkg-cmake-config
-Architecture: x64-mingw-static
-Multi-Arch: same
-Abi: fb7220f7a216451657aadecc23d144a3cef6be65d65a6688835dac9f27c9eddb
-Description: libjpeg-turbo is a JPEG image codec that uses SIMD instructions (MMX, SSE2, NEON, AltiVec) to accelerate baseline JPEG compression and decompression on x86, x86-64, ARM, and PowerPC systems.
-Status: purge ok half-installed

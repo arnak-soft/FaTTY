@@ -265,11 +265,14 @@ void SSHSession::cancel() {
 }
 
 RunResult SSHSession::run(const Server& server, const std::string& command, int timeout_sec, bool login_shell,
-                          const OutputCb& on_output, const std::string& cwd_in, std::string_view shell) {
+                          const OutputCb& on_output, const std::string& cwd_in, std::string_view shell,
+                          bool echo_local) {
   cancel_ = false;
   std::string cwd = trim(cwd_in);
   std::string where = cwd.empty() ? "" : ("  " + cwd);
-  on_output("→ " + server.username + "@" + server.host + ":" + std::to_string(server.port) + where + "\n");
+  if (echo_local) {
+    on_output("→ " + server.username + "@" + server.host + ":" + std::to_string(server.port) + where + "\n");
+  }
   void* raw = nullptr;
   try {
     raw = ssh_connect_raw(server);
@@ -280,7 +283,9 @@ RunResult SSHSession::run(const Server& server, const std::string& command, int 
   }
   auto [remote, mark] = wrap_remote_command(command, cwd, login_shell, shell);
   CwdOutputFilter filt(mark, on_output);
-  on_output("$ " + trim(command) + "\n\n");
+  if (echo_local) {
+    on_output("$ " + trim(command) + "\n\n");
+  }
   LIBSSH2_SESSION* session = session_of(raw);
   LIBSSH2_CHANNEL* channel = libssh2_channel_open_session(session);
   if (!channel) {
@@ -316,7 +321,7 @@ RunResult SSHSession::run(const Server& server, const std::string& command, int 
     while (true) {
       if (cancel_) {
         finish_output();
-        on_output("\n■ Выполнение прервано\n");
+        if (echo_local) on_output("\n■ Выполнение прервано\n");
         result.exit_code = 130;
         result.cwd = filt.cwd().empty() ? cwd : filt.cwd();
         break;
@@ -324,7 +329,7 @@ RunResult SSHSession::run(const Server& server, const std::string& command, int 
       auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - started).count();
       if (timeout_sec > 0 && elapsed > timeout_sec) {
         finish_output();
-        on_output("\n■ Таймаут " + std::to_string(timeout_sec) + " с\n");
+        if (echo_local) on_output("\n■ Таймаут " + std::to_string(timeout_sec) + " с\n");
         result.exit_code = 124;
         result.cwd = filt.cwd().empty() ? cwd : filt.cwd();
         break;

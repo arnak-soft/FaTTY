@@ -30,7 +30,8 @@ class SSHSession {
 
   void cancel();
   RunResult run(const Server& server, const std::string& command, int timeout_sec, bool login_shell,
-                const OutputCb& on_output, const std::string& cwd = "", std::string_view shell = "bash");
+                const OutputCb& on_output, const std::string& cwd = "", std::string_view shell = "bash",
+                bool echo_local = true);
 
  private:
   std::atomic<bool> cancel_{false};

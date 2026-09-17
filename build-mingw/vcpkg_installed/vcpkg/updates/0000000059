@@ -1,6 +1,0 @@
-Package: vcpkg-cmake-config
-Version: 2026-07-21
-Architecture: x64-mingw-static
-Multi-Arch: same
-Abi: 4af5eb247218815f3bc5dcac631652c3fc905d2044b95d4b11ec32d8b1af77e5
-Status: purge ok not-installed

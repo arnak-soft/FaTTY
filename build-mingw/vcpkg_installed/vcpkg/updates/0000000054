@@ -1,9 +1,0 @@
-Package: zlib
-Version: 1.3.2
-Port-Version: 2
-Depends: vcpkg-cmake, vcpkg-cmake-config
-Architecture: x64-mingw-static
-Multi-Arch: same
-Abi: cce5a3386fe07a55e11158c687159735ca2a512d5f0dc36235ff86db56fb151b
-Description: A compression library
-Status: purge ok half-installed

@@ -1,6 +1,0 @@
-Package: vcpkg-cmake
-Version: 2025-08-07
-Architecture: x64-mingw-static
-Multi-Arch: same
-Abi: d6d1ca6522a84361eb0c19404bb6c4d4efe53fe39ebacd57840a8277470b5f1f
-Status: install ok installed

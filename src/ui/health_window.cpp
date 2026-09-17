@@ -583,6 +583,13 @@ void HealthWindow::show_detail() {
     err->Wrap(FromDIP(420));
     root->Add(err, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
+  if (snap.error.empty() && snap.level == HealthLevel::Unknown && snap.checked_at > 0 && snap.cpu_pct < 0 &&
+      snap.mem_pct < 0 && snap.disks.empty()) {
+    auto* hint = new wxStaticText(detail_, wxID_ANY, L"Нет цифр в последней проверке — нажмите «Обновить выбранный».");
+    hint->SetForegroundColour(Theme::muted());
+    hint->Wrap(FromDIP(420));
+    root->Add(hint, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  }
   if (!s->health_enabled) {
     auto* off = new wxStaticText(detail_, wxID_ANY, L"Этот VPS исключён из проверки (карточка сервера).");
     off->SetForegroundColour(Theme::muted());

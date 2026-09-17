@@ -1,7 +1,0 @@
-Package: libssh2
-Feature: openssl
-Depends: openssl
-Architecture: x64-mingw-static
-Multi-Arch: same
-Description: Use the openssl crypto backend
-Status: purge ok not-installed

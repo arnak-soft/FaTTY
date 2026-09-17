@@ -179,9 +179,9 @@ void HealthMonitor::start_check(Server server) {
     std::string captured;
     captured.reserve(16 * 1024);
     try {
-      session->run(
+      auto result = session->run(
           server, script, timeout, false,
-          [&captured](const std::string& chunk) { captured.append(chunk); }, "", shell);
+          [&captured](const std::string& chunk) { captured.append(chunk); }, "", shell, false);
       snap = parse_health_output(captured);
       snap.server_id = server.id;
       snap.server_name = server.name;
@@ -189,8 +189,14 @@ void HealthMonitor::start_check(Server server) {
       if (snap.level != HealthLevel::Unsupported) {
         apply_health_thresholds(snap, thresholds);
       }
-      if (snap.level == HealthLevel::Unknown && !snap.error.empty() && captured.find("FATTYHEALTH") == std::string::npos) {
-        snap.level = HealthLevel::Unknown;
+      if (snap.cpu_pct < 0 && snap.mem_pct < 0 && snap.disks.empty() && snap.load1 < 0 && snap.uptime_sec < 0) {
+        if (result.exit_code == 124) {
+          snap.level = HealthLevel::Unknown;
+          snap.error = "таймаут проверки";
+        } else if (result.exit_code == 130) {
+          snap.level = HealthLevel::Unknown;
+          snap.error = "проверка прервана";
+        }
       }
     } catch (const std::exception& exc) {
       snap.level = HealthLevel::Offline;

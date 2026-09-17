@@ -92,12 +92,43 @@ FATTYCWD_abc:/root
   expect(loaded["s1"].nproc == 2, "cache nproc");
   expect(loaded["s1"].disks.size() == 2, "cache disks");
   expect(loaded["s1"].checked_at == 12345, "cache time");
+  HealthSnapshot bogus;
+  bogus.server_id = "s2";
+  bogus.level = HealthLevel::Ok;
+  bogus.checked_at = 99;
+  cache["s2"] = bogus;
+  save_health_cache(path, cache);
+  loaded = load_health_cache(path);
+  expect(loaded["s2"].level == HealthLevel::Unknown, "empty ok cache demoted");
   expect(load_health_cache(dir / "missing.json").empty(), "missing cache");
   std::filesystem::remove_all(dir, ec);
 
   HealthSnapshot empty;
   apply_health_thresholds(empty, {});
   expect(empty.level == HealthLevel::Unknown, "empty stays unknown");
+
+  HealthSnapshot checked_empty;
+  checked_empty.checked_at = 1;
+  apply_health_thresholds(checked_empty, {});
+  expect(checked_empty.level == HealthLevel::Unknown, "checked empty is not ok");
+
+  const auto echoed = std::string("$ ") + health_remote_script({true, true, true, true}) +
+                      "\n\nFATTYHEALTH v1\nnproc=4\nload1=0.25\nload5=0.2\nload15=0.1\ncpu=3.5\n"
+                      "mem_total_kb=2048000\nmem_avail_kb=1024000\nuptime=3600\ndisk=/ 100 200\nFATTYHEALTH_END\n";
+  auto from_echo = parse_health_output(echoed);
+  expect(from_echo.nproc == 4, "real block after echoed script");
+  expect(from_echo.cpu_pct > 3.4 && from_echo.cpu_pct < 3.6, "cpu from real block");
+  expect(from_echo.disks.size() == 1 && from_echo.disks[0].mount == "/", "disk from real block");
+  from_echo.checked_at = 1;
+  apply_health_thresholds(from_echo, {});
+  expect(from_echo.level == HealthLevel::Ok, "real metrics are ok");
+
+  auto only_echo = parse_health_output("$ " + health_remote_script({true, true, true, true}) + "\n");
+  expect(only_echo.nproc == 0 && only_echo.cpu_pct < 0 && only_echo.disks.empty(), "script echo is not a snapshot");
+  expect(!only_echo.error.empty(), "missing real marker");
+  only_echo.checked_at = 1;
+  apply_health_thresholds(only_echo, {});
+  expect(only_echo.level == HealthLevel::Unknown, "echo-only stays unknown");
 }
 
 }  // namespace fatty::test

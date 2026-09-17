@@ -1,9 +1,0 @@
-Package: tiff
-Version: 4.7.2
-Depends: vcpkg-cmake, vcpkg-cmake-config
-Architecture: x64-mingw-static
-Multi-Arch: same
-Abi: 4995096cfcae3327eb6874fe3ef103d800c04c3b545bbf984c319728b721fe73
-Description: A library that supports the manipulation of TIFF image files
-Default-Features: jpeg, lzma, zip
-Status: purge ok not-installed

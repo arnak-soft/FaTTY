@@ -1,7 +1,0 @@
-Package: vcpkg-cmake-get-vars
-Version: 2025-05-29
-Depends: vcpkg-cmake
-Architecture: x64-mingw-static
-Multi-Arch: same
-Abi: 80f7f2a1649cc73692f55690649bf1255cb0a83293c0bb8f7236f30f063701c2
-Status: install ok installed
