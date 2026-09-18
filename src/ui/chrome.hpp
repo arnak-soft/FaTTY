@@ -68,7 +68,6 @@ enum class BtnIcon {
 class RoundButton : public wxControl {
  public:
   RoundButton(wxWindow* parent, wxWindowID id, const wxString& label, BtnIcon icon = BtnIcon::None);
-  bool Enable(bool enable = true) override;
   void SetLabel(const wxString& label) override;
   void SetIcon(BtnIcon icon);
   void SetDefault();
@@ -76,6 +75,7 @@ class RoundButton : public wxControl {
 
  protected:
   wxSize DoGetBestSize() const override;
+  void DoEnable(bool enable) override;
 
  private:
   void on_paint(wxPaintEvent&);

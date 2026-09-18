@@ -381,7 +381,7 @@ RoundButton::RoundButton(wxWindow* parent, wxWindowID id, const wxString& label,
   Bind(wxEVT_MOUSE_CAPTURE_LOST, &RoundButton::on_capture_lost, this);
   Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
     if (IsEnabled() && (e.GetKeyCode() == WXK_RETURN || e.GetKeyCode() == WXK_SPACE)) {
-      fire();
+      fire_async();
       return;
     }
     e.Skip();
@@ -393,15 +393,16 @@ void RoundButton::on_size(wxSizeEvent& e) {
   e.Skip();
 }
 
-bool RoundButton::Enable(bool enable) {
-  const bool changed = wxControl::Enable(enable);
+void RoundButton::DoEnable(bool enable) {
+  wxControl::DoEnable(enable);
   if (!enable) {
     if (HasCapture()) ReleaseMouse();
     hovered_ = false;
     pressed_ = false;
+    Refresh();
+    return;
   }
-  Refresh();
-  return changed;
+  sync_hover();
 }
 
 void RoundButton::SetLabel(const wxString& label) {
@@ -437,7 +438,7 @@ void RoundButton::SetDefault() {
         return;
       }
     }
-    fire();
+    fire_async();
   });
 }
 
@@ -459,15 +460,18 @@ void RoundButton::fire() {
 void RoundButton::fire_async() {
   CallAfter([this] {
     if (IsBeingDeleted() || !IsEnabled()) return;
+    pressed_ = false;
     fire();
-    if (!IsBeingDeleted()) sync_hover();
+    if (IsBeingDeleted()) return;
+    // Диалог/PuTTY отключают окно: кнопка успевает перерисоваться серой
+    // (IsEnabled() == false). После возврата всегда сбрасываем вид.
+    sync_hover();
   });
 }
 
 void RoundButton::sync_hover() {
   const wxPoint pt = ScreenToClient(wxGetMousePosition());
   const bool inside = IsEnabled() && IsShown() && GetClientRect().Contains(pt);
-  if (hovered_ == inside && (HasCapture() || !pressed_)) return;
   hovered_ = inside;
   if (!HasCapture()) pressed_ = false;
   Refresh();
