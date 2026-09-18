@@ -143,6 +143,10 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   confirm_->SetValue(st.confirm_before_run);
   clear_output_ = new wxCheckBox(general, wxID_ANY, L"Очищать панель вывода перед новым запуском");
   clear_output_->SetValue(st.clear_output_before_run);
+  automation_to_shell_ =
+      new wxCheckBox(general, wxID_ANY,
+                     L"После подключения Shell направлять вывод команд туда (постоянно)");
+  automation_to_shell_->SetValue(st.automation_to_shell_when_connected);
   advance_command_ = new wxCheckBox(general, wxID_ANY, L"Переходить к следующей команде после запуска (F5 / двойной клик)");
   advance_command_->SetValue(st.advance_command_after_run);
   show_folder_col_ = new wxCheckBox(general, wxID_ANY, L"Показывать столбец «Папка» (рабочий каталог) в списке команд");
@@ -168,6 +172,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* check_now = make_button(general, L"Проверить сейчас…", BtnIcon::Refresh);
   gsz->Add(confirm_, 0, wxALL, 8);
   gsz->Add(clear_output_, 0, wxALL, 8);
+  gsz->Add(automation_to_shell_, 0, wxALL, 8);
   gsz->Add(advance_command_, 0, wxALL, 8);
   gsz->Add(show_folder_col_, 0, wxALL, 8);
   gsz->Add(theme_row, 0, wxALL, 8);
@@ -492,6 +497,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.confirm_before_run = confirm_->GetValue();
   config_.settings.check_updates_on_start = updates_->GetValue();
   config_.settings.clear_output_before_run = clear_output_->GetValue();
+  config_.settings.automation_to_shell_when_connected = automation_to_shell_->GetValue();
   config_.settings.advance_command_after_run = advance_command_->GetValue();
   config_.settings.show_command_folder_column = show_folder_col_->GetValue();
   config_.settings.backup_enabled = backup_->GetValue();

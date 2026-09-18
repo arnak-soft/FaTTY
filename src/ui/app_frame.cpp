@@ -28,6 +28,7 @@
 #include <wx/app.h>
 #include <wx/bookctrl.h>
 #include <wx/button.h>
+#include <wx/checkbox.h>
 #include <wx/choicdlg.h>
 #include <wx/dialog.h>
 #include <wx/filedlg.h>
@@ -505,6 +506,11 @@ void AppFrame::build_ui() {
   shell_connect_btn_ = make_button(shellp, L"Подключить", BtnIcon::Terminal);
   shell_disconnect_btn_ = make_button(shellp, L"Отключить", BtnIcon::Stop);
   shell_disconnect_btn_->Enable(false);
+  shell_automation_cb_ = new wxCheckBox(shellp, wxID_ANY, L"Вывод команд сюда");
+  shell_automation_cb_->SetValue(false);
+  shell_automation_cb_->SetToolTip(
+      L"Пока включено, F5 и связки пишут в эту вкладку (если Shell к тому же VPS). "
+      L"Сбрасывается при каждом запуске FaTTY. Постоянно — в Настройки → Общие.");
   shell_status_ = new wxStaticText(shellp, wxID_ANY, L"Выберите VPS и нажмите «Подключить»");
   shell_status_->SetName(L"muted");
   auto* shell_card = new RoundedCard(shellp);
@@ -515,6 +521,7 @@ void AppFrame::build_ui() {
   auto* st = new wxBoxSizer(wxHORIZONTAL);
   st->Add(shell_connect_btn_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
   st->Add(shell_disconnect_btn_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, pad);
+  st->Add(shell_automation_cb_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, pad);
   st->Add(shell_status_, 1, wxALIGN_CENTER_VERTICAL);
   auto* ss = new wxBoxSizer(wxVERTICAL);
   ss->Add(st, 0, wxEXPAND | wxALL, pad);
@@ -536,6 +543,9 @@ void AppFrame::build_ui() {
   });
   shell_connect_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { shell_connect(); });
   shell_disconnect_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { shell_disconnect(); });
+  shell_automation_cb_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+    session_automation_to_shell_ = shell_automation_cb_->GetValue();
+  });
   bottom_nb_->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
     if (e.GetSelection() == 1 && terminal_) terminal_->SetFocus();
     e.Skip();
@@ -1283,6 +1293,10 @@ void AppFrame::open_settings() {
                        persist();
                        if (health_) health_->wake();
                        if (health_window_) health_window_->reload();
+                       if (config_.settings.automation_to_shell_when_connected && shell_ && shell_->running()) {
+                         session_automation_to_shell_ = true;
+                         update_shell_ui();
+                       }
                      },
                      [this] {
                        ChangeMasterDialog d(this, vault_, config_.settings.allow_short_master_password);
@@ -1693,14 +1707,46 @@ void AppFrame::refresh_bundles() {
 }
 
 void AppFrame::append_output(const std::string& text, const wxColour* colour) {
+  if (shell_takes_automation()) {
+    if (bottom_nb_ && bottom_nb_->GetSelection() != 1) bottom_nb_->SetSelection(1);
+    if (!terminal_) return;
+    std::string chunk = text;
+    if (colour) {
+      std::string open;
+      if (*colour == Theme::ok())
+        open = "\x1b[32m";
+      else if (*colour == Theme::err())
+        open = "\x1b[31m";
+      else if (*colour == Theme::meta() || *colour == Theme::warn())
+        open = "\x1b[36m";
+      if (!open.empty()) chunk = open + text + "\x1b[0m";
+    }
+    terminal_->feed(chunk);
+    return;
+  }
   output_->SetDefaultStyle(wxTextAttr(colour ? *colour : Theme::text()));
   output_->AppendText(wxString::FromUTF8(text));
+}
+
+bool AppFrame::shell_takes_automation(const std::string& server_id) const {
+  if (!session_automation_to_shell_) return false;
+  if (!shell_ || !shell_->running() || !terminal_) return false;
+  if (shell_server_id_.empty()) return false;
+  const std::string& id = !server_id.empty() ? server_id : busy_server_id_;
+  if (!id.empty() && id != shell_server_id_) return false;
+  return true;
 }
 
 void AppFrame::update_shell_ui() {
   const bool on = shell_ && shell_->running();
   if (shell_connect_btn_) shell_connect_btn_->Enable(!on);
   if (shell_disconnect_btn_) shell_disconnect_btn_->Enable(on);
+  if (shell_automation_cb_) {
+    shell_automation_cb_->Enable(on);
+    if (shell_automation_cb_->GetValue() != session_automation_to_shell_) {
+      shell_automation_cb_->SetValue(session_automation_to_shell_);
+    }
+  }
 }
 
 void AppFrame::shell_connect() {
@@ -1717,6 +1763,10 @@ void AppFrame::shell_connect() {
   shell_status_->SetLabel(wxString::FromUTF8("Подключение к " + s->name + "…"));
   update_shell_ui();
   if (bottom_nb_) bottom_nb_->SetSelection(1);
+
+  if (config_.settings.automation_to_shell_when_connected) {
+    session_automation_to_shell_ = true;
+  }
 
   shell_ = std::make_unique<ShellSession>();
   auto alive = alive_;

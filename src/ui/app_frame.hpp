@@ -13,6 +13,7 @@
 #include "ui/terminal_view.hpp"
 
 #include <wx/button.h>
+#include <wx/checkbox.h>
 #include <wx/frame.h>
 #include <wx/gauge.h>
 #include <wx/splitter.h>
@@ -78,6 +79,7 @@ class AppFrame : public wxFrame {
   void shell_connect();
   void shell_disconnect();
   void update_shell_ui();
+  bool shell_takes_automation(const std::string& server_id = {}) const;
   void show_journal();
   void show_health(const std::string& select_id = {});
   void show_help(const std::string& tab = {});
@@ -133,9 +135,12 @@ class AppFrame : public wxFrame {
   TerminalView* terminal_{};
   RoundButton* shell_connect_btn_{};
   RoundButton* shell_disconnect_btn_{};
+  wxCheckBox* shell_automation_cb_{};
   wxStaticText* shell_status_{};
   std::unique_ptr<ShellSession> shell_;
   std::string shell_server_id_;
+  // Сессионный флаг: сбрасывается при каждом запуске FaTTY.
+  bool session_automation_to_shell_ = false;
   wxTextCtrl* quick_{};
   wxStaticText* cwd_label_{};
   RoundButton* cwd_reset_{};

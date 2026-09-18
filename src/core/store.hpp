@@ -95,6 +95,8 @@ struct AppSettings {
   int journal_max_entries = 5000;
   bool clear_output_before_run = false;
   bool advance_command_after_run = true;
+  // Если true — после подключения Shell сессионный переключатель «вывод команд в Shell» включается сам.
+  bool automation_to_shell_when_connected = false;
   bool allow_short_master_password = false;
   int master_password_max_attempts = 5;
   int master_password_lockout_minutes = 20;
