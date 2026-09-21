@@ -2,6 +2,7 @@
 
 #include "app/single_instance.hpp"
 #include "app/version.hpp"
+#include "app/whats_new.hpp"
 #include "core/config_io.hpp"
 #include "core/backup.hpp"
 #include "core/paths.hpp"
@@ -207,14 +208,15 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     if (config_.settings.vsash_pos > 0) vsplit_->SetSashPosition(config_.settings.vsash_pos);
     restore_columns();
     restoring_ = false;
-  });
-  if (config_.settings.check_updates_on_start) {
-    using clock = std::chrono::system_clock;
-    double now = std::chrono::duration<double>(clock::now().time_since_epoch()).count();
-    if (now - config_.settings.last_update_check >= 24 * 3600) {
-      check_updates_async(false);
+    maybe_show_whats_new();
+    if (config_.settings.check_updates_on_start) {
+      using clock = std::chrono::system_clock;
+      double now = std::chrono::duration<double>(clock::now().time_since_epoch()).count();
+      if (now - config_.settings.last_update_check >= 24 * 3600) {
+        check_updates_async(false);
+      }
     }
-  }
+  });
   maybe_run_backup();
 }
 
@@ -240,6 +242,7 @@ void AppFrame::build_menu() {
   help->Append(1021, L"Частые команды");
   help->AppendSeparator();
   help->Append(1022, L"Проверить обновления…");
+  help->Append(1023, L"Что нового…");
   help->AppendSeparator();
   help->Append(wxID_ABOUT, L"О программе");
   bar->Append(help, L"Справка");
@@ -290,6 +293,7 @@ void AppFrame::build_menu() {
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_help(); }, 1020);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_help("Команды"); }, 1021);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { check_updates_interactive(); }, 1022);
+  Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_whats_new(); }, 1023);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     wxMessageBox(wxString::FromUTF8(std::string(kAppName) + " " + resolve_version() +
                                     "\n\nЗапуск команд на VPS по SSH.\n\nСправка: F1"),
@@ -1151,6 +1155,31 @@ void AppFrame::show_help(const std::string& tab) {
   help_window_->Show();
   if (!tab.empty()) help_window_->show_tab(tab);
   help_window_->Raise();
+}
+
+void AppFrame::maybe_show_whats_new() {
+  auto current = release_version_id(resolve_version());
+  if (!should_show_whats_new(config_.settings.last_seen_version, current)) {
+    if (!current.empty() && config_.settings.last_seen_version != current) {
+      config_.settings.last_seen_version = current;
+      persist();
+    }
+    return;
+  }
+  show_whats_new();
+}
+
+void AppFrame::show_whats_new() {
+  auto current = release_version_id(resolve_version());
+  auto shown = current.empty() ? resolve_version() : current;
+  auto notes = std::string(kWhatsNew);
+  if (trim(notes).empty()) notes = "В этой сборке коротких заметок пока нет.";
+  WhatsNewDialog dlg(this, shown, notes);
+  dlg.ShowModal();
+  if (!current.empty() && config_.settings.last_seen_version != current) {
+    config_.settings.last_seen_version = current;
+    persist();
+  }
 }
 
 void AppFrame::check_updates_interactive() { check_updates_async(true); }

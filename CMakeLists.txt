@@ -54,6 +54,7 @@ set(FATTY_CORE_SOURCES
   src/core/health.cpp
   src/core/remote_profile.cpp
   src/app/version.cpp
+  src/app/whats_new.cpp
 )
 
 set(FATTY_NET_SOURCES
@@ -182,6 +183,7 @@ add_executable(fatty_tests
   tests/test_config_roundtrip.cpp
   tests/test_health.cpp
   tests/test_remote_profile.cpp
+  tests/test_whats_new.cpp
   tests/test_checklist.cpp
   tests/test_smoke.cpp
 )

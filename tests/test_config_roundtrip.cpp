@@ -54,6 +54,7 @@ void test_config_roundtrip() {
   cfg.settings.health_disk_warn = 70;
   cfg.settings.health_show_load = false;
   cfg.settings.health_show_docker_disks = true;
+  cfg.settings.last_seen_version = "1.2.3";
   cfg.servers[0].health_enabled = false;
 
   SessionVault vault;
@@ -81,6 +82,7 @@ void test_config_roundtrip() {
   expect(loaded.settings.health_disk_warn == 70, "roundtrip disk warn");
   expect(!loaded.settings.health_show_load, "roundtrip hide load");
   expect(loaded.settings.health_show_docker_disks, "roundtrip docker disks");
+  expect(loaded.settings.last_seen_version == "1.2.3", "roundtrip last_seen_version");
 
   nlohmann::json legacy = nlohmann::json::parse(R"({
     "vault": {},

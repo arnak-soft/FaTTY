@@ -852,4 +852,35 @@ UpdateAvailableDialog::UpdateAvailableDialog(wxWindow* parent, const std::string
 
 bool UpdateAvailableDialog::dont_remind() const { return skip_ && skip_->GetValue(); }
 
+WhatsNewDialog::WhatsNewDialog(wxWindow* parent, const std::string& version, const std::string& notes)
+    : wxDialog(parent, wxID_ANY, L"Что нового", wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE) {
+  bind_escape_close(this);
+
+  auto* body = new wxPanel(this);
+  auto ver = wxString::FromUTF8(version.empty() ? "?" : version);
+  auto* intro = new wxStaticText(body, wxID_ANY, wxString::Format(L"Версия %s", ver));
+  intro->SetForegroundColour(Theme::muted());
+  auto* msg = new wxStaticText(body, wxID_ANY, wxString::FromUTF8(notes));
+  msg->Wrap(FromDIP(420));
+
+  auto* btns = new wxBoxSizer(wxHORIZONTAL);
+  btns->AddStretchSpacer();
+  auto* ok = accent_button(body, L"Понятно", BtnIcon::Check, wxID_OK);
+  ok->SetDefault();
+  ok->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { EndModal(wxID_OK); });
+  btns->Add(ok);
+
+  auto* root = new wxBoxSizer(wxVERTICAL);
+  root->Add(intro, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 16);
+  root->Add(msg, 0, wxEXPAND | wxALL, 16);
+  root->Add(btns, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 16);
+  body->SetSizer(root);
+  auto* outer = new wxBoxSizer(wxVERTICAL);
+  outer->Add(body, 1, wxEXPAND);
+  SetSizer(outer);
+  apply_dark(this);
+  outer->SetSizeHints(this);
+  if (parent) CentreOnParent();
+}
+
 }  // namespace fatty

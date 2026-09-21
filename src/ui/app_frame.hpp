@@ -88,6 +88,8 @@ class AppFrame : public wxFrame {
   void show_help(const std::string& tab = {});
   void check_updates_interactive();
   void check_updates_async(bool interactive);
+  void maybe_show_whats_new();
+  void show_whats_new();
   void open_settings();
   void restore_columns();
   void track_window_state();

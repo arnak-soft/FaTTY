@@ -1,6 +1,7 @@
 # Build outputs
 dist/
 build/
+build-*/
 out/
 *.exe
 
@@ -21,6 +22,8 @@ CMakeUserPresets.json
 CMakeCache.txt
 CMakeFiles/
 compile_commands.json
+.ninja_log
+.ninja_deps
 *.obj
 *.o
 *.a
@@ -33,6 +36,7 @@ compile_commands.json
 config.json
 known_hosts
 journal.jsonl
+health.json
 .env
 .env.*
 *.pem

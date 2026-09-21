@@ -78,6 +78,7 @@ struct AppSettings {
   bool check_updates_on_start = true;
   double last_update_check = 0.0;
   std::string skipped_update_version;
+  std::string last_seen_version;
   std::string window_geometry;
   std::string window_state = "normal";
   int sash_pos = 0;

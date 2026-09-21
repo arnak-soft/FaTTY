@@ -561,6 +561,7 @@ Config load_config_from(const std::filesystem::path& path) {
     st.last_update_check = 0.0;
   }
   st.skipped_update_version = settings_raw.value("skipped_update_version", "");
+  st.last_seen_version = settings_raw.value("last_seen_version", "");
   st.window_geometry = settings_raw.value("window_geometry", "");
   st.window_state = settings_raw.value("window_state", "normal");
   if (st.window_state != "normal" && st.window_state != "zoomed") {
@@ -720,6 +721,7 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"check_updates_on_start", config.settings.check_updates_on_start},
       {"last_update_check", config.settings.last_update_check},
       {"skipped_update_version", config.settings.skipped_update_version},
+      {"last_seen_version", config.settings.last_seen_version},
       {"window_geometry", config.settings.window_geometry},
       {"window_state", config.settings.window_state},
       {"sash_pos", config.settings.sash_pos},

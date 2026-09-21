@@ -153,4 +153,9 @@ class UpdateAvailableDialog : public wxDialog {
   wxCheckBox* skip_{};
 };
 
+class WhatsNewDialog : public wxDialog {
+ public:
+  WhatsNewDialog(wxWindow* parent, const std::string& version, const std::string& notes);
+};
+
 }  // namespace fatty
