@@ -2,6 +2,7 @@
 
 #include "ui/theme.hpp"
 
+#include <wx/dc.h>
 #include <wx/dcbuffer.h>
 #include <wx/sizer.h>
 #include <algorithm>
@@ -14,6 +15,24 @@ namespace {
 wxColour row_bg(int row, bool selected) {
   if (selected) return Theme::select();
   return Theme::stripe(row);
+}
+
+void draw_sort_arrow(wxDC& dc, wxWindow* win, int x, int y, bool ascending, const wxColour& colour) {
+  const int w = win->FromDIP(8);
+  const int h = win->FromDIP(5);
+  wxPoint pts[3];
+  if (ascending) {
+    pts[0] = {x + w / 2, y};
+    pts[1] = {x, y + h};
+    pts[2] = {x + w, y + h};
+  } else {
+    pts[0] = {x, y};
+    pts[1] = {x + w, y};
+    pts[2] = {x + w / 2, y + h};
+  }
+  dc.SetPen(wxPen(colour));
+  dc.SetBrush(wxBrush(colour));
+  dc.DrawPolygon(3, pts);
 }
 
 }  // namespace
@@ -36,16 +55,39 @@ void StripedListCtrl::Header::on_paint(wxPaintEvent&) {
   wxAutoBufferedPaintDC dc(this);
   dc.SetBackground(wxBrush(Theme::elevated()));
   dc.Clear();
-  dc.SetFont(Theme::ui_small());
-  dc.SetTextForeground(Theme::muted());
   const int h = GetClientSize().y;
+  const int pad = FromDIP(6);
+  const int arrow_w = FromDIP(8);
+  const int arrow_h = FromDIP(5);
+  const int arrow_gap = FromDIP(6);
   int x = 0;
   for (std::size_t i = 0; i < owner_->columns_.size(); ++i) {
     const auto& col = owner_->columns_[i];
-    wxRect cell(x + FromDIP(6), 0, std::max(0, col.width - FromDIP(10)), h);
+    const bool sorted = static_cast<int>(i) == owner_->sort_col_;
+    wxRect col_rc(x, 0, col.width, h);
+    if (sorted) {
+      dc.SetPen(*wxTRANSPARENT_PEN);
+      dc.SetBrush(wxBrush(Theme::sorted_header()));
+      dc.DrawRectangle(col_rc);
+      dc.SetPen(wxPen(Theme::accent(), FromDIP(2)));
+      dc.DrawLine(x, h - FromDIP(2), x + col.width, h - FromDIP(2));
+    }
+    wxFont font = Theme::ui_small();
+    if (sorted) font.SetWeight(wxFONTWEIGHT_SEMIBOLD);
+    dc.SetFont(font);
+    dc.SetTextForeground(sorted ? Theme::text_bright() : Theme::muted());
+    wxRect cell(x + pad, 0, std::max(0, col.width - pad * 2), h);
+    if (sorted && cell.width > arrow_w + arrow_gap) {
+      cell.width -= arrow_w + arrow_gap;
+    }
     dc.SetClippingRegion(cell);
     dc.DrawLabel(col.title, cell, wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL);
     dc.DestroyClippingRegion();
+    if (sorted && col.width > pad + arrow_w) {
+      const int arrow_x = x + col.width - pad - arrow_w;
+      const int arrow_y = (h - arrow_h) / 2;
+      draw_sort_arrow(dc, this, arrow_x, arrow_y, owner_->sort_asc_, Theme::accent());
+    }
     x += col.width;
     dc.SetPen(wxPen(Theme::border()));
     dc.DrawLine(x - 1, FromDIP(4), x - 1, h - FromDIP(4));
@@ -225,13 +267,19 @@ void StripedListCtrl::Body::on_paint(wxPaintEvent&) {
     const auto& item = owner_->rows_[static_cast<std::size_t>(row)];
     const int y = (row - first) * h;
     wxRect row_rc(0, y, GetClientSize().x, h);
+    const wxColour bg = row_bg(row, item.selected);
     dc.SetPen(*wxTRANSPARENT_PEN);
-    dc.SetBrush(wxBrush(row_bg(row, item.selected)));
+    dc.SetBrush(wxBrush(bg));
     dc.DrawRectangle(row_rc);
     dc.SetTextForeground(item.text.IsOk() ? item.text : Theme::text());
     int x = 0;
     for (int col = 0; col < static_cast<int>(owner_->columns_.size()); ++col) {
       const int w = owner_->columns_[static_cast<std::size_t>(col)].width;
+      if (col == owner_->sort_col_) {
+        dc.SetPen(*wxTRANSPARENT_PEN);
+        dc.SetBrush(wxBrush(Theme::sorted_column(bg)));
+        dc.DrawRectangle(wxRect(x, y, w, h));
+      }
       wxRect cell(x + pad, y, std::max(0, w - pad * 2), h);
       wxString text;
       if (col < static_cast<int>(item.cells.size())) text = item.cells[static_cast<std::size_t>(col)];
@@ -380,6 +428,8 @@ bool StripedListCtrl::DeleteColumn(int col) {
       row.cells.erase(row.cells.begin() + col);
     }
   }
+  if (sort_col_ == col) sort_col_ = -1;
+  else if (sort_col_ > col) --sort_col_;
   if (header_) header_->Refresh();
   refresh_body();
   return true;
@@ -395,6 +445,17 @@ void StripedListCtrl::SetColumnWidth(int col, int width) {
 int StripedListCtrl::GetColumnWidth(int col) const {
   if (col < 0 || col >= GetColumnCount()) return 0;
   return columns_[static_cast<std::size_t>(col)].width;
+}
+
+void StripedListCtrl::set_sort_column(int col, bool ascending) {
+  if (col < 0 || col >= GetColumnCount()) {
+    sort_col_ = -1;
+  } else {
+    sort_col_ = col;
+    sort_asc_ = ascending;
+  }
+  if (header_) header_->Refresh();
+  refresh_body();
 }
 
 void StripedListCtrl::SetItemState(long row, long state, long mask) {
@@ -465,6 +526,14 @@ void StripedListCtrl::MoveColumn(int from, int to_before) {
   columns_.erase(columns_.begin() + from);
   int insert = to_before > from ? to_before - 1 : to_before;
   columns_.insert(columns_.begin() + insert, std::move(col));
+  if (sort_col_ == from) {
+    sort_col_ = insert;
+  } else if (sort_col_ >= 0) {
+    int idx = sort_col_;
+    if (from < idx) --idx;
+    if (insert <= idx) ++idx;
+    sort_col_ = idx;
+  }
   for (auto& row : rows_) {
     ensure_cells(row);
     if (from >= static_cast<int>(row.cells.size())) continue;

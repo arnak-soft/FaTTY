@@ -143,8 +143,9 @@ struct Config {
   void set_commands_for(const std::string& server_id, const std::vector<Command>& ordered);
   void set_commands_for(const std::string& server_id, const std::string& group_id, const std::vector<Command>& ordered);
   bool move_command(const std::string& command_id, int delta);
-  void sort_commands_for(const std::string& server_id, const std::string& by);
-  void sort_commands_for(const std::string& server_id, const std::string& group_id, const std::string& by);
+  void sort_commands_for(const std::string& server_id, const std::string& by, bool ascending = true);
+  void sort_commands_for(const std::string& server_id, const std::string& group_id, const std::string& by,
+                         bool ascending = true);
   void remove_group(const std::string& group_id);
   std::vector<Bundle> bundles_for(const std::string& server_id) const;
   Bundle* bundle_by_id(const std::string& id);

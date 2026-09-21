@@ -115,6 +115,14 @@ wxColour Theme::stripe(int row) {
                theme_is_dark() ? 0.11f : 0.07f);
 }
 
+wxColour Theme::sorted_header() {
+  return blend(elevated(), accent(), theme_is_dark() ? 0.30f : 0.16f);
+}
+
+wxColour Theme::sorted_column(const wxColour& row_bg) {
+  return blend(row_bg, accent(), theme_is_dark() ? 0.22f : 0.12f);
+}
+
 wxColour Theme::run_status(const std::string& status) {
   if (status == "ok") return ok();
   if (status == "failed" || status == "error") return err();

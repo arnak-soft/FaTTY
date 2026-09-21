@@ -58,6 +58,9 @@ class AppFrame : public wxFrame {
   void setup_server_columns();
   std::vector<std::string> command_column_ids() const;
   std::vector<std::string> server_column_ids() const;
+  void sort_visible_commands(const std::string& by, bool toggle);
+  void apply_command_sort_visual();
+  void clear_command_sort();
   void attach_commands_page(int index);
   std::string current_group_id() const;
   Server* selected_server();
@@ -118,6 +121,8 @@ class AppFrame : public wxFrame {
   std::string normal_geometry_;
   std::string server_filter_;
   std::string busy_label_;
+  std::string command_sort_by_;
+  bool command_sort_asc_ = true;
   std::chrono::steady_clock::time_point run_start_{};
   std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
   std::shared_ptr<std::atomic<bool>> worker_running_ = std::make_shared<std::atomic<bool>>(false);

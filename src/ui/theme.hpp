@@ -31,6 +31,8 @@ struct Theme {
   static wxColour hover();
   static wxColour blend(const wxColour& a, const wxColour& b, float t);
   static wxColour stripe(int row);
+  static wxColour sorted_header();
+  static wxColour sorted_column(const wxColour& row_bg);
   static wxColour run_status(const std::string& status);
   static wxFont ui();
   static wxFont ui_small();

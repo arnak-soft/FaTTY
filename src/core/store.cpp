@@ -246,11 +246,12 @@ bool Config::move_command(const std::string& command_id, int delta) {
   return true;
 }
 
-void Config::sort_commands_for(const std::string& server_id, const std::string& by) {
-  sort_commands_for(server_id, "", by);
+void Config::sort_commands_for(const std::string& server_id, const std::string& by, bool ascending) {
+  sort_commands_for(server_id, "", by, ascending);
 }
 
-void Config::sort_commands_for(const std::string& server_id, const std::string& group_id, const std::string& by) {
+void Config::sort_commands_for(const std::string& server_id, const std::string& group_id, const std::string& by,
+                               bool ascending) {
   auto group = commands_for(server_id, group_id);
   auto primary = [&](const Command& c) -> std::string {
     if (by == "command") return to_lower(trim(c.command));
@@ -265,7 +266,7 @@ void Config::sort_commands_for(const std::string& server_id, const std::string& 
     auto ka = primary(a);
     auto kb = primary(b);
     if (ka != kb) {
-      return ka < kb;
+      return ascending ? ka < kb : ka > kb;
     }
     auto na = to_lower(trim(a.name));
     auto nb = to_lower(trim(b.name));

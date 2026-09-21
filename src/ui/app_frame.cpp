@@ -545,6 +545,7 @@ void AppFrame::build_ui() {
   shell_disconnect_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { shell_disconnect(); });
   shell_automation_cb_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
     session_automation_to_shell_ = shell_automation_cb_->GetValue();
+    if (shell_ && shell_->running() && terminal_) terminal_->SetFocus();
   });
   bottom_nb_->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
     if (e.GetSelection() == 1 && terminal_) terminal_->SetFocus();
@@ -589,39 +590,10 @@ void AppFrame::build_ui() {
   });
   commands_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { request_saved_runs(); });
   commands_->Bind(wxEVT_LIST_COL_CLICK, [this](wxListEvent& e) {
-    auto* s = selected_server();
-    if (!s) return;
     const auto ids = command_column_ids();
     const int col = e.GetColumn();
     if (col < 0 || col >= static_cast<int>(ids.size())) return;
-    const auto& by = ids[static_cast<std::size_t>(col)];
-    if (by == "avg") {
-      auto group = config_.commands_for(s->id, current_group_id());
-      auto avg_of = [this](const std::string& id) -> double {
-        auto it = command_stats_.find(id);
-        if (it == command_stats_.end() || it->second.run_count <= 0) return -1;
-        return it->second.average_sec;
-      };
-      std::sort(group.begin(), group.end(), [&](const Command& a, const Command& b) {
-        const double da = avg_of(a.id);
-        const double db = avg_of(b.id);
-        const bool a_missing = da < 0;
-        const bool b_missing = db < 0;
-        if (a_missing != b_missing) return !a_missing;
-        if (da != db) return da < db;
-        auto na = to_lower(trim(a.name));
-        auto nb = to_lower(trim(b.name));
-        if (na != nb) return na < nb;
-        return a.id < b.id;
-      });
-      config_.set_commands_for(s->id, current_group_id(), group);
-    } else if (by == "name" || by == "command" || by == "comment" || by == "folder") {
-      config_.sort_commands_for(s->id, current_group_id(), by);
-    } else {
-      return;
-    }
-    persist();
-    refresh_commands();
+    sort_visible_commands(ids[static_cast<std::size_t>(col)], true);
   });
   servers_->Bind(wxEVT_LIST_COL_END_DRAG, [this](wxListEvent& e) {
     if (e.GetInt() >= 0) {
@@ -634,6 +606,7 @@ void AppFrame::build_ui() {
     if (e.GetInt() >= 0) {
       config_.settings.column_order["commands"] =
           moved_ids(command_column_ids(), e.GetColumn(), e.GetInt());
+      apply_command_sort_visual();
     }
     if (!restoring_) persist();
   });
@@ -803,6 +776,7 @@ void AppFrame::build_ui() {
   up->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* c = selected_command();
     if (c && config_.move_command(c->id, -1)) {
+      clear_command_sort();
       persist();
       refresh_commands();
     }
@@ -810,17 +784,12 @@ void AppFrame::build_ui() {
   down->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* c = selected_command();
     if (c && config_.move_command(c->id, 1)) {
+      clear_command_sort();
       persist();
       refresh_commands();
     }
   });
-  byname->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (!s) return;
-    config_.sort_commands_for(s->id, current_group_id(), "name");
-    persist();
-    refresh_commands();
-  });
+  byname->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { sort_visible_commands("name", false); });
   groups_nb_->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
     if (updating_groups_) return;
     attach_commands_page(e.GetSelection());
@@ -1646,6 +1615,84 @@ void AppFrame::setup_command_columns() {
   if (it != config_.settings.column_widths.end()) {
     apply_list_columns(commands_, it->second, ids);
   }
+  apply_command_sort_visual();
+}
+
+void AppFrame::sort_visible_commands(const std::string& by, bool toggle) {
+  auto* s = selected_server();
+  if (!s) return;
+  if (by != "name" && by != "command" && by != "comment" && by != "folder" && by != "avg" && by != "last") {
+    return;
+  }
+  if (toggle && command_sort_by_ == by) {
+    command_sort_asc_ = !command_sort_asc_;
+  } else {
+    command_sort_by_ = by;
+    command_sort_asc_ = true;
+  }
+  const bool asc = command_sort_asc_;
+  if (by == "avg" || by == "last") {
+    auto group = config_.commands_for(s->id, current_group_id());
+    auto avg_of = [this](const std::string& id) -> double {
+      auto it = command_stats_.find(id);
+      if (it == command_stats_.end() || it->second.run_count <= 0) return -1;
+      return it->second.average_sec;
+    };
+    auto last_of = [this](const std::string& id) -> std::string {
+      auto it = command_stats_.find(id);
+      if (it == command_stats_.end()) return {};
+      return it->second.latest.started_at;
+    };
+    std::sort(group.begin(), group.end(), [&](const Command& a, const Command& b) {
+      if (by == "avg") {
+        const double da = avg_of(a.id);
+        const double db = avg_of(b.id);
+        const bool a_missing = da < 0;
+        const bool b_missing = db < 0;
+        if (a_missing != b_missing) return !a_missing;
+        if (da != db) return asc ? da < db : da > db;
+      } else {
+        const auto sa = last_of(a.id);
+        const auto sb = last_of(b.id);
+        const bool a_missing = sa.empty();
+        const bool b_missing = sb.empty();
+        if (a_missing != b_missing) return !a_missing;
+        if (sa != sb) return asc ? sa < sb : sa > sb;
+      }
+      auto na = to_lower(trim(a.name));
+      auto nb = to_lower(trim(b.name));
+      if (na != nb) return na < nb;
+      return a.id < b.id;
+    });
+    config_.set_commands_for(s->id, current_group_id(), group);
+  } else {
+    config_.sort_commands_for(s->id, current_group_id(), by, asc);
+  }
+  persist();
+  refresh_commands();
+  apply_command_sort_visual();
+}
+
+void AppFrame::apply_command_sort_visual() {
+  if (!commands_) return;
+  if (command_sort_by_.empty()) {
+    commands_->set_sort_column(-1, true);
+    return;
+  }
+  const auto ids = command_column_ids();
+  for (int i = 0; i < static_cast<int>(ids.size()); ++i) {
+    if (ids[static_cast<std::size_t>(i)] == command_sort_by_) {
+      commands_->set_sort_column(i, command_sort_asc_);
+      return;
+    }
+  }
+  commands_->set_sort_column(-1, true);
+}
+
+void AppFrame::clear_command_sort() {
+  command_sort_by_.clear();
+  command_sort_asc_ = true;
+  apply_command_sort_visual();
 }
 
 Server* AppFrame::selected_server() {
@@ -1708,7 +1755,12 @@ void AppFrame::refresh_bundles() {
 
 void AppFrame::append_output(const std::string& text, const wxColour* colour) {
   if (shell_takes_automation()) {
-    if (bottom_nb_ && bottom_nb_->GetSelection() != 1) bottom_nb_->SetSelection(1);
+    if (bottom_nb_ && bottom_nb_->GetSelection() != 1) {
+      bottom_nb_->SetSelection(1);
+      CallAfter([this] {
+        if (terminal_) terminal_->SetFocus();
+      });
+    }
     if (!terminal_) return;
     std::string chunk = text;
     if (colour) {
@@ -1822,12 +1874,24 @@ void AppFrame::set_busy(bool busy) {
     busy_gauge_->Show();
     busy_gauge_->Pulse();
     busy_timer_.Start(250);
+    if (shell_takes_automation() && terminal_) {
+      if (bottom_nb_ && bottom_nb_->GetSelection() != 1) bottom_nb_->SetSelection(1);
+      CallAfter([this] {
+        if (terminal_) terminal_->SetFocus();
+      });
+    }
   } else {
     busy_server_id_.clear();
     busy_timer_.Stop();
     busy_gauge_->Hide();
     if (auto* sizer = busy_gauge_->GetContainingSizer()) sizer->Layout();
     if (health_) health_->wake();
+    if (session_automation_to_shell_ && shell_ && shell_->running() && terminal_ &&
+        bottom_nb_ && bottom_nb_->GetSelection() == 1) {
+      CallAfter([this] {
+        if (terminal_) terminal_->SetFocus();
+      });
+    }
   }
 }
 
@@ -2361,6 +2425,7 @@ void AppFrame::show_commands_context_menu(long row) {
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* c = selected_command();
     if (c && config_.move_command(c->id, -1)) {
+      clear_command_sort();
       persist();
       refresh_commands();
     }
@@ -2368,6 +2433,7 @@ void AppFrame::show_commands_context_menu(long row) {
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* c = selected_command();
     if (c && config_.move_command(c->id, 1)) {
+      clear_command_sort();
       persist();
       refresh_commands();
     }

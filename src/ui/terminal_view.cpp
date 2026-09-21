@@ -307,6 +307,8 @@ void TerminalView::parse_byte(unsigned char b) {
         return;
       }
       if (b == '\n') {
+        // Exec/SSH часто шлёт только LF; без CR текст уезжает вправо по «лесенке».
+        scr_->cx = 0;
         newline();
         return;
       }

@@ -31,6 +31,10 @@ class StripedListCtrl : public wxPanel {
   void SetColumnWidth(int col, int width);
   int GetColumnWidth(int col) const;
 
+  void set_sort_column(int col, bool ascending);
+  int sort_column() const { return sort_col_; }
+  bool sort_ascending() const { return sort_asc_; }
+
   void SetItemState(long row, long state, long mask);
   long GetNextItem(long start, int geometry, int state) const;
 
@@ -107,6 +111,8 @@ class StripedListCtrl : public wxPanel {
   std::vector<Row> rows_;
   bool single_sel_ = true;
   long anchor_ = -1;
+  int sort_col_ = -1;
+  bool sort_asc_ = true;
   Header* header_{};
   Body* body_{};
 };

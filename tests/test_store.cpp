@@ -40,6 +40,10 @@ void test_store() {
   expect(cfg.commands[1].id == c1.id, "moved");
   cfg.sort_commands_for(s.id, "name");
   expect(cfg.commands_for(s.id)[0].name == "a", "sort by name");
+  cfg.sort_commands_for(s.id, "name", false);
+  expect(cfg.commands_for(s.id)[0].name == "b", "sort by name descending");
+  cfg.sort_commands_for(s.id, "name");
+  expect(cfg.commands_for(s.id)[0].name == "a", "sort by name again");
 
   c1.comment = "zeta";
   c2.comment = "alpha note";
