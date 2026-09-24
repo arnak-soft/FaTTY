@@ -511,10 +511,10 @@ void AppFrame::build_ui() {
   shell_disconnect_btn_ = make_button(shellp, L"Отключить", BtnIcon::Stop);
   shell_disconnect_btn_->Enable(false);
   shell_automation_cb_ = new wxCheckBox(shellp, wxID_ANY, L"Вывод команд сюда");
-  shell_automation_cb_->SetValue(false);
+  shell_automation_cb_->SetValue(true);
   shell_automation_cb_->SetToolTip(
       L"Пока включено, F5 и связки пишут в эту вкладку (если Shell к тому же VPS). "
-      L"Сбрасывается при каждом запуске FaTTY. Постоянно — в Настройки → Общие.");
+      L"При каждом запуске FaTTY галочка снова включена.");
   shell_status_ = new wxStaticText(shellp, wxID_ANY, L"Выберите VPS и нажмите «Подключить»");
   shell_status_->SetName(L"muted");
   auto* shell_card = new RoundedCard(shellp);

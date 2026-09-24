@@ -146,8 +146,8 @@ class AppFrame : public wxFrame {
   wxStaticText* shell_status_{};
   std::unique_ptr<ShellSession> shell_;
   std::string shell_server_id_;
-  // Сессионный флаг: сбрасывается при каждом запуске FaTTY.
-  bool session_automation_to_shell_ = false;
+  // Сессионный флаг: при каждом запуске FaTTY снова включается.
+  bool session_automation_to_shell_ = true;
   wxTextCtrl* quick_{};
   wxStaticText* cwd_label_{};
   RoundButton* cwd_reset_{};

@@ -53,6 +53,8 @@ class TerminalView : public wxPanel {
   void on_char(wxKeyEvent&);
   void on_key_down(wxKeyEvent&);
   void on_mouse_down(wxMouseEvent&);
+  void on_mouse_wheel(wxMouseEvent&);
+  void on_scroll(wxScrollWinEvent&);
   void on_blink(wxTimerEvent&);
 
   void ensure_grid();
@@ -60,6 +62,12 @@ class TerminalView : public wxPanel {
   void put_char(char32_t ch);
   void newline();
   void scroll_up(int n = 1);
+  void scroll_view(int lines_up);
+  void snap_to_bottom();
+  void update_scrollbar();
+  int max_view_offset() const;
+  const Cell* view_cell(int x, int y) const;
+  int cursor_view_row() const;
   void erase_in_display(int mode);
   void erase_in_line(int mode);
   void cup(int row, int col);
@@ -82,6 +90,9 @@ class TerminalView : public wxPanel {
   Screen* scr_ = &primary_;
   bool alt_active_ = false;
   std::deque<std::vector<Cell>> scrollback_;
+  // Строк вверх от живого экрана. 0 — низ, новый вывод виден сразу.
+  int view_offset_ = 0;
+  Cell blank_{};
   static constexpr int kMaxScrollback = 5000;
 
   int cols_ = 80;

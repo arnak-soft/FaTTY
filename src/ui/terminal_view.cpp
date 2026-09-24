@@ -94,7 +94,7 @@ wxColour colour256(int idx) {
 }  // namespace
 
 TerminalView::TerminalView(wxWindow* parent)
-    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxWANTS_CHARS | wxBORDER_NONE) {
+    : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxWANTS_CHARS | wxBORDER_NONE | wxVSCROLL) {
   SetBackgroundStyle(wxBG_STYLE_PAINT);
   SetName(L"terminal");
   SetBackgroundColour(Theme::terminal());
@@ -106,6 +106,15 @@ TerminalView::TerminalView(wxWindow* parent)
   Bind(wxEVT_CHAR, &TerminalView::on_char, this);
   Bind(wxEVT_KEY_DOWN, &TerminalView::on_key_down, this);
   Bind(wxEVT_LEFT_DOWN, &TerminalView::on_mouse_down, this);
+  Bind(wxEVT_MOUSEWHEEL, &TerminalView::on_mouse_wheel, this);
+  Bind(wxEVT_SCROLLWIN_TOP, &TerminalView::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_BOTTOM, &TerminalView::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_LINEUP, &TerminalView::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_LINEDOWN, &TerminalView::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_PAGEUP, &TerminalView::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_PAGEDOWN, &TerminalView::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_THUMBTRACK, &TerminalView::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_THUMBRELEASE, &TerminalView::on_scroll, this);
   blink_timer_.SetOwner(this);
   Bind(wxEVT_TIMER, &TerminalView::on_blink, this);
   blink_timer_.Start(530);
@@ -124,9 +133,11 @@ void TerminalView::reset() {
   alt_active_ = false;
   scr_ = &primary_;
   scrollback_.clear();
+  view_offset_ = 0;
   primary_ = Screen{};
   alt_ = Screen{};
   ensure_grid();
+  update_scrollbar();
   Refresh();
 }
 
@@ -138,6 +149,7 @@ void TerminalView::clear_screen() {
 
 void TerminalView::feed(const std::string& bytes) {
   for (unsigned char b : bytes) parse_byte(b);
+  update_scrollbar();
   Refresh();
 }
 
@@ -200,6 +212,9 @@ void TerminalView::scroll_up(int n) {
       scrollback_.push_back(std::move(row));
       while (static_cast<int>(scrollback_.size()) > kMaxScrollback) scrollback_.pop_front();
     }
+    if (view_offset_ > 0) {
+      view_offset_ = std::min(view_offset_ + n, static_cast<int>(scrollback_.size()));
+    }
   }
   for (int y = 0; y < rows_ - n; ++y) {
     for (int x = 0; x < cols_; ++x) at(*scr_, x, y) = at(*scr_, x, y + n);
@@ -207,6 +222,55 @@ void TerminalView::scroll_up(int n) {
   for (int y = std::max(0, rows_ - n); y < rows_; ++y) {
     for (int x = 0; x < cols_; ++x) at(*scr_, x, y) = Cell{};
   }
+}
+
+int TerminalView::max_view_offset() const {
+  if (alt_active_) return 0;
+  return static_cast<int>(scrollback_.size());
+}
+
+void TerminalView::scroll_view(int lines_up) {
+  const int next = std::clamp(view_offset_ + lines_up, 0, max_view_offset());
+  if (next == view_offset_) return;
+  view_offset_ = next;
+  update_scrollbar();
+  Refresh();
+}
+
+void TerminalView::snap_to_bottom() {
+  if (view_offset_ == 0) return;
+  view_offset_ = 0;
+  update_scrollbar();
+  Refresh();
+}
+
+void TerminalView::update_scrollbar() {
+  view_offset_ = std::clamp(view_offset_, 0, max_view_offset());
+  const int sb = max_view_offset();
+  const int thumb = std::max(1, rows_);
+  const int range = std::max(thumb, sb + rows_);
+  const int pos = sb - view_offset_;
+  SetScrollbar(wxVERTICAL, pos, thumb, range);
+}
+
+const TerminalView::Cell* TerminalView::view_cell(int x, int y) const {
+  if (x < 0 || y < 0 || x >= cols_ || y >= rows_) return &blank_;
+  const int sb = alt_active_ ? 0 : static_cast<int>(scrollback_.size());
+  const int line = sb - view_offset_ + y;
+  if (!alt_active_ && line >= 0 && line < sb) {
+    const auto& row = scrollback_[static_cast<std::size_t>(line)];
+    if (x >= static_cast<int>(row.size())) return &blank_;
+    return &row[static_cast<std::size_t>(x)];
+  }
+  const int sy = line - sb;
+  if (sy < 0 || sy >= rows_ || scr_->cells.empty()) return &blank_;
+  return &scr_->cells[static_cast<std::size_t>(sy * cols_ + x)];
+}
+
+int TerminalView::cursor_view_row() const {
+  const int row = scr_->cy + (alt_active_ ? 0 : view_offset_);
+  if (row < 0 || row >= rows_) return -1;
+  return row;
 }
 
 void TerminalView::erase_in_display(int mode) {
@@ -295,6 +359,7 @@ void TerminalView::switch_alt(bool enable) {
   if (enable) {
     for (auto& c : alt_.cells) c = Cell{};
     alt_.cx = alt_.cy = 0;
+    view_offset_ = 0;
   }
 }
 
@@ -523,6 +588,7 @@ void TerminalView::emit_resize_if_needed() {
 void TerminalView::on_size(wxSizeEvent& e) {
   recompute_size();
   emit_resize_if_needed();
+  update_scrollbar();
   Refresh();
   e.Skip();
 }
@@ -536,7 +602,7 @@ void TerminalView::on_paint(wxPaintEvent&) {
 
   for (int y = 0; y < rows_; ++y) {
     for (int x = 0; x < cols_; ++x) {
-      const Cell& c = at(*scr_, x, y);
+      const Cell& c = *view_cell(x, y);
       const wxColour bg = c.bg == 0 ? Theme::terminal() : bg_colour(c.bg);
       const wxColour fg = fg_colour(c.fg, (c.attrs & 1) != 0);
       const int px = x * cell_w_;
@@ -561,9 +627,10 @@ void TerminalView::on_paint(wxPaintEvent&) {
     }
   }
 
-  if (scr_->cursor_visible && focused_blink_ && HasFocus()) {
+  const int cursor_row = cursor_view_row();
+  if (cursor_row >= 0 && scr_->cursor_visible && focused_blink_ && HasFocus()) {
     const int px = scr_->cx * cell_w_;
-    const int py = scr_->cy * cell_h_;
+    const int py = cursor_row * cell_h_;
     dc.SetPen(*wxTRANSPARENT_PEN);
     dc.SetBrush(wxBrush(Theme::text()));
     dc.DrawRectangle(px, py + cell_h_ - 2, cell_w_, 2);
@@ -572,7 +639,52 @@ void TerminalView::on_paint(wxPaintEvent&) {
 
 void TerminalView::on_blink(wxTimerEvent&) {
   focused_blink_ = !focused_blink_;
-  if (HasFocus()) RefreshRect(wxRect(scr_->cx * cell_w_, scr_->cy * cell_h_, cell_w_, cell_h_));
+  const int row = cursor_view_row();
+  if (HasFocus() && row >= 0) RefreshRect(wxRect(scr_->cx * cell_w_, row * cell_h_, cell_w_, cell_h_));
+}
+
+void TerminalView::on_mouse_wheel(wxMouseEvent& e) {
+  if (alt_active_) {
+    const int steps = std::max(1, std::abs(e.GetWheelRotation()) / std::max(1, e.GetWheelDelta()));
+    const char* seq = e.GetWheelRotation() > 0 ? "\x1b[A" : "\x1b[B";
+    if (write_cb_) {
+      for (int i = 0; i < steps; ++i) write_cb_(seq);
+    }
+    return;
+  }
+  const int notches = std::max(1, std::abs(e.GetWheelRotation()) / std::max(1, e.GetWheelDelta()));
+  scroll_view(e.GetWheelRotation() > 0 ? notches * 3 : -notches * 3);
+}
+
+void TerminalView::on_scroll(wxScrollWinEvent& e) {
+  const int max_pos = max_view_offset();
+  int pos = max_pos - view_offset_;
+  const int page = std::max(1, rows_ - 1);
+  const wxEventType type = e.GetEventType();
+  if (type == wxEVT_SCROLLWIN_TOP) {
+    pos = 0;
+  } else if (type == wxEVT_SCROLLWIN_BOTTOM) {
+    pos = max_pos;
+  } else if (type == wxEVT_SCROLLWIN_LINEUP) {
+    pos = std::max(0, pos - 1);
+  } else if (type == wxEVT_SCROLLWIN_LINEDOWN) {
+    pos = std::min(max_pos, pos + 1);
+  } else if (type == wxEVT_SCROLLWIN_PAGEUP) {
+    pos = std::max(0, pos - page);
+  } else if (type == wxEVT_SCROLLWIN_PAGEDOWN) {
+    pos = std::min(max_pos, pos + page);
+  } else if (type == wxEVT_SCROLLWIN_THUMBTRACK || type == wxEVT_SCROLLWIN_THUMBRELEASE) {
+    pos = std::clamp(e.GetPosition(), 0, max_pos);
+  } else {
+    e.Skip();
+    return;
+  }
+  const int next = max_pos - pos;
+  if (next != view_offset_) {
+    view_offset_ = next;
+    Refresh();
+  }
+  update_scrollbar();
 }
 
 void TerminalView::on_mouse_down(wxMouseEvent& e) {
@@ -653,10 +765,17 @@ std::string TerminalView::key_to_seq(int key, int modifiers) const {
 
 void TerminalView::on_key_down(wxKeyEvent& e) {
   const int key = e.GetKeyCode();
+  if (!alt_active_ && e.ShiftDown() && !e.ControlDown() && !e.AltDown() &&
+      (key == WXK_PAGEUP || key == WXK_PAGEDOWN)) {
+    const int page = std::max(1, rows_ - 1);
+    scroll_view(key == WXK_PAGEUP ? page : -page);
+    return;
+  }
   if (key == 'C' && e.ControlDown() && !e.AltDown() && !e.ShiftDown()) {
     // Ctrl+C → ETX to shell (not copy). Copy via select not implemented yet.
   }
   if (key == 'V' && e.ControlDown()) {
+    snap_to_bottom();
     if (wxTheClipboard->Open()) {
       if (wxTheClipboard->IsSupported(wxDF_UNICODETEXT)) {
         wxTextDataObject data;
@@ -670,6 +789,7 @@ void TerminalView::on_key_down(wxKeyEvent& e) {
   }
   const std::string seq = key_to_seq(key, e.GetModifiers());
   if (!seq.empty()) {
+    snap_to_bottom();
     if (write_cb_) write_cb_(seq);
     return;
   }
@@ -684,6 +804,7 @@ void TerminalView::on_char(wxKeyEvent& e) {
   }
   // Special keys already handled in KEY_DOWN
   if (uc < 32 && uc != 8 && uc != 9 && uc != 13 && uc != 27) {
+    snap_to_bottom();
     if (write_cb_) write_cb_(std::string(1, static_cast<char>(uc)));
     return;
   }
@@ -692,6 +813,7 @@ void TerminalView::on_char(wxKeyEvent& e) {
     e.Skip();
     return;
   }
+  snap_to_bottom();
   if (write_cb_) {
     wxString s;
     s.Append(static_cast<wchar_t>(uc));
