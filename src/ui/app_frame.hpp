@@ -83,6 +83,7 @@ class AppFrame : public wxFrame {
   void shell_disconnect();
   void update_shell_ui();
   bool shell_takes_automation(const std::string& server_id = {}) const;
+  void settle_shell_after_run();
   void show_journal();
   void show_health(const std::string& select_id = {});
   void show_help(const std::string& tab = {});

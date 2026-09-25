@@ -101,11 +101,14 @@ TerminalView::TerminalView(wxWindow* parent)
   SetForegroundColour(Theme::text());
   SetFont(Theme::mono());
   SetCanFocus(true);
+  SetCursor(wxCursor(wxCURSOR_IBEAM));
   Bind(wxEVT_PAINT, &TerminalView::on_paint, this);
   Bind(wxEVT_SIZE, &TerminalView::on_size, this);
   Bind(wxEVT_CHAR, &TerminalView::on_char, this);
   Bind(wxEVT_KEY_DOWN, &TerminalView::on_key_down, this);
   Bind(wxEVT_LEFT_DOWN, &TerminalView::on_mouse_down, this);
+  Bind(wxEVT_MOTION, &TerminalView::on_mouse_move, this);
+  Bind(wxEVT_LEFT_UP, &TerminalView::on_mouse_up, this);
   Bind(wxEVT_MOUSEWHEEL, &TerminalView::on_mouse_wheel, this);
   Bind(wxEVT_SCROLLWIN_TOP, &TerminalView::on_scroll, this);
   Bind(wxEVT_SCROLLWIN_BOTTOM, &TerminalView::on_scroll, this);
@@ -134,6 +137,12 @@ void TerminalView::reset() {
   scr_ = &primary_;
   scrollback_.clear();
   view_offset_ = 0;
+  swallow_on_ = false;
+  swallow_nl_ = false;
+  swallow_echo_.clear();
+  swallow_i_ = 0;
+  sel_on_ = false;
+  sel_drag_ = false;
   primary_ = Screen{};
   alt_ = Screen{};
   ensure_grid();
@@ -147,8 +156,46 @@ void TerminalView::clear_screen() {
   Refresh();
 }
 
-void TerminalView::feed(const std::string& bytes) {
-  for (unsigned char b : bytes) parse_byte(b);
+void TerminalView::expect_prompt_after(const std::string& echoed_line) {
+  swallow_echo_ = echoed_line;
+  swallow_i_ = 0;
+  swallow_nl_ = echoed_line.empty();
+  swallow_on_ = true;
+}
+
+std::string TerminalView::take_swallowed(const std::string& in) {
+  if (!swallow_on_) return in;
+  std::string out;
+  out.reserve(in.size());
+  for (unsigned char b : in) {
+    if (!swallow_on_) {
+      out.push_back(static_cast<char>(b));
+      continue;
+    }
+    if (!swallow_nl_) {
+      if (swallow_i_ < swallow_echo_.size() && b == static_cast<unsigned char>(swallow_echo_[swallow_i_])) {
+        ++swallow_i_;
+        if (swallow_i_ == swallow_echo_.size()) swallow_nl_ = true;
+        continue;
+      }
+      swallow_on_ = false;
+      out.push_back(static_cast<char>(b));
+      continue;
+    }
+    if (b == '\r') continue;
+    if (b == '\n') {
+      swallow_on_ = false;
+      continue;
+    }
+    swallow_on_ = false;
+    out.push_back(static_cast<char>(b));
+  }
+  return out;
+}
+
+void TerminalView::feed(const std::string& bytes, bool from_pty) {
+  const std::string& shown = from_pty ? take_swallowed(bytes) : bytes;
+  for (unsigned char b : shown) parse_byte(b);
   update_scrollbar();
   Refresh();
 }
@@ -271,6 +318,80 @@ int TerminalView::cursor_view_row() const {
   const int row = scr_->cy + (alt_active_ ? 0 : view_offset_);
   if (row < 0 || row >= rows_) return -1;
   return row;
+}
+
+int TerminalView::history_line_at(int view_y) const {
+  const int sb = alt_active_ ? 0 : static_cast<int>(scrollback_.size());
+  return sb - view_offset_ + view_y;
+}
+
+const TerminalView::Cell* TerminalView::history_cell(int line, int col) const {
+  if (col < 0 || col >= cols_) return &blank_;
+  const int sb = alt_active_ ? 0 : static_cast<int>(scrollback_.size());
+  if (!alt_active_ && line >= 0 && line < sb) {
+    const auto& row = scrollback_[static_cast<std::size_t>(line)];
+    if (col >= static_cast<int>(row.size())) return &blank_;
+    return &row[static_cast<std::size_t>(col)];
+  }
+  const int sy = line - sb;
+  if (sy < 0 || sy >= rows_ || scr_->cells.empty()) return &blank_;
+  return &scr_->cells[static_cast<std::size_t>(sy * cols_ + col)];
+}
+
+TerminalView::Pos TerminalView::pos_at(int px, int py) const {
+  const int x = std::clamp(cell_w_ > 0 ? px / cell_w_ : 0, 0, std::max(0, cols_ - 1));
+  const int y = std::clamp(cell_h_ > 0 ? py / cell_h_ : 0, 0, std::max(0, rows_ - 1));
+  return {history_line_at(y), x};
+}
+
+bool TerminalView::cell_selected(int line, int col) const {
+  if (!sel_on_) return false;
+  Pos a = sel_a_;
+  Pos b = sel_b_;
+  if (b.line < a.line || (b.line == a.line && b.col < a.col)) std::swap(a, b);
+  if (line < a.line || line > b.line) return false;
+  if (a.line == b.line) return col >= a.col && col <= b.col;
+  if (line == a.line) return col >= a.col;
+  if (line == b.line) return col <= b.col;
+  return true;
+}
+
+void TerminalView::copy_selection() {
+  if (!sel_on_) return;
+  Pos a = sel_a_;
+  Pos b = sel_b_;
+  if (b.line < a.line || (b.line == a.line && b.col < a.col)) std::swap(a, b);
+  std::string text;
+  for (int line = a.line; line <= b.line; ++line) {
+    const int c0 = line == a.line ? a.col : 0;
+    const int c1 = line == b.line ? b.col : cols_ - 1;
+    std::string row;
+    for (int col = c0; col <= c1; ++col) {
+      const char32_t ch = history_cell(line, col)->ch;
+      if (ch == 0 || ch == U' ') {
+        row.push_back(' ');
+        continue;
+      }
+      wxString s;
+      if (ch <= 0xFFFF) {
+        s.Append(static_cast<wchar_t>(ch));
+      } else {
+        const char32_t u = ch - 0x10000;
+        s.Append(static_cast<wchar_t>(0xD800 + (u >> 10)));
+        s.Append(static_cast<wchar_t>(0xDC00 + (u & 0x3FF)));
+      }
+      row += std::string(s.utf8_string());
+    }
+    while (!row.empty() && row.back() == ' ') row.pop_back();
+    if (line != a.line) text.push_back('\n');
+    text += row;
+  }
+  if (text.empty()) return;
+  if (wxTheClipboard->Open()) {
+    wxTheClipboard->SetData(new wxTextDataObject(wxString::FromUTF8(text)));
+    wxTheClipboard->Close();
+  }
+  if (copy_cb_) copy_cb_(text);
 }
 
 void TerminalView::erase_in_display(int mode) {
@@ -603,11 +724,12 @@ void TerminalView::on_paint(wxPaintEvent&) {
   for (int y = 0; y < rows_; ++y) {
     for (int x = 0; x < cols_; ++x) {
       const Cell& c = *view_cell(x, y);
-      const wxColour bg = c.bg == 0 ? Theme::terminal() : bg_colour(c.bg);
-      const wxColour fg = fg_colour(c.fg, (c.attrs & 1) != 0);
+      const bool selected = cell_selected(history_line_at(y), x);
+      const wxColour bg = selected ? Theme::select() : (c.bg == 0 ? Theme::terminal() : bg_colour(c.bg));
+      const wxColour fg = selected ? Theme::text_bright() : fg_colour(c.fg, (c.attrs & 1) != 0);
       const int px = x * cell_w_;
       const int py = y * cell_h_;
-      if (c.bg != 0 || c.ch != U' ') {
+      if (selected || c.bg != 0 || c.ch != U' ') {
         dc.SetPen(*wxTRANSPARENT_PEN);
         dc.SetBrush(wxBrush(bg));
         dc.DrawRectangle(px, py, cell_w_, cell_h_);
@@ -689,7 +811,30 @@ void TerminalView::on_scroll(wxScrollWinEvent& e) {
 
 void TerminalView::on_mouse_down(wxMouseEvent& e) {
   SetFocus();
-  e.Skip();
+  sel_a_ = sel_b_ = pos_at(e.GetX(), e.GetY());
+  sel_on_ = false;
+  sel_drag_ = true;
+  if (!HasCapture()) CaptureMouse();
+  Refresh();
+}
+
+void TerminalView::on_mouse_move(wxMouseEvent& e) {
+  if (!sel_drag_ || !e.LeftIsDown()) return;
+  const Pos p = pos_at(e.GetX(), e.GetY());
+  if (p.line == sel_b_.line && p.col == sel_b_.col) return;
+  sel_b_ = p;
+  sel_on_ = sel_a_.line != sel_b_.line || sel_a_.col != sel_b_.col;
+  Refresh();
+}
+
+void TerminalView::on_mouse_up(wxMouseEvent& e) {
+  if (HasCapture()) ReleaseMouse();
+  if (!sel_drag_) return;
+  sel_drag_ = false;
+  sel_b_ = pos_at(e.GetX(), e.GetY());
+  sel_on_ = sel_a_.line != sel_b_.line || sel_a_.col != sel_b_.col;
+  if (sel_on_) copy_selection();
+  Refresh();
 }
 
 std::string TerminalView::key_to_seq(int key, int modifiers) const {

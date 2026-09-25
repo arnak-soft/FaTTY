@@ -591,6 +591,7 @@ Config load_config_from(const std::filesystem::path& path) {
   st.journal_max_entries = json_int(settings_raw, "journal_max_entries", 5000, 100, 50000);
   st.clear_output_before_run = settings_raw.value("clear_output_before_run", false);
   st.automation_to_shell_when_connected = settings_raw.value("automation_to_shell_when_connected", true);
+  st.shell_follow_command_cwd = settings_raw.value("shell_follow_command_cwd", true);
   st.advance_command_after_run = settings_raw.value("advance_command_after_run", true);
   st.allow_short_master_password = settings_raw.value("allow_short_master_password", false);
   st.master_password_max_attempts = json_int(settings_raw, "master_password_max_attempts", 5, 0, 100);
@@ -739,6 +740,7 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"journal_max_entries", config.settings.journal_max_entries},
       {"clear_output_before_run", config.settings.clear_output_before_run},
       {"automation_to_shell_when_connected", config.settings.automation_to_shell_when_connected},
+      {"shell_follow_command_cwd", config.settings.shell_follow_command_cwd},
       {"advance_command_after_run", config.settings.advance_command_after_run},
       {"allow_short_master_password", config.settings.allow_short_master_password},
       {"master_password_max_attempts", config.settings.master_password_max_attempts},

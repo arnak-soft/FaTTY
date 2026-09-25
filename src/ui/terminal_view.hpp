@@ -20,15 +20,21 @@ class TerminalView : public wxPanel {
   explicit TerminalView(wxWindow* parent);
 
   void set_write_callback(WriteCb cb) { write_cb_ = std::move(cb); }
-  void feed(const std::string& bytes);
+  void feed(const std::string& bytes, bool from_pty = false);
+  // Следующий вывод PTY: спрятать эхо команды (может быть пустым) и перевод строки,
+  // чтобы приглашение встало на текущую строку.
+  void expect_prompt_after(const std::string& echoed_line);
   void clear_screen();
   void reset();
+  bool alt_screen() const { return alt_active_; }
 
   int cols() const { return cols_; }
   int rows() const { return rows_; }
 
   using ResizeCb = std::function<void(int cols, int rows)>;
   void set_resize_callback(ResizeCb cb) { resize_cb_ = std::move(cb); }
+  using CopyCb = std::function<void(const std::string&)>;
+  void set_copy_callback(CopyCb cb) { copy_cb_ = std::move(cb); }
 
  protected:
   wxSize DoGetBestSize() const override;
@@ -53,6 +59,8 @@ class TerminalView : public wxPanel {
   void on_char(wxKeyEvent&);
   void on_key_down(wxKeyEvent&);
   void on_mouse_down(wxMouseEvent&);
+  void on_mouse_move(wxMouseEvent&);
+  void on_mouse_up(wxMouseEvent&);
   void on_mouse_wheel(wxMouseEvent&);
   void on_scroll(wxScrollWinEvent&);
   void on_blink(wxTimerEvent&);
@@ -68,11 +76,21 @@ class TerminalView : public wxPanel {
   int max_view_offset() const;
   const Cell* view_cell(int x, int y) const;
   int cursor_view_row() const;
+  struct Pos {
+    int line = 0;
+    int col = 0;
+  };
+  int history_line_at(int view_y) const;
+  const Cell* history_cell(int line, int col) const;
+  Pos pos_at(int px, int py) const;
+  bool cell_selected(int line, int col) const;
+  void copy_selection();
   void erase_in_display(int mode);
   void erase_in_line(int mode);
   void cup(int row, int col);
   void apply_sgr(const std::vector<int>& params);
   void parse_byte(unsigned char b);
+  std::string take_swallowed(const std::string& in);
   void handle_csi(char final_byte, const std::string& params, bool priv);
   void handle_osc(const std::string& body);
   void switch_alt(bool enable);
@@ -84,6 +102,11 @@ class TerminalView : public wxPanel {
 
   WriteCb write_cb_;
   ResizeCb resize_cb_;
+  CopyCb copy_cb_;
+  Pos sel_a_{};
+  Pos sel_b_{};
+  bool sel_on_ = false;
+  bool sel_drag_ = false;
 
   Screen primary_;
   Screen alt_;
@@ -116,6 +139,10 @@ class TerminalView : public wxPanel {
 
   bool focused_blink_ = true;
   wxTimer blink_timer_;
+  bool swallow_on_ = false;
+  bool swallow_nl_ = false;
+  std::string swallow_echo_;
+  std::size_t swallow_i_ = 0;
 };
 
 }  // namespace fatty

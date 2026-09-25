@@ -7,6 +7,7 @@
 #include "core/backup.hpp"
 #include "core/paths.hpp"
 #include "core/presets.hpp"
+#include "core/quote.hpp"
 #include "core/util.hpp"
 #include "net/sftp_session.hpp"
 #include "net/updates.hpp"
@@ -544,6 +545,9 @@ void AppFrame::build_ui() {
   });
   terminal_->set_resize_callback([this](int cols, int rows) {
     if (shell_ && shell_->running()) shell_->resize(cols, rows);
+  });
+  terminal_->set_copy_callback([this](const std::string& t) {
+    status_->SetLabel(wxString::Format(L"Скопировано в буфер (%d симв.)", (int)t.size()));
   });
   shell_connect_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { shell_connect(); });
   shell_disconnect_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { shell_disconnect(); });
@@ -1859,7 +1863,7 @@ void AppFrame::shell_connect() {
       [this, alive](const std::string& chunk) {
         wxTheApp->CallAfter([this, alive, chunk] {
           if (!alive->load() || !terminal_) return;
-          terminal_->feed(chunk);
+          terminal_->feed(chunk, true);
         });
       },
       [this, alive](const std::string& reason) {
@@ -1910,11 +1914,13 @@ void AppFrame::set_busy(bool busy) {
       });
     }
   } else {
+    const bool settle = shell_takes_automation();
     busy_server_id_.clear();
     busy_timer_.Stop();
     busy_gauge_->Hide();
     if (auto* sizer = busy_gauge_->GetContainingSizer()) sizer->Layout();
     if (health_) health_->wake();
+    if (settle) settle_shell_after_run();
     if (session_automation_to_shell_ && shell_ && shell_->running() && terminal_ &&
         bottom_nb_ && bottom_nb_->GetSelection() == 1) {
       CallAfter([this] {
@@ -1922,6 +1928,25 @@ void AppFrame::set_busy(bool busy) {
       });
     }
   }
+}
+
+void AppFrame::settle_shell_after_run() {
+  if (!shell_ || !shell_->running() || !terminal_ || terminal_->alt_screen()) return;
+  std::string echoed;
+  if (config_.settings.shell_follow_command_cwd) {
+    std::string cwd;
+    auto it = remote_cwd_.find(shell_server_id_);
+    if (it != remote_cwd_.end()) cwd = trim(it->second);
+    if (cwd.empty() || cwd == "~") {
+      echoed = "cd";
+    } else if (cwd.size() >= 2 && cwd[0] == '~' && cwd[1] == '/') {
+      echoed = "cd ~/" + shlex_quote(cwd.substr(2));
+    } else {
+      echoed = "cd " + shlex_quote(cwd);
+    }
+  }
+  terminal_->expect_prompt_after(echoed);
+  shell_->write("\x15" + echoed + "\n");
 }
 
 void AppFrame::init_run_controllers() {

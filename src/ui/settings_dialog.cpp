@@ -147,6 +147,12 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
       new wxCheckBox(general, wxID_ANY,
                      L"После подключения Shell направлять вывод команд туда (постоянно)");
   automation_to_shell_->SetValue(st.automation_to_shell_when_connected);
+  shell_follow_cwd_ =
+      new wxCheckBox(general, wxID_ANY, L"После команд переходить в Shell в ту же папку");
+  shell_follow_cwd_->SetValue(st.shell_follow_command_cwd);
+  shell_follow_cwd_->SetToolTip(
+      L"Если команда или связка сменила каталог, активный Shell делает то же самое. "
+      L"Приглашение появляется сразу под выводом, как после обычного ввода.");
   advance_command_ = new wxCheckBox(general, wxID_ANY, L"Переходить к следующей команде после запуска (F5 / двойной клик)");
   advance_command_->SetValue(st.advance_command_after_run);
   show_folder_col_ = new wxCheckBox(general, wxID_ANY, L"Показывать столбец «Папка» (рабочий каталог) в списке команд");
@@ -173,6 +179,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   gsz->Add(confirm_, 0, wxALL, 8);
   gsz->Add(clear_output_, 0, wxALL, 8);
   gsz->Add(automation_to_shell_, 0, wxALL, 8);
+  gsz->Add(shell_follow_cwd_, 0, wxALL, 8);
   gsz->Add(advance_command_, 0, wxALL, 8);
   gsz->Add(show_folder_col_, 0, wxALL, 8);
   gsz->Add(theme_row, 0, wxALL, 8);
@@ -498,6 +505,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.check_updates_on_start = updates_->GetValue();
   config_.settings.clear_output_before_run = clear_output_->GetValue();
   config_.settings.automation_to_shell_when_connected = automation_to_shell_->GetValue();
+  config_.settings.shell_follow_command_cwd = shell_follow_cwd_->GetValue();
   config_.settings.advance_command_after_run = advance_command_->GetValue();
   config_.settings.show_command_folder_column = show_folder_col_->GetValue();
   config_.settings.backup_enabled = backup_->GetValue();
