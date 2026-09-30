@@ -137,6 +137,7 @@ std::string kind_label(const std::string& kind) {
   if (kind == "command") return "сохранённая";
   if (kind == "quick") return "разовая";
   if (kind == "test") return "проверка связи";
+  if (kind == "bundle") return "связка";
   return kind;
 }
 
@@ -175,23 +176,36 @@ std::string status_from_exit(int code) {
   return "failed";
 }
 
-std::map<std::string, CommandRunStats> command_run_stats(const std::vector<JournalEntry>& entries) {
-  std::map<std::string, CommandRunStats> stats;
+JournalStatsSnapshot split_run_stats(const std::vector<JournalEntry>& entries) {
+  JournalStatsSnapshot out;
   for (const auto& item : entries) {
     auto cid = trim(item.command_id);
     if (cid.empty()) continue;
-    auto& s = stats[cid];
+    auto& bucket = item.kind == "bundle" ? out.bundles : out.commands;
+    auto& s = bucket[cid];
     if (s.run_count == 0) {
       s.latest = item;
     }
     s.average_sec += item.duration_sec;
     s.run_count += 1;
   }
-  for (auto& [cid, s] : stats) {
-    (void)cid;
-    if (s.run_count > 0) s.average_sec /= static_cast<double>(s.run_count);
-  }
-  return stats;
+  auto normalize = [](std::map<std::string, CommandRunStats>& stats) {
+    for (auto& [cid, s] : stats) {
+      (void)cid;
+      if (s.run_count > 0) s.average_sec /= static_cast<double>(s.run_count);
+    }
+  };
+  normalize(out.commands);
+  normalize(out.bundles);
+  return out;
+}
+
+std::map<std::string, CommandRunStats> command_run_stats(const std::vector<JournalEntry>& entries) {
+  return split_run_stats(entries).commands;
+}
+
+std::map<std::string, CommandRunStats> bundle_run_stats(const std::vector<JournalEntry>& entries) {
+  return split_run_stats(entries).bundles;
 }
 
 std::string JournalEntry::target() const {
@@ -412,6 +426,14 @@ std::map<std::string, JournalEntry> Journal::latest_by_command_id() const {
 
 std::map<std::string, CommandRunStats> Journal::stats_by_command_id() const {
   return command_run_stats(load());
+}
+
+std::map<std::string, CommandRunStats> Journal::stats_by_bundle_id() const {
+  return bundle_run_stats(load());
+}
+
+JournalStatsSnapshot Journal::stats_snapshot() const {
+  return split_run_stats(load());
 }
 
 bool Journal::remove(const std::string& id) {

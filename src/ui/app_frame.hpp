@@ -114,6 +114,7 @@ class AppFrame : public wxFrame {
   std::unique_ptr<HealthMonitor> health_;
   std::map<std::string, std::string> remote_cwd_;
   std::map<std::string, CommandRunStats> command_stats_;
+  std::map<std::string, CommandRunStats> bundle_stats_;
   bool busy_ = false;
   std::string busy_server_id_;
   bool closing_for_install_ = false;

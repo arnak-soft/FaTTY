@@ -101,14 +101,20 @@ AppFrame::AppFrame(Config config, SessionVault vault)
   SetMinSize(FromDIP(wxSize(860, 560)));
   SetSize(FromDIP(wxSize(1100, 720)));
   Centre();
-  command_stats_ = journal_->stats_by_command_id();
+  {
+    auto snap = journal_->stats_snapshot();
+    command_stats_ = std::move(snap.commands);
+    bundle_stats_ = std::move(snap.bundles);
+  }
   // Слушателя может дёрнуть фоновый поток команды, поэтому на главный поток
   // возвращаемся через wxTheApp и проверяем живой-токен.
   journal_->add_listener([this, alive = alive_, journal = journal_] {
     if (!alive->load()) return;
     wxTheApp->CallAfter([this, alive, journal] {
       if (!alive->load()) return;
-      command_stats_ = journal->stats_by_command_id();
+      auto snap = journal->stats_snapshot();
+      command_stats_ = std::move(snap.commands);
+      bundle_stats_ = std::move(snap.bundles);
       refresh_commands();
     });
   });
@@ -427,6 +433,7 @@ void AppFrame::build_ui() {
   bundles_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(160));
   bundles_->AppendColumn(L"Команд", wxLIST_FORMAT_LEFT, FromDIP(70));
   bundles_->AppendColumn(L"Пауза", wxLIST_FORMAT_LEFT, FromDIP(70));
+  bundles_->AppendColumn(L"Последний раз", wxLIST_FORMAT_LEFT, FromDIP(160));
   auto* bundles_sz = new wxBoxSizer(wxVERTICAL);
   bundles_sz->Add(bundles_, 1, wxEXPAND);
   bundles_card->SetSizer(bundles_sz);
@@ -1104,6 +1111,14 @@ void AppFrame::show_journal() {
         wxMessageBox(L"VPS из этой записи больше нет в списке.", L"Журнал", wxOK | wxICON_ERROR, this);
         return;
       }
+      if (e.kind == "bundle") {
+        if (!config_.bundle_by_id(e.command_id)) {
+          wxMessageBox(L"Связки из этой записи больше нет.", L"Журнал", wxOK | wxICON_ERROR, this);
+          return;
+        }
+        start_bundle(e.command_id);
+        return;
+      }
       if (auto* c = config_.command_by_id(e.command_id)) {
         if (!confirm_saved_run(this, *c, s->name)) return;
         run_command(*s, e.command, e.timeout_sec, e.login_shell, e.title.empty() ? "журнал" : e.title, e.command_id,
@@ -1769,20 +1784,36 @@ Bundle* AppFrame::selected_bundle() {
 
 void AppFrame::refresh_bundles() {
   if (!bundles_) return;
+  std::string keep;
+  if (auto* cur = selected_bundle()) keep = cur->id;
   bundles_->DeleteAllItems();
   auto* s = selected_server();
   if (!s) return;
   auto list = config_.bundles_for(s->id);
+  long sel = -1;
   for (std::size_t i = 0; i < list.size(); ++i) {
     const auto& b = list[i];
     int n = 0;
     for (const auto& cid : b.command_ids) {
       if (config_.command_by_id(cid)) ++n;
     }
+    wxString last = L"—";
+    wxColour colour = Theme::text();
+    auto it = bundle_stats_.find(b.id);
+    if (it != bundle_stats_.end()) {
+      last = wxString::FromUTF8(it->second.latest.last_run_label());
+      colour = Theme::run_status(it->second.latest.status);
+    }
     long row = bundles_->InsertItem(static_cast<long>(i), wxString::FromUTF8(b.name));
     bundles_->SetItem(row, 1, wxString::FromUTF8(std::to_string(n)));
     bundles_->SetItem(row, 2, wxString::FromUTF8(std::to_string(b.interval_sec) + " с"));
-    style_list_row(bundles_, row, Theme::text());
+    bundles_->SetItem(row, 3, last);
+    style_list_row(bundles_, row, colour);
+    if (b.id == keep) sel = row;
+  }
+  if (sel >= 0) {
+    bundles_->SetItemState(sel, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
+                           wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
   }
 }
 
@@ -1981,6 +2012,7 @@ void AppFrame::init_run_controllers() {
     run_command(srv, cmd.command, cmd.timeout_sec, cmd.login_shell, cmd.name, cmd.id, "command", std::move(on_done),
                 command_run_working_dir(config_, cmd), cmd.cd_before_run, effective_remote_shell(srv, cmd));
   };
+  bh.journal = journal_;
   bundle_run_ = std::make_unique<BundleController>(std::move(bh));
 }
 
@@ -2110,8 +2142,9 @@ void AppFrame::open_bundle_steps() {
 }
 
 void AppFrame::start_bundle(const std::string& bundle_id_override) {
-  auto* s = selected_server();
   Bundle* b = bundle_id_override.empty() ? selected_bundle() : config_.bundle_by_id(bundle_id_override);
+  Server* s = b ? config_.server_by_id(b->server_id) : nullptr;
+  if (!s) s = selected_server();
   if (!s || !b) {
     wxMessageBox(L"Выберите VPS и связку.", L"Связка");
     return;
@@ -2135,7 +2168,7 @@ void AppFrame::start_bundle(const std::string& bundle_id_override) {
     }
     return;
   }
-  if (bundle_run_) bundle_run_->start(*s, b->name, std::move(cmds), pause);
+  if (bundle_run_) bundle_run_->start(*s, b->id, b->name, std::move(cmds), pause);
 }
 
 void AppFrame::add_group() {

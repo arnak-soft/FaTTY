@@ -121,6 +121,28 @@ void test_journal() {
     expect(stats.count("") == 0, "empty command_id skipped");
     expect(format_duration(4.0) == "4.0 с", "format duration seconds");
 
+    JournalEntry bundle_same_id;
+    bundle_same_id.kind = "bundle";
+    bundle_same_id.command_id = "avg-cmd";
+    bundle_same_id.command = "deploy → pull";
+    bundle_same_id.status = "failed";
+    bundle_same_id.exit_code = 2;
+    bundle_same_id.duration_sec = 100;
+    bundle_same_id.started_at = now_iso();
+    timed.append(bundle_same_id);
+    stats = timed.stats_by_command_id();
+    expect(stats["avg-cmd"].run_count == 2, "bundle kind excluded from command stats");
+    expect(stats["avg-cmd"].average_sec > 3.9 && stats["avg-cmd"].average_sec < 4.1, "bundle duration not in command avg");
+    auto bundles = timed.stats_by_bundle_id();
+    expect(bundles.count("avg-cmd") == 1, "bundle stats present");
+    expect(bundles["avg-cmd"].run_count == 1, "bundle run count");
+    expect(bundles["avg-cmd"].latest.status == "failed", "bundle latest status");
+    expect(bundles["avg-cmd"].latest.last_run_label().find("2") == 0, "bundle last run label");
+    expect(kind_label("bundle") == "связка", "bundle kind label");
+    auto snap = timed.stats_snapshot();
+    expect(snap.commands["avg-cmd"].run_count == 2, "snapshot commands");
+    expect(snap.bundles["avg-cmd"].run_count == 1, "snapshot bundles");
+
     std::vector<JournalEntry> in_memory;
     JournalEntry newest;
     newest.command_id = "x";

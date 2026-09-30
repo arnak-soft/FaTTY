@@ -49,12 +49,19 @@ struct CommandRunStats {
   int run_count = 0;
 };
 
+struct JournalStatsSnapshot {
+  std::map<std::string, CommandRunStats> commands;
+  std::map<std::string, CommandRunStats> bundles;
+};
+
 std::string now_iso();
 std::string format_duration(double seconds);
 std::string status_from_exit(int code);
 std::string status_label(const std::string& status);
 std::string kind_label(const std::string& kind);
 std::map<std::string, CommandRunStats> command_run_stats(const std::vector<JournalEntry>& entries);
+std::map<std::string, CommandRunStats> bundle_run_stats(const std::vector<JournalEntry>& entries);
+JournalStatsSnapshot split_run_stats(const std::vector<JournalEntry>& entries);
 
 inline constexpr std::size_t kJournalOutputMax = 256 * 1024;
 
@@ -69,6 +76,8 @@ class Journal {
   std::vector<JournalEntry> load(int limit = 5000) const;
   std::map<std::string, JournalEntry> latest_by_command_id() const;
   std::map<std::string, CommandRunStats> stats_by_command_id() const;
+  std::map<std::string, CommandRunStats> stats_by_bundle_id() const;
+  JournalStatsSnapshot stats_snapshot() const;
   bool remove(const std::string& id);
   void clear();
   std::string export_text(const std::vector<JournalEntry>* entries = nullptr) const;
