@@ -2,6 +2,7 @@
 
 #include "ui/theme.hpp"
 
+#include <wx/arrstr.h>
 #include <wx/dc.h>
 #include <wx/dcbuffer.h>
 #include <wx/sizer.h>
@@ -33,6 +34,46 @@ void draw_sort_arrow(wxDC& dc, wxWindow* win, int x, int y, bool ascending, cons
   dc.SetPen(wxPen(colour));
   dc.SetBrush(wxBrush(colour));
   dc.DrawPolygon(3, pts);
+}
+
+void draw_empty_hint(wxDC& dc, wxWindow* win, const wxString& hint) {
+  if (hint.empty()) return;
+  dc.SetFont(Theme::ui());
+  dc.SetTextForeground(Theme::muted());
+  const int pad = win->FromDIP(16);
+  const int max_w = std::max(win->FromDIP(80), win->GetClientSize().x - pad * 2);
+  const int line_h = dc.GetCharHeight() + win->FromDIP(4);
+  wxArrayString lines;
+  wxString rest = hint;
+  while (!rest.empty()) {
+    const int nl = rest.Find(L'\n');
+    wxString para = nl == wxNOT_FOUND ? rest : rest.Left(nl);
+    rest = nl == wxNOT_FOUND ? wxString() : rest.Mid(nl + 1);
+    wxString line;
+    wxString word;
+    auto flush_word = [&] {
+      if (word.empty()) return;
+      const wxString trial = line.empty() ? word : line + L" " + word;
+      if (!line.empty() && dc.GetTextExtent(trial).x > max_w) {
+        lines.Add(line);
+        line = word;
+      } else {
+        line = trial;
+      }
+      word.clear();
+    };
+    for (size_t i = 0; i < para.size(); ++i) {
+      if (para[i] == L' ') flush_word();
+      else word += para[i];
+    }
+    flush_word();
+    if (!line.empty()) lines.Add(line);
+  }
+  int y = pad;
+  for (const auto& line : lines) {
+    dc.DrawText(line, pad, y);
+    y += line_h;
+  }
 }
 
 }  // namespace
@@ -257,7 +298,10 @@ void StripedListCtrl::Body::on_paint(wxPaintEvent&) {
   wxAutoBufferedPaintDC dc(this);
   dc.SetBackground(wxBrush(Theme::elevated()));
   dc.Clear();
-  if (owner_->rows_.empty()) return;
+  if (owner_->rows_.empty()) {
+    draw_empty_hint(dc, this, owner_->empty_hint_);
+    return;
+  }
   dc.SetFont(Theme::ui());
   const int h = owner_->row_height();
   const int pad = FromDIP(6);
@@ -445,6 +489,12 @@ void StripedListCtrl::SetColumnWidth(int col, int width) {
 int StripedListCtrl::GetColumnWidth(int col) const {
   if (col < 0 || col >= GetColumnCount()) return 0;
   return columns_[static_cast<std::size_t>(col)].width;
+}
+
+void StripedListCtrl::set_empty_hint(const wxString& hint) {
+  if (empty_hint_ == hint) return;
+  empty_hint_ = hint;
+  refresh_body();
 }
 
 void StripedListCtrl::set_sort_column(int col, bool ascending) {

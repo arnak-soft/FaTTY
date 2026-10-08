@@ -52,6 +52,7 @@ class AppFrame : public wxFrame {
   void apply_ui_theme();
   void refresh_servers(const std::string& keep_id = {});
   void refresh_commands();
+  void update_server_heading();
   void refresh_bundles();
   void rebuild_group_tabs();
   void setup_command_columns();
@@ -73,6 +74,7 @@ class AppFrame : public wxFrame {
                    std::function<void(int code, std::string status)> on_done = {},
                    std::string working_dir = {}, bool cd_before_run = false, std::string remote_shell = {});
   void request_saved_runs();
+  void move_selected_command(int delta);
   void advance_command_selection();
   void start_bundle(const std::string& bundle_id_override = {});
   void open_bundle_steps();
@@ -140,6 +142,8 @@ class AppFrame : public wxFrame {
   wxSplitterWindow* hsplit_{};
   wxTextCtrl* server_search_{};
   StripedListCtrl* servers_{};
+  wxStaticText* server_heading_{};
+  wxStaticText* server_meta_{};
   RoundedNotebook* groups_nb_{};
   StripedListCtrl* commands_{};
   StripedListCtrl* bundles_{};

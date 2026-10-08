@@ -207,6 +207,18 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       open_settings();
       return;
     }
+    if (e.ControlDown() && !e.AltDown() && !e.ShiftDown() &&
+        (e.GetKeyCode() == WXK_UP || e.GetKeyCode() == WXK_NUMPAD_UP || e.GetKeyCode() == WXK_DOWN ||
+         e.GetKeyCode() == WXK_NUMPAD_DOWN)) {
+      if (auto* focus = wxWindow::FindFocus()) {
+        if (commands_ && (focus == commands_ || commands_->IsDescendant(focus))) {
+          const int delta =
+              (e.GetKeyCode() == WXK_UP || e.GetKeyCode() == WXK_NUMPAD_UP) ? -1 : 1;
+          move_selected_command(delta);
+          return;
+        }
+      }
+    }
     e.Skip();
   });
   CallAfter([this] {
@@ -333,26 +345,19 @@ void AppFrame::build_ui() {
   servers_card->SetSizer(servers_sz);
   auto* sbtns = new wxWrapSizer(wxHORIZONTAL);
   auto* sadd = make_button(left, L"Добавить", BtnIcon::Plus);
-  auto* sedit = make_button(left, L"Изменить", BtnIcon::Pencil);
-  auto* sdup = make_button(left, L"Дублировать", BtnIcon::Copy);
-  auto* sdel = make_button(left, L"Удалить", BtnIcon::Trash);
-  add_btn(sbtns, sadd);
-  add_btn(sbtns, sedit);
-  add_btn(sbtns, sdup);
-  add_btn(sbtns, sdel);
-  auto* sact = new wxWrapSizer(wxHORIZONTAL);
   auto* files = make_button(left, L"Файлы", BtnIcon::Folder);
   auto* cons = make_button(left, L"Открыть консоль", BtnIcon::Terminal);
   auto* putty = make_button(left, L"PuTTY", BtnIcon::Putty);
   auto* winscp = make_button(left, L"WinSCP", BtnIcon::WinSCP);
   auto* test = make_button(left, L"Проверить связь", BtnIcon::Network);
   auto* health_btn = make_button(left, L"Состояние", BtnIcon::Pulse);
-  add_btn(sact, files);
-  add_btn(sact, cons);
-  add_btn(sact, putty);
-  add_btn(sact, winscp);
-  add_btn(sact, test);
-  add_btn(sact, health_btn);
+  add_btn(sbtns, sadd);
+  add_btn(sbtns, files);
+  add_btn(sbtns, cons);
+  add_btn(sbtns, putty);
+  add_btn(sbtns, winscp);
+  add_btn(sbtns, test);
+  add_btn(sbtns, health_btn);
   extra_tools_parent_ = left;
   extra_tools_sizer_ = new wxWrapSizer(wxHORIZONTAL);
   auto* ls = new wxBoxSizer(wxVERTICAL);
@@ -360,12 +365,11 @@ void AppFrame::build_ui() {
   ls->Add(server_search_, 0, wxEXPAND | wxBOTTOM, gap);
   ls->Add(servers_card, 1, wxEXPAND);
   ls->Add(sbtns, 0, wxTOP, pad);
-  ls->Add(sact, 0);
   ls->Add(extra_tools_sizer_, 0);
   left->SetSizer(ls);
-  // Кнопки VPS и внешние программы гасятся на время SSH; список команд
-  // остаётся доступен — запуск ставит в очередь.
-  busy_disable_ = {sedit, sdup, sdel, cons, putty, winscp, test, files};
+  // Внешние программы гасятся на время SSH; список команд остаётся доступен —
+  // запуск ставит в очередь. Правка VPS — двойной клик и контекстное меню.
+  busy_disable_ = {cons, putty, winscp, test, files};
   rebuild_extra_tools();
 
   auto* right_nb = new RoundedNotebook(right);
@@ -386,42 +390,25 @@ void AppFrame::build_ui() {
   first_page->SetSizer(page_sz);
   groups_nb_->AddPage(first_page, L"Общее");
   group_tab_ids_.push_back("");
-  auto* corder = new wxWrapSizer(wxHORIZONTAL);
-  auto* up = make_button(groups_page, L"Вверх", BtnIcon::ArrowUp);
-  auto* down = make_button(groups_page, L"Вниз", BtnIcon::ArrowDown);
-  auto* byname = make_button(groups_page, L"По имени", BtnIcon::Sort);
-  auto* fadd = make_button(groups_page, L"Группа+", BtnIcon::FolderPlus);
-  auto* frename = make_button(groups_page, L"Переименовать", BtnIcon::Pencil);
-  auto* fdel = make_button(groups_page, L"Удалить группу", BtnIcon::Trash);
-  add_btn(corder, up);
-  add_btn(corder, down);
-  corder->Add(byname, 0, wxRIGHT | wxBOTTOM, FromDIP(16));
-  add_btn(corder, fadd);
-  add_btn(corder, frename);
-  add_btn(corder, fdel);
-  auto* cbtns = new wxBoxSizer(wxHORIZONTAL);
+  auto* cleft = new wxWrapSizer(wxHORIZONTAL);
   auto* cadd = make_button(groups_page, L"Добавить", BtnIcon::Plus);
-  auto* cedit = make_button(groups_page, L"Изменить  (F2)", BtnIcon::Pencil);
-  auto* cdup = make_button(groups_page, L"Дублировать", BtnIcon::Copy);
-  auto* cdel = make_button(groups_page, L"Удалить", BtnIcon::Trash);
-  auto* cmove = make_button(groups_page, L"Переместить в группу", BtnIcon::FolderMove);
   auto* presets = make_button(groups_page, L"Пресеты…", BtnIcon::List);
+  auto* gadd = make_button(groups_page, L"Группа", BtnIcon::FolderPlus);
+  gadd->SetToolTip(L"Новая группа. Правый клик по вкладке — переименовать или удалить.");
+  add_btn(cleft, cadd);
+  add_btn(cleft, presets);
+  add_btn(cleft, gadd);
   stop_btn_ = make_button(groups_page, L"Стоп", BtnIcon::Stop);
-  run_btn_ = accent_button(groups_page, L"Запустить  (F5)", BtnIcon::Play);
+  run_btn_ = accent_button(groups_page, L"Запустить", BtnIcon::Play);
+  run_btn_->SetToolTip(L"F5, Enter или двойной клик");
   stop_btn_->Enable(false);
-  cbtns->Add(cadd, 0, wxRIGHT, gap);
-  cbtns->Add(cedit, 0, wxRIGHT, gap);
-  cbtns->Add(cdup, 0, wxRIGHT, gap);
-  cbtns->Add(cdel, 0, wxRIGHT, gap);
-  cbtns->Add(cmove, 0, wxRIGHT, gap);
-  cbtns->Add(presets, 0, wxRIGHT, pad);
-  cbtns->AddStretchSpacer();
+  auto* cbtns = new wxBoxSizer(wxHORIZONTAL);
+  cbtns->Add(cleft, 1, wxEXPAND);
   cbtns->Add(run_btn_, 0, wxRIGHT, gap);
-  cbtns->Add(stop_btn_);
+  cbtns->Add(stop_btn_, 0, wxALIGN_CENTER_VERTICAL);
   auto* gs = new wxBoxSizer(wxVERTICAL);
   gs->Add(groups_nb_, 1, wxEXPAND);
-  gs->Add(corder, 0, wxTOP, pad);
-  gs->Add(cbtns, 0);
+  gs->Add(cbtns, 0, wxTOP, pad);
   groups_page->SetSizer(gs);
 
   auto* bundles_page = new wxPanel(right_nb);
@@ -466,6 +453,13 @@ void AppFrame::build_ui() {
     e.Skip();
   });
 
+  server_heading_ = new wxStaticText(right, wxID_ANY, L"");
+  server_heading_->SetName(L"heading");
+  server_meta_ = new wxStaticText(right, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_END);
+  server_meta_->SetName(L"muted");
+  auto* head = new wxBoxSizer(wxHORIZONTAL);
+  head->Add(server_heading_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
+  head->Add(server_meta_, 1, wxALIGN_CENTER_VERTICAL);
   auto* qrow = new wxBoxSizer(wxHORIZONTAL);
   qrow->Add(new wxStaticText(right, wxID_ANY, L"Разовая команда:"), 0, wxALIGN_CENTER_VERTICAL);
   quick_ = new wxTextCtrl(right, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
@@ -474,6 +468,7 @@ void AppFrame::build_ui() {
   qrow->Add(quick_, 1, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, pad);
   qrow->Add(qrun, 0, wxALIGN_CENTER_VERTICAL);
   auto* rs = new wxBoxSizer(wxVERTICAL);
+  rs->Add(head, 0, wxEXPAND | wxBOTTOM, gap);
   rs->Add(right_nb, 1, wxEXPAND);
   rs->Add(qrow, 0, wxEXPAND | wxTOP, pad);
   right->SetSizer(rs);
@@ -599,9 +594,16 @@ void AppFrame::build_ui() {
     rebuild_group_tabs();
     refresh_commands();
   });
-  servers_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this, sedit](wxListEvent&) {
-    wxCommandEvent ev(wxEVT_BUTTON);
-    sedit->GetEventHandler()->ProcessEvent(ev);
+  servers_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) {
+    auto* s = selected_server();
+    if (!s) return;
+    ServerDialog dlg(this, *s, wxString::FromUTF8("VPS: " + s->name), false);
+    dlg.setup_layout(&config_.settings, "server", false, [this] { persist(); });
+    if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
+      *s = dlg.result;
+      persist();
+      refresh_servers(s->id);
+    }
   });
   commands_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { request_saved_runs(); });
   commands_->Bind(wxEVT_LIST_COL_CLICK, [this](wxListEvent& e) {
@@ -634,77 +636,6 @@ void AppFrame::build_ui() {
       persist();
       refresh_servers(dlg.result.id);
     }
-  });
-  sedit->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (!s) return;
-    ServerDialog dlg(this, *s, wxString::FromUTF8("VPS: " + s->name), false);
-    dlg.setup_layout(&config_.settings, "server", false, [this] { persist(); });
-    if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
-      *s = dlg.result;
-      persist();
-      refresh_servers(s->id);
-    }
-  });
-  sdup->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (!s) return;
-    std::vector<std::string> names;
-    for (auto& x : config_.servers) names.push_back(x.name);
-    auto clone = s->duplicate(copy_name(s->name, names));
-    auto cmds = config_.commands_for(s->id);
-    std::map<std::string, std::string> folder_map;
-    for (const auto& f : config_.groups_for(s->id)) {
-      auto nf = CommandGroup::make_new(clone.id, f.name);
-      nf.working_dir = f.working_dir;
-      folder_map[f.id] = nf.id;
-      config_.groups.push_back(nf);
-    }
-    config_.servers.push_back(clone);
-    std::map<std::string, std::string> cmd_map;
-    for (auto& c : cmds) {
-      auto d = c.duplicate("", clone.id);
-      if (!c.group_id.empty() && folder_map.count(c.group_id)) {
-        d.group_id = folder_map[c.group_id];
-      } else {
-        d.group_id.clear();
-      }
-      config_.commands.push_back(d);
-      cmd_map[c.id] = d.id;
-    }
-    for (const auto& b : config_.bundles_for(s->id)) {
-      auto nb = b;
-      nb.id = new_uuid();
-      nb.server_id = clone.id;
-      std::vector<std::string> ids;
-      for (const auto& cid : b.command_ids) {
-        auto it = cmd_map.find(cid);
-        if (it != cmd_map.end()) ids.push_back(it->second);
-      }
-      if (ids.empty()) continue;
-      nb.command_ids = std::move(ids);
-      config_.bundles.push_back(std::move(nb));
-    }
-    persist();
-    refresh_servers(clone.id);
-  });
-  sdel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (!s) return;
-    if (wxMessageBox(L"Удалить «" + wxString::FromUTF8(s->name) + L"»?", L"Удалить VPS", wxYES_NO, this) != wxYES) return;
-    auto id = s->id;
-    config_.servers.erase(std::remove_if(config_.servers.begin(), config_.servers.end(),
-                                         [&](const Server& x) { return x.id == id; }),
-                          config_.servers.end());
-    config_.commands.erase(std::remove_if(config_.commands.begin(), config_.commands.end(),
-                                          [&](const Command& x) { return x.server_id == id; }),
-                           config_.commands.end());
-    config_.groups.erase(std::remove_if(config_.groups.begin(), config_.groups.end(),
-                                         [&](const CommandGroup& x) { return x.server_id == id; }),
-                          config_.groups.end());
-    config_.drop_server_bundles(id);
-    persist();
-    refresh_servers();
   });
   files->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* s = selected_server();
@@ -788,85 +719,13 @@ void AppFrame::build_ui() {
     auto* s = selected_server();
     show_health(s ? s->id : std::string{});
   });
-  up->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* c = selected_command();
-    if (c && config_.move_command(c->id, -1)) {
-      clear_command_sort();
-      persist();
-      refresh_commands();
-    }
-  });
-  down->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* c = selected_command();
-    if (c && config_.move_command(c->id, 1)) {
-      clear_command_sort();
-      persist();
-      refresh_commands();
-    }
-  });
-  byname->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { sort_visible_commands("name", false); });
+  gadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { add_group(); });
   groups_nb_->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
     if (updating_groups_) return;
     attach_commands_page(e.GetSelection());
     if (auto* s = selected_server()) {
       config_.settings.last_group_by_server[s->id] = current_group_id();
     }
-    refresh_commands();
-  });
-  fadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (!s) {
-      wxMessageBox(L"Сначала выберите VPS.", L"Группа");
-      return;
-    }
-    auto name = wxGetTextFromUser(L"Имя группы", L"Новая группа", L"", this);
-    auto trimmed = trim(std::string(name.utf8_string()));
-    if (trimmed.empty()) return;
-    for (const auto& f : config_.groups_for(s->id)) {
-      if (to_lower(f.name) == to_lower(trimmed)) {
-        wxMessageBox(L"Такая группа уже есть.", L"Группа", wxOK | wxICON_WARNING, this);
-        return;
-      }
-    }
-    auto folder = CommandGroup::make_new(s->id, trimmed);
-    config_.settings.last_group_by_server[s->id] = folder.id;
-    config_.groups.push_back(folder);
-    persist();
-    rebuild_group_tabs();
-    refresh_commands();
-  });
-  frename->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto id = current_group_id();
-    auto* f = config_.group_by_id(id);
-    if (!f) {
-      wxMessageBox(L"Вкладку «Общее» переименовать нельзя — создайте группу.", L"Группа");
-      return;
-    }
-    auto name = wxGetTextFromUser(L"Новое имя", L"Группа", wxString::FromUTF8(f->name), this);
-    auto trimmed = trim(std::string(name.utf8_string()));
-    if (trimmed.empty()) return;
-    f->name = trimmed;
-    persist();
-    rebuild_group_tabs();
-    refresh_commands();
-  });
-  fdel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto id = current_group_id();
-    if (id.empty()) {
-      wxMessageBox(L"Вкладку «Общее» удалить нельзя.", L"Группа");
-      return;
-    }
-    auto* f = config_.group_by_id(id);
-    if (!f) return;
-    if (wxMessageBox(L"Удалить группу «" + wxString::FromUTF8(f->name) +
-                         L"»? Команды останутся во вкладке «Общее».",
-                     L"Группа", wxYES_NO, this) != wxYES)
-      return;
-    auto* s = selected_server();
-    if (s) config_.settings.last_group_by_server[s->id].clear();
-    config_.remove_group(id);
-    persist();
-    rebuild_group_tabs();
     refresh_commands();
   });
   cadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
@@ -886,86 +745,6 @@ void AppFrame::build_ui() {
       persist();
       refresh_servers(dlg.result.server_id);
     }
-  });
-  cedit->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* c = selected_command();
-    if (!c) return;
-    CommandDialog dlg(this, *c, config_.servers, config_.groups, wxString::FromUTF8("Команда: " + c->name));
-    dlg.setup_layout(&config_.settings, "command", true, [this] { persist(); });
-    if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
-      *c = dlg.result;
-      config_.settings.last_group_by_server[dlg.result.server_id] = dlg.result.group_id;
-      persist();
-      refresh_servers(dlg.result.server_id);
-    }
-  });
-  cdup->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* c = selected_command();
-    if (!c) return;
-    std::vector<std::string> names;
-    for (auto& x : config_.commands_for(c->server_id)) names.push_back(x.name);
-    auto clone = c->duplicate(copy_name(c->name, names));
-    config_.commands.push_back(clone);
-    persist();
-    refresh_commands();
-  });
-  cdel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto sel = selected_commands();
-    if (sel.empty()) return;
-    wxString msg;
-    if (sel.size() == 1) {
-      msg = L"Удалить «" + wxString::FromUTF8(sel[0]->name) + L"»?";
-    } else {
-      msg = wxString::Format(L"Удалить выбранные команды (%d)?", static_cast<int>(sel.size()));
-    }
-    if (wxMessageBox(msg, L"Удалить команду", wxYES_NO, this) != wxYES) return;
-    std::vector<std::string> ids;
-    ids.reserve(sel.size());
-    for (auto* c : sel) ids.push_back(c->id);
-    for (const auto& id : ids) config_.drop_command_from_bundles(id);
-    config_.commands.erase(std::remove_if(config_.commands.begin(), config_.commands.end(),
-                                          [&](const Command& x) {
-                                            return std::find(ids.begin(), ids.end(), x.id) != ids.end();
-                                          }),
-                           config_.commands.end());
-    persist();
-    refresh_commands();
-  });
-  cmove->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto sel = selected_commands();
-    if (sel.empty()) {
-      wxMessageBox(L"Выберите одну или несколько команд.", L"Переместить в группу");
-      return;
-    }
-    auto* s = selected_server();
-    if (!s) return;
-    wxArrayString labels;
-    std::vector<std::string> ids;
-    labels.Add(L"Общее");
-    ids.push_back("");
-    for (const auto& f : config_.groups_for(s->id)) {
-      labels.Add(wxString::FromUTF8(f.name));
-      ids.push_back(f.id);
-    }
-    const int n = wxGetSingleChoiceIndex(L"Куда переместить выбранные команды?", L"Переместить в группу", labels, this);
-    if (n < 0 || n >= static_cast<int>(ids.size())) return;
-    const std::string dest = ids[static_cast<std::size_t>(n)];
-    int moved = 0;
-    for (auto* c : sel) {
-      if (c->server_id != s->id) continue;
-      if (c->group_id == dest) continue;
-      c->group_id = dest;
-      ++moved;
-    }
-    if (moved == 0) {
-      wxMessageBox(L"Выбранные команды уже в этой группе.", L"Переместить в группу");
-      return;
-    }
-    config_.settings.last_group_by_server[s->id] = dest;
-    persist();
-    rebuild_group_tabs();
-    refresh_commands();
-    status_->SetLabel(wxString::Format(L"Перемещено команд: %d", moved));
   });
   presets->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* s = selected_server();
@@ -1461,6 +1240,13 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
     ++row;
   }
   if (sel < 0 && servers_->GetItemCount() > 0) sel = 0;
+  if (config_.servers.empty()) {
+    servers_->set_empty_hint(L"Пока нет VPS.\nНажмите «Добавить».");
+  } else if (servers_->GetItemCount() == 0) {
+    servers_->set_empty_hint(L"Ничего не найдено.");
+  } else {
+    servers_->set_empty_hint(L"");
+  }
   if (sel >= 0) servers_->SetItemState(sel, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
   rebuild_group_tabs();
   refresh_commands();
@@ -1564,12 +1350,19 @@ void AppFrame::refresh_commands() {
     if (status_) status_->SetLabel(L"Показан сохранённый порядок");
   }
   if (!s) {
+    commands_->set_empty_hint(L"Сначала выберите VPS слева.");
     apply_command_sort_visual();
+    update_server_heading();
     update_cwd_label();
     refresh_bundles();
     return;
   }
   auto cmds = config_.commands_for(s->id, group);
+  if (cmds.empty()) {
+    commands_->set_empty_hint(L"В этой группе команд нет.\n«Добавить» или «Пресеты…».");
+  } else {
+    commands_->set_empty_hint(L"");
+  }
   if (!command_sort_by_.empty()) apply_command_view_sort(cmds);
   long sel = -1;
   for (std::size_t i = 0; i < cmds.size(); ++i) {
@@ -1606,8 +1399,24 @@ void AppFrame::refresh_commands() {
     commands_->SetItemState(sel, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
                             wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
   }
+  update_server_heading();
   update_cwd_label();
   refresh_bundles();
+}
+
+void AppFrame::update_server_heading() {
+  if (!server_heading_) return;
+  auto* s = selected_server();
+  if (!s) {
+    server_heading_->SetLabel(L"Нет VPS");
+    if (server_meta_) server_meta_->SetLabel(L"");
+  } else {
+    server_heading_->SetLabel(wxString::FromUTF8(s->name.empty() ? s->host : s->name));
+    if (server_meta_) {
+      server_meta_->SetLabel(wxString::FromUTF8(s->username + "@" + s->host + ":" + std::to_string(s->port)));
+    }
+  }
+  if (server_heading_->GetParent()) server_heading_->GetParent()->Layout();
 }
 
 std::vector<std::string> AppFrame::command_column_ids() const {
@@ -2116,6 +1925,14 @@ void AppFrame::request_saved_runs() {
   }
 }
 
+void AppFrame::move_selected_command(int delta) {
+  auto* c = selected_command();
+  if (!c || !config_.move_command(c->id, delta)) return;
+  clear_command_sort();
+  persist();
+  refresh_commands();
+}
+
 void AppFrame::advance_command_selection() {
   if (visible_command_ids_.size() < 2 || !commands_) return;
   long cur = commands_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
@@ -2549,22 +2366,8 @@ void AppFrame::show_commands_context_menu(long row) {
     refresh_commands();
     status_->SetLabel(wxString::Format(L"Перемещено команд: %d", moved));
   }, 2014);
-  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    auto* c = selected_command();
-    if (c && config_.move_command(c->id, -1)) {
-      clear_command_sort();
-      persist();
-      refresh_commands();
-    }
-  }, 2015);
-  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    auto* c = selected_command();
-    if (c && config_.move_command(c->id, 1)) {
-      clear_command_sort();
-      persist();
-      refresh_commands();
-    }
-  }, 2016);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { move_selected_command(-1); }, 2015);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { move_selected_command(1); }, 2016);
   PopupMenu(&menu);
 }
 

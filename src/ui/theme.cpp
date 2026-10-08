@@ -131,6 +131,7 @@ wxColour Theme::run_status(const std::string& status) {
 wxFont Theme::ui() { return wxFont(10, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
 wxFont Theme::ui_small() { return wxFont(9, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
 wxFont Theme::ui_section() { return wxFont(8, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_SEMIBOLD, false, L"Segoe UI"); }
+wxFont Theme::ui_heading() { return wxFont(14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_SEMIBOLD, false, L"Segoe UI"); }
 wxFont Theme::ui_title() { return wxFont(18, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, L"Segoe UI"); }
 wxFont Theme::mono() { return wxFont(10, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, mono_face()); }
 
@@ -148,7 +149,7 @@ void apply_dark_titlebar(wxWindow* window) {
 void apply_theme(wxWindow* window) {
   if (!window) return;
   const wxString name = window->GetName();
-  if (name != L"title" && name != L"mono" && name != L"section") window->SetFont(Theme::ui());
+  if (name != L"title" && name != L"mono" && name != L"section" && name != L"heading") window->SetFont(Theme::ui());
   wxWindow* parent = window->GetParent();
   const wxColour parent_bg = parent ? parent->GetBackgroundColour() : Theme::bg();
   if (dynamic_cast<RoundButton*>(window) || dynamic_cast<RoundedNotebook*>(window) ||
@@ -168,6 +169,10 @@ void apply_theme(wxWindow* window) {
     window->SetFont(Theme::ui_section());
     window->SetBackgroundColour(parent_bg);
     window->SetForegroundColour(Theme::muted());
+  } else if (name == L"heading") {
+    window->SetFont(Theme::ui_heading());
+    window->SetBackgroundColour(parent_bg);
+    window->SetForegroundColour(Theme::text_bright());
   } else if (name == L"muted") {
     window->SetBackgroundColour(parent_bg);
     window->SetForegroundColour(Theme::muted());

@@ -34,6 +34,7 @@ class StripedListCtrl : public wxPanel {
   void set_sort_column(int col, bool ascending);
   int sort_column() const { return sort_col_; }
   bool sort_ascending() const { return sort_asc_; }
+  void set_empty_hint(const wxString& hint);
 
   void SetItemState(long row, long state, long mask);
   long GetNextItem(long start, int geometry, int state) const;
@@ -113,6 +114,7 @@ class StripedListCtrl : public wxPanel {
   long anchor_ = -1;
   int sort_col_ = -1;
   bool sort_asc_ = true;
+  wxString empty_hint_;
   Header* header_{};
   Body* body_{};
 };

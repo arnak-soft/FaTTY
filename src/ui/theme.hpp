@@ -37,6 +37,7 @@ struct Theme {
   static wxFont ui();
   static wxFont ui_small();
   static wxFont ui_section();
+  static wxFont ui_heading();
   static wxFont ui_title();
   static wxFont mono();
 };
