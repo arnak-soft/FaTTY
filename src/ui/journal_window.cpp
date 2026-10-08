@@ -115,7 +115,7 @@ JournalWindow::JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
     wxMenu menu;
     menu.Append(1, L"Удалить запись");
     menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { delete_selected(); }, 1);
-    PopupMenu(&menu);
+    show_themed_menu(this, &menu);
   });
   Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
     if (e.GetKeyCode() == WXK_DELETE) {

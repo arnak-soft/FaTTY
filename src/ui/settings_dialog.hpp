@@ -2,12 +2,11 @@
 
 #include "core/store.hpp"
 #include "core/vault.hpp"
+#include "ui/chrome.hpp"
 #include "ui/layout.hpp"
 #include "ui/striped_list.hpp"
 
 #include <wx/button.h>
-#include <wx/checkbox.h>
-#include <wx/choice.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 #include <functional>
@@ -31,16 +30,16 @@ class SettingsDialog : public PositionedDialog {
   std::function<void()> on_change_master_;
   std::function<void()> on_check_updates_;
   std::function<void()> on_import_done_;
-  wxCheckBox* confirm_{};
-  wxCheckBox* updates_{};
-  wxCheckBox* clear_output_{};
-  wxCheckBox* automation_to_shell_{};
-  wxCheckBox* shell_follow_cwd_{};
-  wxCheckBox* advance_command_{};
-  wxCheckBox* show_folder_col_{};
-  wxCheckBox* backup_{};
-  wxChoice* theme_{};
-  wxChoice* terminal_font_{};
+  ThemedCheckBox* confirm_{};
+  ThemedCheckBox* updates_{};
+  ThemedCheckBox* clear_output_{};
+  ThemedCheckBox* automation_to_shell_{};
+  ThemedCheckBox* shell_follow_cwd_{};
+  ThemedCheckBox* advance_command_{};
+  ThemedCheckBox* show_folder_col_{};
+  ThemedCheckBox* backup_{};
+  ThemedChoice* theme_{};
+  ThemedChoice* terminal_font_{};
   wxTextCtrl* timeout_{};
   wxTextCtrl* journal_{};
   wxTextCtrl* putty_{};
@@ -48,14 +47,14 @@ class SettingsDialog : public PositionedDialog {
   wxTextCtrl* ssh_{};
   StripedListCtrl* extra_list_{};
   std::vector<ExtraProgram> extra_programs_;
-  wxCheckBox* export_secrets_{};
-  wxCheckBox* export_settings_{};
-  wxCheckBox* import_settings_{};
-  wxCheckBox* short_pw_{};
+  ThemedCheckBox* export_secrets_{};
+  ThemedCheckBox* export_settings_{};
+  ThemedCheckBox* import_settings_{};
+  ThemedCheckBox* short_pw_{};
   wxTextCtrl* lockout_attempts_{};
   wxTextCtrl* lockout_minutes_{};
-  wxCheckBox* health_auto_{};
-  wxChoice* health_interval_{};
+  ThemedCheckBox* health_auto_{};
+  ThemedChoice* health_interval_{};
   wxTextCtrl* health_interval_sec_{};
   wxTextCtrl* health_timeout_{};
   wxTextCtrl* health_disk_warn_{};
@@ -64,11 +63,11 @@ class SettingsDialog : public PositionedDialog {
   wxTextCtrl* health_ram_crit_{};
   wxTextCtrl* health_cpu_warn_{};
   wxTextCtrl* health_cpu_crit_{};
-  wxCheckBox* health_cpu_{};
-  wxCheckBox* health_ram_{};
-  wxCheckBox* health_disk_{};
-  wxCheckBox* health_load_{};
-  wxCheckBox* health_docker_disks_{};
+  ThemedCheckBox* health_cpu_{};
+  ThemedCheckBox* health_ram_{};
+  ThemedCheckBox* health_disk_{};
+  ThemedCheckBox* health_load_{};
+  ThemedCheckBox* health_docker_disks_{};
 };
 
 }  // namespace fatty

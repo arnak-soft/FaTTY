@@ -217,6 +217,9 @@ void apply_theme(wxWindow* window) {
   } else if (name == L"chrome") {
     window->SetBackgroundColour(Theme::chrome());
     window->SetForegroundColour(Theme::text());
+  } else if (dynamic_cast<ThemedCheckBox*>(window) || dynamic_cast<ThemedChoice*>(window) ||
+             dynamic_cast<ThemedMenuBar*>(window)) {
+    window->SetForegroundColour(Theme::text());
   } else if (dynamic_cast<wxStaticText*>(window) || dynamic_cast<wxCheckBox*>(window)) {
     window->SetBackgroundColour(parent_bg);
     window->SetForegroundColour(Theme::text());

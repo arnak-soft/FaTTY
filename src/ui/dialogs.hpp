@@ -6,8 +6,6 @@
 #include "ui/layout.hpp"
 #include "ui/chrome.hpp"
 
-#include <wx/checkbox.h>
-#include <wx/combobox.h>
 #include <wx/dialog.h>
 #include <wx/listctrl.h>
 #include <wx/stattext.h>
@@ -33,10 +31,10 @@ class ServerDialog : public PositionedDialog {
   wxTextCtrl* user_{};
   wxTextCtrl* password_{};
   wxTextCtrl* key_{};
-  wxCheckBox* show_pw_{};
-  wxCheckBox* clear_pw_{};
-  wxComboBox* shell_{};
-  wxCheckBox* health_{};
+  ThemedCheckBox* show_pw_{};
+  ThemedCheckBox* clear_pw_{};
+  ThemedChoice* shell_{};
+  ThemedCheckBox* health_{};
   wxStaticText* error_{};
   std::string stored_password_;
 };
@@ -54,7 +52,7 @@ class PresetDialog : public PositionedDialog {
   wxTextCtrl* branch_{};
   wxTextCtrl* pm2_{};
   wxPanel* list_{};
-  std::vector<wxCheckBox*> checks_;
+  std::vector<ThemedCheckBox*> checks_;
   std::vector<Preset> presets_;
 };
 
@@ -75,15 +73,15 @@ class CommandDialog : public PositionedDialog {
   std::vector<Preset> presets_;
   std::vector<std::string> group_ids_;
   wxTextCtrl* name_{};
-  wxComboBox* server_{};
-  wxComboBox* group_{};
+  ThemedChoice* server_{};
+  ThemedChoice* group_{};
   wxTextCtrl* working_dir_{};
-  wxCheckBox* cd_before_{};
+  ThemedCheckBox* cd_before_{};
   wxTextCtrl* timeout_{};
-  wxCheckBox* login_{};
-  wxCheckBox* confirm_{};
-  wxComboBox* shell_{};
-  wxComboBox* preset_{};
+  ThemedCheckBox* login_{};
+  ThemedCheckBox* confirm_{};
+  ThemedChoice* shell_{};
+  ThemedChoice* preset_{};
   wxTextCtrl* comment_{};
   wxTextCtrl* text_{};
 };
@@ -166,7 +164,7 @@ class UpdateAvailableDialog : public wxDialog {
   bool dont_remind() const;
 
  private:
-  wxCheckBox* skip_{};
+  ThemedCheckBox* skip_{};
 };
 
 class WhatsNewDialog : public wxDialog {

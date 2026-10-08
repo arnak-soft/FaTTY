@@ -140,32 +140,32 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* general = new wxPanel(nb);
   general->SetName(L"card-page");
   auto* gsz = new wxBoxSizer(wxVERTICAL);
-  confirm_ = new wxCheckBox(general, wxID_ANY, L"Спрашивать подтверждение перед разовой командой");
+  confirm_ = new ThemedCheckBox(general, wxID_ANY, L"Спрашивать подтверждение перед разовой командой");
   confirm_->SetValue(st.confirm_before_run);
-  clear_output_ = new wxCheckBox(general, wxID_ANY, L"Очищать панель вывода перед новым запуском");
+  clear_output_ = new ThemedCheckBox(general, wxID_ANY, L"Очищать панель вывода перед новым запуском");
   clear_output_->SetValue(st.clear_output_before_run);
   automation_to_shell_ =
-      new wxCheckBox(general, wxID_ANY,
+      new ThemedCheckBox(general, wxID_ANY,
                      L"После подключения Shell направлять вывод команд туда (постоянно)");
   automation_to_shell_->SetValue(st.automation_to_shell_when_connected);
   shell_follow_cwd_ =
-      new wxCheckBox(general, wxID_ANY, L"После команд переходить в Shell в ту же папку");
+      new ThemedCheckBox(general, wxID_ANY, L"После команд переходить в Shell в ту же папку");
   shell_follow_cwd_->SetValue(st.shell_follow_command_cwd);
   shell_follow_cwd_->SetToolTip(
       L"Если команда или связка сменила каталог, активный Shell делает то же самое. "
       L"Приглашение появляется сразу под выводом, как после обычного ввода.");
-  advance_command_ = new wxCheckBox(general, wxID_ANY, L"Переходить к следующей команде после запуска (F5 / двойной клик)");
+  advance_command_ = new ThemedCheckBox(general, wxID_ANY, L"Переходить к следующей команде после запуска (F5 / двойной клик)");
   advance_command_->SetValue(st.advance_command_after_run);
-  show_folder_col_ = new wxCheckBox(general, wxID_ANY, L"Показывать столбец «Папка» (рабочий каталог) в списке команд");
+  show_folder_col_ = new ThemedCheckBox(general, wxID_ANY, L"Показывать столбец «Папка» (рабочий каталог) в списке команд");
   show_folder_col_->SetValue(st.show_command_folder_column);
-  updates_ = new wxCheckBox(general, wxID_ANY, L"Проверять обновления при запуске (не чаще раза в сутки)");
+  updates_ = new ThemedCheckBox(general, wxID_ANY, L"Проверять обновления при запуске (не чаще раза в сутки)");
   updates_->SetValue(st.check_updates_on_start);
   auto* theme_row = new wxBoxSizer(wxHORIZONTAL);
   theme_row->Add(new wxStaticText(general, wxID_ANY, L"Тема"), 0, wxALIGN_CENTER_VERTICAL);
   wxArrayString themes;
   themes.Add(L"Тёмная");
   themes.Add(L"Светлая");
-  theme_ = new wxChoice(general, wxID_ANY, wxDefaultPosition, wxDefaultSize, themes);
+  theme_ = new ThemedChoice(general, wxID_ANY, wxDefaultPosition, wxDefaultSize, themes);
   theme_->SetSelection(st.theme == "light" ? 1 : 0);
   theme_row->Add(theme_, 0, wxLEFT, 8);
   auto* font_row = new wxBoxSizer(wxHORIZONTAL);
@@ -177,7 +177,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
     font_sizes.Add(std::to_wstring(font_pts[i]));
     if (font_pts[i] == st.terminal_font_pt) font_sel = i;
   }
-  terminal_font_ = new wxChoice(general, wxID_ANY, wxDefaultPosition, wxDefaultSize, font_sizes);
+  terminal_font_ = new ThemedChoice(general, wxID_ANY, wxDefaultPosition, wxDefaultSize, font_sizes);
   terminal_font_->SetSelection(font_sel);
   terminal_font_->SetToolTip(L"Shell, панель «Вывод» и моноширинный текст. По умолчанию 12.");
   font_row->Add(terminal_font_, 0, wxLEFT, 8);
@@ -209,7 +209,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   health_page->SetName(L"card-page");
   health_page->SetScrollRate(0, 16);
   auto* hsz = new wxBoxSizer(wxVERTICAL);
-  health_auto_ = new wxCheckBox(health_page, wxID_ANY, L"Автоматически опрашивать VPS по расписанию");
+  health_auto_ = new ThemedCheckBox(health_page, wxID_ANY, L"Автоматически опрашивать VPS по расписанию");
   health_auto_->SetValue(st.health_auto);
   auto* health_hint = new wxStaticText(
       health_page, wxID_ANY,
@@ -230,7 +230,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   intervals.Add(L"3 дня");
   intervals.Add(L"7 дней");
   intervals.Add(L"свой…");
-  health_interval_ = new wxChoice(health_page, wxID_ANY, wxDefaultPosition, wxDefaultSize, intervals);
+  health_interval_ = new ThemedChoice(health_page, wxID_ANY, wxDefaultPosition, wxDefaultSize, intervals);
   int interval_sel = 8;
   for (int i = 0; i < 8; ++i) {
     if (kHealthIntervalChoices[i] == st.health_interval_sec) {
@@ -251,15 +251,15 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   trow_h->Add(health_timeout_, 0, wxLEFT, 8);
   auto* metrics_label = new wxStaticText(health_page, wxID_ANY, L"Что собирать и показывать");
   metrics_label->SetName(L"section");
-  health_cpu_ = new wxCheckBox(health_page, wxID_ANY, L"CPU");
+  health_cpu_ = new ThemedCheckBox(health_page, wxID_ANY, L"CPU");
   health_cpu_->SetValue(st.health_show_cpu);
-  health_ram_ = new wxCheckBox(health_page, wxID_ANY, L"RAM");
+  health_ram_ = new ThemedCheckBox(health_page, wxID_ANY, L"RAM");
   health_ram_->SetValue(st.health_show_ram);
-  health_disk_ = new wxCheckBox(health_page, wxID_ANY, L"Диск");
+  health_disk_ = new ThemedCheckBox(health_page, wxID_ANY, L"Диск");
   health_disk_->SetValue(st.health_show_disk);
-  health_load_ = new wxCheckBox(health_page, wxID_ANY, L"Нагрузка (load average)");
+  health_load_ = new ThemedCheckBox(health_page, wxID_ANY, L"Нагрузка (load average)");
   health_load_->SetValue(st.health_show_load);
-  health_docker_disks_ = new wxCheckBox(health_page, wxID_ANY, L"Тома Docker overlay / snap");
+  health_docker_disks_ = new ThemedCheckBox(health_page, wxID_ANY, L"Тома Docker overlay / snap");
   health_docker_disks_->SetValue(st.health_show_docker_disks);
   health_docker_disks_->SetToolTip(
       L"Слои контейнеров на том же диске, что и /. Снятая галочка прячет их с графика. "
@@ -373,17 +373,17 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   data->SetName(L"card-page");
   auto* dsz = new wxBoxSizer(wxVERTICAL);
   auto* open_dir = make_button(data, L"Открыть папку конфига", BtnIcon::Folder);
-  backup_ = new wxCheckBox(data, wxID_ANY, L"Автоматические резервные копии конфига (раз в сутки)");
+  backup_ = new ThemedCheckBox(data, wxID_ANY, L"Автоматические резервные копии конфига (раз в сутки)");
   backup_->SetValue(st.backup_enabled);
   auto* backup_note = new wxStaticText(data, wxID_ANY, L"Папка backups рядом с конфигом, хранятся последние 14 копий.");
   backup_note->SetName(L"muted");
   backup_note->SetForegroundColour(Theme::muted());
   backup_note->Wrap(FromDIP(480));
   auto* open_backups = make_button(data, L"Открыть папку копий", BtnIcon::Folder);
-  export_secrets_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить пароли (открытым текстом)");
-  export_settings_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить настройки");
+  export_secrets_ = new ThemedCheckBox(data, wxID_ANY, L"Экспорт: включить пароли (открытым текстом)");
+  export_settings_ = new ThemedCheckBox(data, wxID_ANY, L"Экспорт: включить настройки");
   export_settings_->SetValue(true);
-  import_settings_ = new wxCheckBox(data, wxID_ANY, L"Импорт: применять настройки");
+  import_settings_ = new ThemedCheckBox(data, wxID_ANY, L"Импорт: применять настройки");
   import_settings_->SetValue(true);
   auto* exp = make_button(data, L"Экспорт…", BtnIcon::Export);
   auto* imp = make_button(data, L"Импорт…", BtnIcon::Import);
@@ -402,7 +402,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* sec = new wxPanel(nb);
   sec->SetName(L"card-page");
   auto* ssz = new wxBoxSizer(wxVERTICAL);
-  short_pw_ = new wxCheckBox(sec, wxID_ANY, L"Разрешить короткий мастер-пароль (от 4 символов)");
+  short_pw_ = new ThemedCheckBox(sec, wxID_ANY, L"Разрешить короткий мастер-пароль (от 4 символов)");
   short_pw_->SetValue(st.allow_short_master_password);
   auto* arow = new wxBoxSizer(wxHORIZONTAL);
   arow->Add(new wxStaticText(sec, wxID_ANY, L"Попыток до блокировки"), 0, wxALIGN_CENTER_VERTICAL);
@@ -536,8 +536,8 @@ void SettingsDialog::on_save(wxCommandEvent&) {
     config_.settings.terminal_font_pt = (sel >= 0 && sel < 5) ? font_pts[sel] : 12;
   }
   if (config_.settings.theme != old_theme) {
-    wxMessageBox(L"Тема применена. Системные элементы (меню, заголовки таблиц, скроллбары)\n"
-                 L"полностью переключатся после перезапуска FaTTY.",
+    wxMessageBox(L"Тема применена. Галочки, списки и меню уже в новых цветах.\n"
+                 L"Окна выбора файла и системные сообщения остаются системными.",
                  L"Тема", wxOK | wxICON_INFORMATION, this);
   }
   config_.settings.default_command_timeout = clamp_int(timeout, 1, 86400);

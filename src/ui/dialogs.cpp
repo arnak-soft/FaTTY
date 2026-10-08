@@ -52,7 +52,7 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   password_ = new wxTextCtrl(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PASSWORD);
   style_text(password_);
   pwrow->Add(password_, 1, wxEXPAND);
-  show_pw_ = new wxCheckBox(body, wxID_ANY, L"показать");
+  show_pw_ = new ThemedCheckBox(body, wxID_ANY, L"показать");
   pwrow->Add(show_pw_, 0, wxALIGN_CENTER_VERTICAL | wxLEFT, 8);
   grid->Add(pwrow, 1, wxEXPAND);
   wxString note;
@@ -70,7 +70,7 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   grid->Add(note_l, 1, wxEXPAND);
   if (!stored_password_.empty()) {
     grid->Add(new wxStaticText(body, wxID_ANY, L""), 0);
-    clear_pw_ = new wxCheckBox(body, wxID_ANY, L"Удалить сохранённый пароль");
+    clear_pw_ = new ThemedCheckBox(body, wxID_ANY, L"Удалить сохранённый пароль");
     grid->Add(clear_pw_, 1);
   }
   grid->Add(new wxStaticText(body, wxID_ANY, L"SSH-ключ"), 0, wxALIGN_CENTER_VERTICAL);
@@ -82,12 +82,11 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   keyrow->Add(browse, 0, wxLEFT, 8);
   grid->Add(keyrow, 1, wxEXPAND);
   grid->Add(new wxStaticText(body, wxID_ANY, L"Shell по умолчанию"), 0, wxALIGN_CENTER_VERTICAL);
-  shell_ = new wxComboBox(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize,
-                          wxArrayString{L"bash", L"sh"}, wxCB_READONLY);
+  shell_ = new ThemedChoice(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxArrayString{L"bash", L"sh"});
   shell_->SetSelection(normalize_remote_shell(server.remote_shell) == "sh" ? 1 : 0);
   grid->Add(shell_, 1, wxEXPAND);
   grid->Add(new wxStaticText(body, wxID_ANY, L""), 0);
-  health_ = new wxCheckBox(body, wxID_ANY, L"Учитывать в окне «Состояние VPS»");
+  health_ = new ThemedCheckBox(body, wxID_ANY, L"Учитывать в окне «Состояние VPS»");
   health_->SetValue(server.health_enabled);
   grid->Add(health_, 1, wxEXPAND);
 
@@ -253,7 +252,7 @@ void PresetDialog::rebuild() {
   for (const auto& p : presets_) {
     std::string extra = !p.comment.empty() ? p.comment
                                            : (p.command.size() > 80 ? p.command.substr(0, 77) + "…" : p.command);
-    auto* cb = new wxCheckBox(list_, wxID_ANY, wxString::FromUTF8(p.name + "  —  " + extra));
+    auto* cb = new ThemedCheckBox(list_, wxID_ANY, wxString::FromUTF8(p.name + "  —  " + extra));
     cb->SetValue(true);
     sizer->Add(cb, 0, wxBOTTOM, 4);
     checks_.push_back(cb);
@@ -292,26 +291,26 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
     names.Add(wxString::FromUTF8(s.name));
     if (s.id == command.server_id) current = wxString::FromUTF8(s.name);
   }
-  server_ = new wxComboBox(body, wxID_ANY, current, wxDefaultPosition, wxDefaultSize, names, wxCB_READONLY);
+  server_ = new ThemedChoice(body, wxID_ANY, current, wxDefaultPosition, wxDefaultSize, names);
   form->Add(server_, 1, wxEXPAND);
   form->Add(new wxStaticText(body, wxID_ANY, L"Группа"), 0, wxALIGN_CENTER_VERTICAL);
-  group_ = new wxComboBox(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxArrayString(), wxCB_READONLY);
+  group_ = new ThemedChoice(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxArrayString());
   form->Add(group_, 1, wxEXPAND);
   fill_groups();
   working_dir_ = labeled_entry(body, form, L"Папка", wxString::FromUTF8(command.working_dir));
   working_dir_->SetHint(L"/var/www/app или относительный путь");
   form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
-  cd_before_ = new wxCheckBox(body, wxID_ANY, L"Переходить в папку перед выполнением");
+  cd_before_ = new ThemedCheckBox(body, wxID_ANY, L"Переходить в папку перед выполнением");
   cd_before_->SetValue(command.cd_before_run);
   form->Add(cd_before_, 1);
   timeout_ = labeled_entry(body, form, L"Таймаут, с", wxString::FromUTF8(std::to_string(command.timeout_sec)));
   form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
-  login_ = new wxCheckBox(body, wxID_ANY, L"Login-shell (bash -lc) — подхватывает PATH из .bashrc");
+  login_ = new ThemedCheckBox(body, wxID_ANY, L"Login-shell (bash -lc) — подхватывает PATH из .bashrc");
   login_->SetValue(command.login_shell);
   form->Add(login_, 1);
   form->Add(new wxStaticText(body, wxID_ANY, L"Shell"), 0, wxALIGN_CENTER_VERTICAL);
-  shell_ = new wxComboBox(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize,
-                          wxArrayString{L"как у VPS", L"bash", L"sh"}, wxCB_READONLY);
+  shell_ = new ThemedChoice(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize,
+                          wxArrayString{L"как у VPS", L"bash", L"sh"});
   if (command.remote_shell.empty()) {
     shell_->SetSelection(0);
   } else {
@@ -319,14 +318,14 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   }
   form->Add(shell_, 1, wxEXPAND);
   form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
-  confirm_ = new wxCheckBox(body, wxID_ANY, L"Предупреждать перед запуском");
+  confirm_ = new ThemedCheckBox(body, wxID_ANY, L"Предупреждать перед запуском");
   confirm_->SetValue(command.confirm_before_run);
   form->Add(confirm_, 1);
   form->Add(new wxStaticText(body, wxID_ANY, L"Пресет"), 0, wxALIGN_CENTER_VERTICAL);
   presets_ = all_presets();
   wxArrayString pname;
   for (const auto& p : presets_) pname.Add(wxString::FromUTF8(p.name));
-  preset_ = new wxComboBox(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, pname, wxCB_READONLY);
+  preset_ = new ThemedChoice(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, pname);
   form->Add(preset_, 1, wxEXPAND);
 
   text_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(command.command), wxDefaultPosition,
@@ -877,8 +876,8 @@ ExportChoice ask_export_options(wxWindow* parent) {
       auto* body = new wxPanel(this);
       auto* msg = new wxStaticText(body, wxID_ANY, L"Пароли в файл не попадают, пока это не отмечено.");
       msg->Wrap(FromDIP(440));
-      secrets_ = new wxCheckBox(body, wxID_ANY, L"Включить пароли VPS — в файле они будут открытым текстом");
-      settings_ = new wxCheckBox(body, wxID_ANY, L"Включить настройки приложения");
+      secrets_ = new ThemedCheckBox(body, wxID_ANY, L"Включить пароли VPS — в файле они будут открытым текстом");
+      settings_ = new ThemedCheckBox(body, wxID_ANY, L"Включить настройки приложения");
       settings_->SetValue(true);
       auto* warn = new wxStaticText(body, wxID_ANY, L"");
       warn->SetName(L"error");
@@ -919,8 +918,8 @@ ExportChoice ask_export_options(wxWindow* parent) {
     }
 
    private:
-    wxCheckBox* secrets_{};
-    wxCheckBox* settings_{};
+    ThemedCheckBox* secrets_{};
+    ThemedCheckBox* settings_{};
   };
 
   ExportChoice out;
@@ -979,7 +978,7 @@ UpdateAvailableDialog::UpdateAvailableDialog(wxWindow* parent, const std::string
       body, wxID_ANY,
       wxString::Format(L"Доступна версия %s (у вас %s).\nСкачать установщик?", latest_s, current_s));
   msg->Wrap(FromDIP(400));
-  skip_ = new wxCheckBox(body, wxID_ANY, L"Больше не напоминать об этой версии");
+  skip_ = new ThemedCheckBox(body, wxID_ANY, L"Больше не напоминать об этой версии");
   skip_->SetValue(true);
 
   auto* btns = new wxBoxSizer(wxHORIZONTAL);

@@ -1,10 +1,13 @@
 #pragma once
 
+#include <wx/arrstr.h>
 #include <wx/control.h>
 #include <wx/panel.h>
 #include <wx/string.h>
 #include <wx/timer.h>
 #include <vector>
+
+class wxMenu;
 
 class wxBookCtrlEvent;
 class wxCommandEvent;
@@ -153,5 +156,79 @@ class TabStrip : public wxPanel {
   int hover_index_ = -1;
   wxTimer timer_;
 };
+
+// Галочка в цветах темы. Пробел переключает, клик — по всей строке.
+class ThemedCheckBox : public wxControl {
+ public:
+  ThemedCheckBox(wxWindow* parent, wxWindowID id, const wxString& label);
+  void SetLabel(const wxString& label) override;
+  void SetValue(bool on);
+  bool GetValue() const { return value_; }
+  bool AcceptsFocus() const override { return IsShown() && IsEnabled(); }
+
+ protected:
+  wxSize DoGetBestSize() const override;
+  void DoEnable(bool enable) override;
+
+ private:
+  void toggle();
+  void on_paint(wxPaintEvent&);
+  bool value_ = false;
+};
+
+// Выпадающий список в цветах темы. Заменяет светлые wxChoice и wxComboBox.
+class ThemedChoice : public wxControl {
+ public:
+  ThemedChoice(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size, const wxArrayString& choices);
+  ThemedChoice(wxWindow* parent, wxWindowID id, const wxString& value, const wxPoint& pos, const wxSize& size,
+               const wxArrayString& choices);
+
+  void Clear();
+  int Append(const wxString& item);
+  void SetSelection(int n);
+  int GetSelection() const { return selection_; }
+  wxString GetValue() const;
+  int GetCount() const { return static_cast<int>(items_.size()); }
+  bool AcceptsFocus() const override { return IsShown() && IsEnabled(); }
+
+ protected:
+  wxSize DoGetBestSize() const override;
+  void DoEnable(bool enable) override;
+
+ private:
+  void init(const wxString& value, const wxArrayString& choices);
+  void open_popup();
+  void choose(int index, bool notify);
+  void move_selection(int delta);
+  void on_paint(wxPaintEvent&);
+
+  std::vector<wxString> items_;
+  int selection_ = -1;
+  bool open_ = false;
+};
+
+// Полоса «Файл / Настройки / Справка» вместо системного меню.
+class ThemedMenuBar : public wxPanel {
+ public:
+  explicit ThemedMenuBar(wxWindow* parent);
+  ~ThemedMenuBar() override;
+  void AddMenu(const wxString& title, wxMenu* menu);
+
+ private:
+  void on_paint(wxPaintEvent&);
+  void on_mouse(wxMouseEvent&);
+  void open_at(int index);
+
+  struct Entry {
+    wxString title;
+    wxMenu* menu = nullptr;
+    wxRect rect;
+  };
+  std::vector<Entry> entries_;
+  int hover_ = -1;
+};
+
+// Модальное меню в цветах темы. Событие wxEVT_MENU уходит в menu, затем в parent.
+void show_themed_menu(wxWindow* parent, wxMenu* menu, const wxPoint& screen_pos = wxDefaultPosition);
 
 }  // namespace fatty

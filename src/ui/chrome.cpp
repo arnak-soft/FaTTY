@@ -6,9 +6,13 @@
 #include <wx/dcbuffer.h>
 #include <wx/dcclient.h>
 #include <wx/dcgraph.h>
+#include <wx/display.h>
 #include <wx/event.h>
+#include <wx/evtloop.h>
 #include <wx/graphics.h>
+#include <wx/menu.h>
 #include <wx/notebook.h>
+#include <wx/popupwin.h>
 #include <wx/sizer.h>
 #include <wx/textctrl.h>
 #include <wx/toplevel.h>
@@ -386,6 +390,14 @@ RoundButton::RoundButton(wxWindow* parent, wxWindowID id, const wxString& label,
     }
     e.Skip();
   });
+  Bind(wxEVT_SET_FOCUS, [this](wxFocusEvent& e) {
+    Refresh();
+    e.Skip();
+  });
+  Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent& e) {
+    Refresh();
+    e.Skip();
+  });
 }
 
 void RoundButton::on_size(wxSizeEvent& e) {
@@ -543,6 +555,14 @@ void RoundButton::on_paint(wxPaintEvent&) {
   gc.SetPen(*wxTRANSPARENT_PEN);
   gc.SetBrush(wxBrush(fill));
   gc.DrawRoundedRectangle(0.5, 0.5, sz.x - 1.0, sz.y - 1.0, radius);
+  if (IsEnabled() && HasFocus()) {
+    const wxColour ring = accent ? *wxWHITE : Theme::accent();
+    gc.SetBrush(*wxTRANSPARENT_BRUSH);
+    gc.SetPen(wxPen(ring, std::max(1, FromDIP(2))));
+    const double inset = FromDIP(2);
+    gc.DrawRoundedRectangle(inset, inset, std::max(1.0, sz.x - inset * 2), std::max(1.0, sz.y - inset * 2),
+                            std::max(1.0, radius - 1.0));
+  }
   gc.SetFont(GetFont().IsOk() ? GetFont() : Theme::ui());
   gc.SetTextForeground(fg);
   const wxString label = GetLabel();
@@ -890,5 +910,634 @@ void RoundedNotebook::relayout_body() {
 }
 
 wxDEFINE_EVENT(wxEVT_TAB_RIGHT_CLICK, wxCommandEvent);
+
+namespace {
+
+struct PopupRow {
+  wxString label;
+  wxString hint;
+  int id = -1;
+  bool enabled = true;
+  bool separator = false;
+};
+
+class ThemedPopup : public wxPopupTransientWindow {
+ public:
+  ThemedPopup(wxWindow* parent, std::vector<PopupRow> rows, int preselect)
+      : wxPopupTransientWindow(parent, wxBORDER_NONE), rows_(std::move(rows)) {
+    SetBackgroundStyle(wxBG_STYLE_PAINT);
+    hover_ = first_enabled(preselect);
+    Bind(wxEVT_PAINT, &ThemedPopup::on_paint, this);
+    Bind(wxEVT_MOTION, &ThemedPopup::on_mouse, this);
+    Bind(wxEVT_LEFT_UP, &ThemedPopup::on_mouse, this);
+    Bind(wxEVT_CHAR_HOOK, &ThemedPopup::on_key, this);
+  }
+
+  bool finished() const { return finished_; }
+  int result() const { return result_; }
+
+  wxSize preferred_size(wxWindow* measure, int min_width) const {
+    wxClientDC dc(measure);
+    dc.SetFont(Theme::ui());
+    int text_w = 0;
+    int hint_w = 0;
+    int height = FromDIP(8);
+    for (const auto& row : rows_) {
+      if (row.separator) {
+        height += FromDIP(9);
+        continue;
+      }
+      const wxSize label = dc.GetTextExtent(row.label);
+      text_w = std::max(text_w, label.GetWidth());
+      if (!row.hint.empty()) hint_w = std::max(hint_w, dc.GetTextExtent(row.hint).GetWidth());
+      height += FromDIP(30);
+    }
+    height += FromDIP(8);
+    const int gap = hint_w ? FromDIP(24) : 0;
+    const int width = std::max(min_width, FromDIP(16) + text_w + gap + hint_w + FromDIP(16));
+    return {width, std::max(height, FromDIP(36))};
+  }
+
+ private:
+  int first_enabled(int prefer) const {
+    if (prefer >= 0 && prefer < static_cast<int>(rows_.size()) && rows_[static_cast<std::size_t>(prefer)].enabled &&
+        !rows_[static_cast<std::size_t>(prefer)].separator) {
+      return prefer;
+    }
+    for (int i = 0; i < static_cast<int>(rows_.size()); ++i) {
+      if (rows_[static_cast<std::size_t>(i)].enabled && !rows_[static_cast<std::size_t>(i)].separator) return i;
+    }
+    return -1;
+  }
+
+  int row_at(int y) const {
+    int acc = FromDIP(4);
+    for (int i = 0; i < static_cast<int>(rows_.size()); ++i) {
+      const int h = rows_[static_cast<std::size_t>(i)].separator ? FromDIP(9) : FromDIP(30);
+      if (y >= acc && y < acc + h) return i;
+      acc += h;
+    }
+    return -1;
+  }
+
+  void move_hover(int delta) {
+    if (rows_.empty()) return;
+    int i = hover_;
+    for (int n = 0; n < static_cast<int>(rows_.size()); ++n) {
+      i += delta;
+      if (i < 0) i = static_cast<int>(rows_.size()) - 1;
+      if (i >= static_cast<int>(rows_.size())) i = 0;
+      const auto& row = rows_[static_cast<std::size_t>(i)];
+      if (row.enabled && !row.separator) {
+        hover_ = i;
+        Refresh();
+        return;
+      }
+    }
+  }
+
+  void accept(int index) {
+    if (index < 0 || index >= static_cast<int>(rows_.size())) return;
+    const auto& row = rows_[static_cast<std::size_t>(index)];
+    if (!row.enabled || row.separator) return;
+    result_ = row.id;
+    finished_ = true;
+    Dismiss();
+  }
+
+  void on_paint(wxPaintEvent&) {
+    wxAutoBufferedPaintDC dc(this);
+    wxGCDC gc(dc);
+    const wxSize sz = GetClientSize();
+    gc.SetBackground(wxBrush(Theme::elevated()));
+    gc.Clear();
+    gc.SetPen(wxPen(Theme::border()));
+    gc.SetBrush(*wxTRANSPARENT_BRUSH);
+    gc.DrawRectangle(0, 0, sz.x, sz.y);
+    gc.SetFont(Theme::ui());
+    int y = FromDIP(4);
+    for (int i = 0; i < static_cast<int>(rows_.size()); ++i) {
+      const auto& row = rows_[static_cast<std::size_t>(i)];
+      if (row.separator) {
+        const int mid = y + FromDIP(4);
+        gc.SetPen(wxPen(Theme::border()));
+        gc.DrawLine(FromDIP(8), mid, sz.x - FromDIP(8), mid);
+        y += FromDIP(9);
+        continue;
+      }
+      const int h = FromDIP(30);
+      const bool hot = i == hover_ && row.enabled;
+      if (hot) {
+        gc.SetPen(*wxTRANSPARENT_PEN);
+        gc.SetBrush(wxBrush(Theme::select()));
+        gc.DrawRectangle(FromDIP(4), y, sz.x - FromDIP(8), h);
+      }
+      gc.SetTextForeground(row.enabled ? (hot ? Theme::text_bright() : Theme::text()) : Theme::muted());
+      const wxSize ext = gc.GetTextExtent(row.label);
+      gc.DrawText(row.label, FromDIP(12), y + (h - ext.y) / 2);
+      if (!row.hint.empty()) {
+        gc.SetTextForeground(Theme::muted());
+        const wxSize hint = gc.GetTextExtent(row.hint);
+        gc.DrawText(row.hint, sz.x - FromDIP(12) - hint.x, y + (h - hint.y) / 2);
+      }
+      y += h;
+    }
+  }
+
+  void on_mouse(wxMouseEvent& e) {
+    const int index = row_at(e.GetPosition().y);
+    if (e.Moving() || e.Dragging()) {
+      if (index != hover_) {
+        hover_ = index;
+        Refresh();
+      }
+      return;
+    }
+    if (e.LeftUp()) accept(index);
+  }
+
+  void on_key(wxKeyEvent& e) {
+    const int key = e.GetKeyCode();
+    if (key == WXK_ESCAPE) {
+      finished_ = true;
+      result_ = -1;
+      Dismiss();
+      return;
+    }
+    if (key == WXK_UP || key == WXK_NUMPAD_UP) {
+      move_hover(-1);
+      return;
+    }
+    if (key == WXK_DOWN || key == WXK_NUMPAD_DOWN) {
+      move_hover(1);
+      return;
+    }
+    if (key == WXK_RETURN || key == WXK_NUMPAD_ENTER || key == WXK_SPACE) {
+      accept(hover_);
+      return;
+    }
+    e.Skip();
+  }
+
+  void OnDismiss() override {
+    finished_ = true;
+    wxPopupTransientWindow::OnDismiss();
+  }
+
+  std::vector<PopupRow> rows_;
+  int hover_ = -1;
+  int result_ = -1;
+  bool finished_ = false;
+};
+
+wxPoint clamp_popup(const wxPoint& screen, const wxSize& size, int anchor_h) {
+  const int display = wxDisplay::GetFromPoint(screen);
+  wxRect area = display == wxNOT_FOUND ? wxRect(0, 0, 1280, 800) : wxDisplay(display).GetClientArea();
+  wxPoint pos = screen;
+  if (pos.x + size.x > area.GetRight()) pos.x = area.GetRight() - size.x;
+  if (pos.x < area.x) pos.x = area.x;
+  if (pos.y + size.y > area.GetBottom()) pos.y = std::max(area.y, screen.y - anchor_h - size.y);
+  if (pos.y < area.y) pos.y = area.y;
+  return pos;
+}
+
+int run_popup(wxWindow* parent, std::vector<PopupRow> rows, const wxPoint& screen, int min_width, int anchor_h,
+              int preselect) {
+  if (!parent || rows.empty()) return -1;
+  wxWindow* owner = wxGetTopLevelParent(parent);
+  if (!owner) owner = parent;
+  auto* pop = new ThemedPopup(owner, std::move(rows), preselect);
+  const wxSize size = pop->preferred_size(owner, min_width);
+  pop->SetSize(size);
+  pop->SetPosition(clamp_popup(screen, size, anchor_h));
+  pop->Popup();
+  pop->SetFocus();
+  pop->Update();
+  wxEventLoop loop;
+  wxEventLoopActivator activator(&loop);
+  while (!pop->finished()) {
+    if (!loop.Dispatch()) break;
+  }
+  const int id = pop->result();
+  if (!pop->IsBeingDeleted()) pop->Destroy();
+  return id;
+}
+
+void draw_check(wxGraphicsContext* gfx, double x, double y, double size, const wxColour& colour) {
+  if (!gfx) return;
+  gfx->SetPen(wxPen(colour, std::max(1.5, size / 8.0)));
+  wxGraphicsPath path = gfx->CreatePath();
+  path.MoveToPoint(x + size * 0.22, y + size * 0.52);
+  path.AddLineToPoint(x + size * 0.42, y + size * 0.72);
+  path.AddLineToPoint(x + size * 0.78, y + size * 0.30);
+  gfx->StrokePath(path);
+}
+
+void draw_chevron(wxGraphicsContext* gfx, double x, double y, double size, const wxColour& colour) {
+  if (!gfx) return;
+  gfx->SetPen(wxPen(colour, std::max(1.5, size / 8.0)));
+  wxGraphicsPath path = gfx->CreatePath();
+  path.MoveToPoint(x, y);
+  path.AddLineToPoint(x + size * 0.5, y + size * 0.55);
+  path.AddLineToPoint(x + size, y);
+  gfx->StrokePath(path);
+}
+
+}  // namespace
+
+ThemedCheckBox::ThemedCheckBox(wxWindow* parent, wxWindowID id, const wxString& label)
+    : wxControl(parent, id, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxTAB_TRAVERSAL) {
+  SetLabel(label);
+  SetFont(Theme::ui());
+  SetCanFocus(true);
+  SetBackgroundStyle(wxBG_STYLE_PAINT);
+  Bind(wxEVT_PAINT, &ThemedCheckBox::on_paint, this);
+  Bind(wxEVT_LEFT_UP, [this](wxMouseEvent&) { toggle(); });
+  Bind(wxEVT_SET_FOCUS, [this](wxFocusEvent& e) {
+    Refresh();
+    e.Skip();
+  });
+  Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent& e) {
+    Refresh();
+    e.Skip();
+  });
+  Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
+    if (IsEnabled() && e.GetKeyCode() == WXK_SPACE) {
+      toggle();
+      return;
+    }
+    e.Skip();
+  });
+}
+
+void ThemedCheckBox::SetLabel(const wxString& label) {
+  wxControl::SetLabel(label);
+  InvalidateBestSize();
+  Refresh();
+}
+
+void ThemedCheckBox::SetValue(bool on) {
+  if (value_ == on) return;
+  value_ = on;
+  Refresh();
+}
+
+void ThemedCheckBox::DoEnable(bool enable) {
+  wxControl::DoEnable(enable);
+  Refresh();
+}
+
+wxSize ThemedCheckBox::DoGetBestSize() const {
+  const wxSize text = GetTextExtent(GetLabel());
+  const int box = FromDIP(16);
+  const int pad = FromDIP(3);
+  return {pad + box + FromDIP(8) + text.x + pad, std::max(FromDIP(24), text.y + FromDIP(8))};
+}
+
+void ThemedCheckBox::toggle() {
+  if (!IsEnabled()) return;
+  value_ = !value_;
+  Refresh();
+  wxCommandEvent ev(wxEVT_CHECKBOX, GetId());
+  ev.SetEventObject(this);
+  ev.SetInt(value_ ? 1 : 0);
+  ProcessWindowEvent(ev);
+}
+
+void ThemedCheckBox::on_paint(wxPaintEvent&) {
+  wxAutoBufferedPaintDC dc(this);
+  wxGCDC gc(dc);
+  const wxColour parent_bg = GetParent() ? GetParent()->GetBackgroundColour() : Theme::bg();
+  gc.SetBackground(wxBrush(parent_bg));
+  gc.Clear();
+  const int box = FromDIP(16);
+  const int pad = FromDIP(3);
+  const int x = pad;
+  const int y = (GetClientSize().y - box) / 2;
+  const bool on = value_;
+  wxColour fill = on ? Theme::accent() : Theme::btn();
+  wxColour border = on ? Theme::accent() : Theme::border();
+  if (!IsEnabled()) {
+    fill = Theme::chrome();
+    border = Theme::border();
+  }
+  if (wxGraphicsContext* gfx = gc.GetGraphicsContext()) gfx->SetAntialiasMode(wxANTIALIAS_DEFAULT);
+  gc.SetPen(wxPen(border));
+  gc.SetBrush(wxBrush(fill));
+  gc.DrawRoundedRectangle(x, y, box, box, FromDIP(4));
+  if (on) {
+    if (wxGraphicsContext* gfx = gc.GetGraphicsContext()) draw_check(gfx, x, y, box, *wxWHITE);
+  }
+  if (IsEnabled() && HasFocus()) {
+    gc.SetBrush(*wxTRANSPARENT_BRUSH);
+    gc.SetPen(wxPen(Theme::accent(), std::max(1, FromDIP(2))));
+    gc.DrawRoundedRectangle(x - pad, y - pad, box + pad * 2, box + pad * 2, FromDIP(6));
+  }
+  gc.SetFont(GetFont().IsOk() ? GetFont() : Theme::ui());
+  gc.SetTextForeground(IsEnabled() ? Theme::text() : Theme::muted());
+  const wxString label = GetLabel();
+  const wxSize text = gc.GetTextExtent(label);
+  gc.DrawText(label, box + FromDIP(8), (GetClientSize().y - text.y) / 2);
+}
+
+ThemedChoice::ThemedChoice(wxWindow* parent, wxWindowID id, const wxPoint& pos, const wxSize& size,
+                           const wxArrayString& choices)
+    : wxControl(parent, id, pos, size, wxBORDER_NONE | wxTAB_TRAVERSAL) {
+  init(wxString(), choices);
+}
+
+ThemedChoice::ThemedChoice(wxWindow* parent, wxWindowID id, const wxString& value, const wxPoint& pos,
+                           const wxSize& size, const wxArrayString& choices)
+    : wxControl(parent, id, pos, size, wxBORDER_NONE | wxTAB_TRAVERSAL) {
+  init(value, choices);
+}
+
+void ThemedChoice::init(const wxString& value, const wxArrayString& choices) {
+  SetFont(Theme::ui());
+  SetCanFocus(true);
+  SetBackgroundStyle(wxBG_STYLE_PAINT);
+  SetCursor(wxCURSOR_HAND);
+  for (unsigned i = 0; i < choices.size(); ++i) items_.push_back(choices[i]);
+  if (!value.empty()) {
+    for (int i = 0; i < static_cast<int>(items_.size()); ++i) {
+      if (items_[static_cast<std::size_t>(i)] == value) {
+        selection_ = i;
+        break;
+      }
+    }
+  }
+  Bind(wxEVT_PAINT, &ThemedChoice::on_paint, this);
+  Bind(wxEVT_LEFT_UP, [this](wxMouseEvent&) { open_popup(); });
+  Bind(wxEVT_SET_FOCUS, [this](wxFocusEvent& e) {
+    Refresh();
+    e.Skip();
+  });
+  Bind(wxEVT_KILL_FOCUS, [this](wxFocusEvent& e) {
+    Refresh();
+    e.Skip();
+  });
+  Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
+    if (!IsEnabled()) {
+      e.Skip();
+      return;
+    }
+    const int key = e.GetKeyCode();
+    if (key == WXK_SPACE || key == WXK_F4 || ((key == WXK_DOWN || key == WXK_NUMPAD_DOWN) && e.AltDown())) {
+      open_popup();
+      return;
+    }
+    if (key == WXK_DOWN || key == WXK_NUMPAD_DOWN) {
+      move_selection(1);
+      return;
+    }
+    if (key == WXK_UP || key == WXK_NUMPAD_UP) {
+      move_selection(-1);
+      return;
+    }
+    e.Skip();
+  });
+}
+
+void ThemedChoice::Clear() {
+  items_.clear();
+  selection_ = -1;
+  InvalidateBestSize();
+  Refresh();
+}
+
+int ThemedChoice::Append(const wxString& item) {
+  items_.push_back(item);
+  InvalidateBestSize();
+  Refresh();
+  return static_cast<int>(items_.size()) - 1;
+}
+
+void ThemedChoice::SetSelection(int n) {
+  if (n < 0 || n >= static_cast<int>(items_.size())) n = -1;
+  selection_ = n;
+  Refresh();
+}
+
+wxString ThemedChoice::GetValue() const {
+  if (selection_ < 0 || selection_ >= static_cast<int>(items_.size())) return {};
+  return items_[static_cast<std::size_t>(selection_)];
+}
+
+void ThemedChoice::DoEnable(bool enable) {
+  wxControl::DoEnable(enable);
+  Refresh();
+}
+
+wxSize ThemedChoice::DoGetBestSize() const {
+  wxClientDC dc(const_cast<ThemedChoice*>(this));
+  dc.SetFont(GetFont().IsOk() ? GetFont() : Theme::ui());
+  int text_w = FromDIP(80);
+  for (const auto& item : items_) text_w = std::max(text_w, dc.GetTextExtent(item).GetWidth());
+  const wxSize one = dc.GetTextExtent(L"Ag");
+  return {text_w + FromDIP(36), std::max(FromDIP(32), one.y + FromDIP(12))};
+}
+
+void ThemedChoice::choose(int index, bool notify) {
+  if (index < 0 || index >= static_cast<int>(items_.size())) return;
+  const bool changed = index != selection_;
+  selection_ = index;
+  Refresh();
+  if (!notify || !changed) return;
+  wxCommandEvent choice(wxEVT_CHOICE, GetId());
+  choice.SetEventObject(this);
+  choice.SetInt(selection_);
+  choice.SetString(GetValue());
+  ProcessWindowEvent(choice);
+  wxCommandEvent combo(wxEVT_COMBOBOX, GetId());
+  combo.SetEventObject(this);
+  combo.SetInt(selection_);
+  combo.SetString(GetValue());
+  ProcessWindowEvent(combo);
+}
+
+void ThemedChoice::move_selection(int delta) {
+  if (items_.empty()) return;
+  int next = selection_ < 0 ? (delta > 0 ? 0 : static_cast<int>(items_.size()) - 1) : selection_ + delta;
+  next = std::clamp(next, 0, static_cast<int>(items_.size()) - 1);
+  choose(next, true);
+}
+
+void ThemedChoice::open_popup() {
+  if (!IsEnabled() || items_.empty() || open_) return;
+  std::vector<PopupRow> rows;
+  rows.reserve(items_.size());
+  for (int i = 0; i < static_cast<int>(items_.size()); ++i) {
+    PopupRow row;
+    row.label = items_[static_cast<std::size_t>(i)];
+    row.id = i;
+    rows.push_back(std::move(row));
+  }
+  open_ = true;
+  Refresh();
+  const wxPoint screen = ClientToScreen(wxPoint(0, GetClientSize().y));
+  const int picked = run_popup(this, std::move(rows), screen, GetClientSize().x, GetClientSize().y, selection_);
+  open_ = false;
+  if (picked >= 0) choose(picked, true);
+  Refresh();
+  if (!IsBeingDeleted()) SetFocus();
+}
+
+void ThemedChoice::on_paint(wxPaintEvent&) {
+  wxAutoBufferedPaintDC dc(this);
+  wxGCDC gc(dc);
+  const wxColour parent_bg = GetParent() ? GetParent()->GetBackgroundColour() : Theme::bg();
+  gc.SetBackground(wxBrush(parent_bg));
+  gc.Clear();
+  if (wxGraphicsContext* gfx = gc.GetGraphicsContext()) gfx->SetAntialiasMode(wxANTIALIAS_DEFAULT);
+  const wxSize sz = GetClientSize();
+  const double radius = FromDIP(4);
+  wxColour fill = Theme::btn();
+  wxColour fg = Theme::text();
+  if (!IsEnabled()) fg = Theme::muted();
+  gc.SetPen(wxPen(Theme::border()));
+  gc.SetBrush(wxBrush(fill));
+  gc.DrawRoundedRectangle(0.5, 0.5, std::max(1.0, sz.x - 1.0), std::max(1.0, sz.y - 1.0), radius);
+  if (IsEnabled() && (HasFocus() || open_)) {
+    gc.SetBrush(*wxTRANSPARENT_BRUSH);
+    gc.SetPen(wxPen(Theme::accent(), std::max(1, FromDIP(2))));
+    const double inset = FromDIP(2);
+    gc.DrawRoundedRectangle(inset, inset, std::max(1.0, sz.x - inset * 2), std::max(1.0, sz.y - inset * 2), radius);
+  }
+  gc.SetFont(GetFont().IsOk() ? GetFont() : Theme::ui());
+  gc.SetTextForeground(fg);
+  const wxString label = GetValue();
+  const wxSize text = gc.GetTextExtent(label);
+  const int chevron = FromDIP(10);
+  const int text_x = FromDIP(10);
+  const int text_right = sz.x - FromDIP(22);
+  if (text_right > text_x) {
+    gc.SetClippingRegion(text_x, 0, text_right - text_x, sz.y);
+    gc.DrawText(label, text_x, (sz.y - text.y) / 2);
+    gc.DestroyClippingRegion();
+  }
+  if (wxGraphicsContext* gfx = gc.GetGraphicsContext()) {
+    draw_chevron(gfx, sz.x - FromDIP(16), (sz.y - chevron * 0.55) / 2.0, chevron,
+                 IsEnabled() ? Theme::muted() : Theme::border());
+  }
+}
+
+ThemedMenuBar::ThemedMenuBar(wxWindow* parent) : wxPanel(parent, wxID_ANY) {
+  SetName(L"chrome");
+  SetFont(Theme::ui());
+  SetCanFocus(false);
+  SetBackgroundStyle(wxBG_STYLE_PAINT);
+  SetMinSize(wxSize(-1, FromDIP(32)));
+  SetCursor(wxCURSOR_HAND);
+  Bind(wxEVT_PAINT, &ThemedMenuBar::on_paint, this);
+  Bind(wxEVT_LEFT_UP, &ThemedMenuBar::on_mouse, this);
+  Bind(wxEVT_MOTION, &ThemedMenuBar::on_mouse, this);
+  Bind(wxEVT_LEAVE_WINDOW, &ThemedMenuBar::on_mouse, this);
+}
+
+ThemedMenuBar::~ThemedMenuBar() {
+  for (auto& entry : entries_) delete entry.menu;
+}
+
+void ThemedMenuBar::AddMenu(const wxString& title, wxMenu* menu) {
+  entries_.push_back(Entry{title, menu, {}});
+  InvalidateBestSize();
+  Refresh();
+}
+
+void ThemedMenuBar::on_paint(wxPaintEvent&) {
+  wxAutoBufferedPaintDC dc(this);
+  wxGCDC gc(dc);
+  const wxSize sz = GetClientSize();
+  gc.SetBackground(wxBrush(Theme::chrome()));
+  gc.Clear();
+  gc.SetFont(GetFont().IsOk() ? GetFont() : Theme::ui());
+  int x = FromDIP(8);
+  const int pad_x = FromDIP(12);
+  const int h = sz.y;
+  for (int index = 0; index < static_cast<int>(entries_.size()); ++index) {
+    auto& entry = entries_[static_cast<std::size_t>(index)];
+    const wxSize text = gc.GetTextExtent(entry.title);
+    const int w = text.x + pad_x * 2;
+    entry.rect = wxRect(x, 0, w, h);
+    if (index == hover_) {
+      gc.SetPen(*wxTRANSPARENT_PEN);
+      gc.SetBrush(wxBrush(Theme::hover()));
+      gc.DrawRectangle(entry.rect);
+    }
+    gc.SetTextForeground(Theme::text());
+    gc.DrawText(entry.title, x + pad_x, (h - text.y) / 2);
+    x += w;
+  }
+  gc.SetPen(wxPen(Theme::border()));
+  gc.DrawLine(0, h - 1, sz.x, h - 1);
+}
+
+void ThemedMenuBar::on_mouse(wxMouseEvent& e) {
+  if (e.Leaving()) {
+    hover_ = -1;
+    Refresh();
+    return;
+  }
+  int found = -1;
+  for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
+    if (entries_[static_cast<std::size_t>(i)].rect.Contains(e.GetPosition())) found = i;
+  }
+  if (e.Moving() && found != hover_) {
+    hover_ = found;
+    Refresh();
+  }
+  if (e.LeftUp() && found >= 0) open_at(found);
+}
+
+void ThemedMenuBar::open_at(int index) {
+  if (index < 0 || index >= static_cast<int>(entries_.size())) return;
+  auto& entry = entries_[static_cast<std::size_t>(index)];
+  if (!entry.menu) return;
+  const wxPoint screen = ClientToScreen(wxPoint(entry.rect.x, GetClientSize().y));
+  hover_ = index;
+  Refresh();
+  Update();
+  show_themed_menu(wxGetTopLevelParent(this), entry.menu, screen);
+  const wxPoint pt = ScreenToClient(wxGetMousePosition());
+  hover_ = -1;
+  for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
+    if (entries_[static_cast<std::size_t>(i)].rect.Contains(pt)) hover_ = i;
+  }
+  Refresh();
+}
+
+void show_themed_menu(wxWindow* parent, wxMenu* menu, const wxPoint& screen_pos) {
+  if (!parent || !menu) return;
+  std::vector<PopupRow> rows;
+  for (size_t i = 0; i < menu->GetMenuItemCount(); ++i) {
+    wxMenuItem* item = menu->FindItemByPosition(i);
+    if (!item) continue;
+    PopupRow row;
+    if (item->IsSeparator()) {
+      row.separator = true;
+      rows.push_back(std::move(row));
+      continue;
+    }
+    row.label = item->GetItemLabelText();
+    row.id = item->GetId();
+    row.enabled = item->IsEnabled();
+    if (auto* accel = item->GetAccel()) row.hint = accel->ToString();
+    if (row.hint.empty()) {
+      const wxString full = item->GetItemLabel();
+      const int tab = full.Find(wxUniChar('\t'));
+      if (tab != wxNOT_FOUND) row.hint = full.Mid(tab + 1);
+    }
+    rows.push_back(std::move(row));
+  }
+  const wxPoint screen = screen_pos == wxDefaultPosition ? wxGetMousePosition() : screen_pos;
+  const int id = run_popup(parent, std::move(rows), screen, parent->FromDIP(180), 0, -1);
+  if (id < 0) return;
+  wxCommandEvent ev(wxEVT_MENU, id);
+  ev.SetEventObject(menu);
+  if (!menu->ProcessEvent(ev)) {
+    ev.SetEventObject(parent);
+    parent->ProcessWindowEvent(ev);
+  }
+}
 
 }  // namespace fatty

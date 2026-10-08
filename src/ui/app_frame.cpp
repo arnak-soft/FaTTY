@@ -205,6 +205,10 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       show_journal();
       return;
     }
+    if (e.ControlDown() && !e.AltDown() && !e.ShiftDown() && (e.GetKeyCode() == 'H' || e.GetKeyCode() == 'h')) {
+      show_health();
+      return;
+    }
     if (e.ControlDown() && e.GetKeyCode() == ',') {
       open_settings();
       return;
@@ -242,7 +246,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
 }
 
 void AppFrame::build_menu() {
-  auto* bar = new wxMenuBar();
+  menu_bar_ = new ThemedMenuBar(this);
   auto* file = new wxMenu();
   file->Append(1001, L"Открыть папку конфига");
   file->Append(1002, L"Журнал команд…\tCtrl+J");
@@ -252,12 +256,12 @@ void AppFrame::build_menu() {
   file->Append(1004, L"Импорт…");
   file->AppendSeparator();
   file->Append(wxID_EXIT, L"Выход");
-  bar->Append(file, L"Файл");
+  menu_bar_->AddMenu(L"Файл", file);
   auto* opt = new wxMenu();
   opt->Append(1010, L"Настройки…\tCtrl+,");
   opt->AppendSeparator();
   opt->Append(1011, L"Сменить мастер-пароль…");
-  bar->Append(opt, L"Настройки");
+  menu_bar_->AddMenu(L"Настройки", opt);
   auto* help = new wxMenu();
   help->Append(1020, L"Содержание\tF1");
   help->Append(1021, L"Частые команды");
@@ -266,8 +270,7 @@ void AppFrame::build_menu() {
   help->Append(1023, L"Что нового…");
   help->AppendSeparator();
   help->Append(wxID_ABOUT, L"О программе");
-  bar->Append(help, L"Справка");
-  SetMenuBar(bar);
+  menu_bar_->AddMenu(L"Справка", help);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { open_directory(app_dir()); }, 1001);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_journal(); }, 1002);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_health(); }, 1005);
@@ -514,7 +517,7 @@ void AppFrame::build_ui() {
   shell_connect_btn_ = make_button(shellp, L"Подключить", BtnIcon::Terminal);
   shell_disconnect_btn_ = make_button(shellp, L"Отключить", BtnIcon::Stop);
   shell_disconnect_btn_->Enable(false);
-  shell_automation_cb_ = new wxCheckBox(shellp, wxID_ANY, L"Вывод команд сюда");
+  shell_automation_cb_ = new ThemedCheckBox(shellp, wxID_ANY, L"Вывод команд сюда");
   shell_automation_cb_->SetValue(true);
   shell_automation_cb_->SetToolTip(
       L"Пока включено, F5 и связки пишут в эту вкладку (если Shell к тому же VPS). "
@@ -584,6 +587,7 @@ void AppFrame::build_ui() {
   root->Add(status_bar, 0, wxEXPAND);
   panel->SetSizer(root);
   auto* outer = new wxBoxSizer(wxVERTICAL);
+  if (menu_bar_) outer->Add(menu_bar_, 0, wxEXPAND);
   outer->Add(panel, 1, wxEXPAND);
   SetSizer(outer);
 
@@ -2271,7 +2275,7 @@ void AppFrame::show_servers_context_menu(long row) {
     persist();
     refresh_servers();
   }, 2008);
-  PopupMenu(&menu);
+  show_themed_menu(this, &menu);
 }
 
 void AppFrame::show_commands_context_menu(long row) {
@@ -2370,7 +2374,7 @@ void AppFrame::show_commands_context_menu(long row) {
   }, 2014);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { move_selected_command(-1); }, 2015);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { move_selected_command(1); }, 2016);
-  PopupMenu(&menu);
+  show_themed_menu(this, &menu);
 }
 
 void AppFrame::show_bundles_context_menu(long row) {
@@ -2414,7 +2418,7 @@ void AppFrame::show_bundles_context_menu(long row) {
     persist();
     refresh_bundles();
   }, 2023);
-  PopupMenu(&menu);
+  show_themed_menu(this, &menu);
 }
 
 void AppFrame::show_group_tab_context_menu(int tab_index) {
@@ -2434,7 +2438,7 @@ void AppFrame::show_group_tab_context_menu(int tab_index) {
     menu.Bind(wxEVT_MENU, [this, gid](wxCommandEvent&) { edit_group_folder(gid); }, 2032);
     menu.Bind(wxEVT_MENU, [this, gid](wxCommandEvent&) { delete_group(gid); }, 2033);
   }
-  PopupMenu(&menu);
+  show_themed_menu(this, &menu);
 }
 
 void AppFrame::show_sections_tab_context_menu(int tab_index, wxWindow* groups_page, wxWindow* bundles_page) {
@@ -2484,7 +2488,7 @@ void AppFrame::show_sections_tab_context_menu(int tab_index, wxWindow* groups_pa
   } else {
     return;
   }
-  PopupMenu(&menu);
+  show_themed_menu(this, &menu);
 }
 
 }  // namespace fatty
