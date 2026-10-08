@@ -144,6 +144,22 @@ class ChangeMasterDialog : public PositionedDialog {
   wxStaticText* error_{};
 };
 
+enum class ImportApply { Cancel, Merge, Replace };
+
+struct ExportChoice {
+  bool accepted = false;
+  bool secrets = false;
+  bool settings = true;
+};
+
+// Импорт: «Добавить» — по Enter, «Заменить всё» — отдельная кнопка слева.
+ImportApply ask_import_mode(wxWindow* parent, const wxString& filename);
+// Экспорт: пароли выключены, пока их явно не отметили.
+ExportChoice ask_export_options(wxWindow* parent);
+// accept_default == false — Enter и Escape оставляют отказ.
+bool ask_confirm(wxWindow* parent, const wxString& title, const wxString& message, const wxString& accept_label,
+                 bool accept_default);
+
 class UpdateAvailableDialog : public wxDialog {
  public:
   UpdateAvailableDialog(wxWindow* parent, const std::string& current, const std::string& latest);

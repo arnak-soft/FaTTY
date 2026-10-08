@@ -6,6 +6,7 @@
 #include "ui/widgets.hpp"
 
 #include <algorithm>
+#include <wx/checkbox.h>
 #include <wx/filedlg.h>
 #include <wx/listctrl.h>
 #include <wx/msgdlg.h>
@@ -810,6 +811,161 @@ void ChangeMasterDialog::on_submit(wxCommandEvent&) {
   }
   ok = true;
   EndModal(wxID_OK);
+}
+
+ImportApply ask_import_mode(wxWindow* parent, const wxString& filename) {
+  class Dlg : public wxDialog {
+   public:
+    ImportApply mode = ImportApply::Cancel;
+    explicit Dlg(wxWindow* parent, const wxString& filename) : wxDialog(parent, wxID_ANY, L"Импорт") {
+      bind_escape_close(this);
+      auto* body = new wxPanel(this);
+      auto* msg = new wxStaticText(
+          body, wxID_ANY,
+          L"Добавить — новые VPS и команды присоединяются к текущим.\n"
+          L"Заменить всё — текущие VPS, команды, группы и связки удаляются и берутся из файла.");
+      msg->Wrap(FromDIP(460));
+      auto* file = new wxStaticText(body, wxID_ANY, filename);
+      file->SetName(L"muted");
+
+      auto* replace = make_button(body, L"Заменить всё", BtnIcon::Trash);
+      auto* merge = accent_button(body, L"Добавить к текущим", BtnIcon::Import);
+      auto* cancel = make_button(body, L"Отмена", BtnIcon::Cancel, wxID_CANCEL);
+      merge->SetDefault();
+
+      auto* btns = new wxBoxSizer(wxHORIZONTAL);
+      btns->Add(replace, 0, wxALIGN_CENTER_VERTICAL);
+      btns->AddStretchSpacer();
+      btns->Add(merge, 0, wxRIGHT, 8);
+      btns->Add(cancel, 0);
+
+      auto* root = new wxBoxSizer(wxVERTICAL);
+      root->Add(msg, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 16);
+      root->Add(file, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 12);
+      root->Add(btns, 0, wxEXPAND | wxALL, 16);
+      body->SetSizer(root);
+      auto* outer = new wxBoxSizer(wxVERTICAL);
+      outer->Add(body, 1, wxEXPAND);
+      SetSizer(outer);
+      apply_dark(this);
+      outer->SetSizeHints(this);
+      if (parent) CentreOnParent();
+
+      replace->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        mode = ImportApply::Replace;
+        EndModal(wxID_OK);
+      });
+      merge->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        mode = ImportApply::Merge;
+        EndModal(wxID_OK);
+      });
+    }
+  };
+
+  Dlg dlg(parent, filename);
+  if (dlg.ShowModal() != wxID_OK) return ImportApply::Cancel;
+  return dlg.mode;
+}
+
+ExportChoice ask_export_options(wxWindow* parent) {
+  class Dlg : public wxDialog {
+   public:
+    bool secrets = false;
+    bool settings = true;
+    explicit Dlg(wxWindow* parent) : wxDialog(parent, wxID_ANY, L"Экспорт") {
+      bind_escape_close(this);
+      auto* body = new wxPanel(this);
+      auto* msg = new wxStaticText(body, wxID_ANY, L"Пароли в файл не попадают, пока это не отмечено.");
+      msg->Wrap(FromDIP(440));
+      secrets_ = new wxCheckBox(body, wxID_ANY, L"Включить пароли VPS — в файле они будут открытым текстом");
+      settings_ = new wxCheckBox(body, wxID_ANY, L"Включить настройки приложения");
+      settings_->SetValue(true);
+      auto* warn = new wxStaticText(body, wxID_ANY, L"");
+      warn->SetName(L"error");
+      warn->Wrap(FromDIP(440));
+
+      auto* save = accent_button(body, L"Экспорт", BtnIcon::Export);
+      auto* cancel = make_button(body, L"Отмена", BtnIcon::Cancel, wxID_CANCEL);
+      save->SetDefault();
+      auto* btns = new wxBoxSizer(wxHORIZONTAL);
+      btns->AddStretchSpacer();
+      btns->Add(save, 0, wxRIGHT, 8);
+      btns->Add(cancel);
+
+      auto* root = new wxBoxSizer(wxVERTICAL);
+      root->Add(msg, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 16);
+      root->Add(secrets_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 12);
+      root->Add(settings_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 8);
+      root->Add(warn, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 8);
+      root->Add(btns, 0, wxEXPAND | wxALL, 16);
+      body->SetSizer(root);
+      auto* outer = new wxBoxSizer(wxVERTICAL);
+      outer->Add(body, 1, wxEXPAND);
+      SetSizer(outer);
+      apply_dark(this);
+      outer->SetSizeHints(this);
+      if (parent) CentreOnParent();
+
+      secrets_->Bind(wxEVT_CHECKBOX, [this, warn](wxCommandEvent& e) {
+        warn->SetLabel(e.IsChecked() ? L"Любой, кто откроет файл, увидит пароли." : L"");
+        Layout();
+        Fit();
+      });
+      save->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        secrets = secrets_->GetValue();
+        settings = settings_->GetValue();
+        EndModal(wxID_OK);
+      });
+    }
+
+   private:
+    wxCheckBox* secrets_{};
+    wxCheckBox* settings_{};
+  };
+
+  ExportChoice out;
+  Dlg dlg(parent);
+  if (dlg.ShowModal() != wxID_OK) return out;
+  out.accepted = true;
+  out.secrets = dlg.secrets;
+  out.settings = dlg.settings;
+  return out;
+}
+
+bool ask_confirm(wxWindow* parent, const wxString& title, const wxString& message, const wxString& accept_label,
+                 bool accept_default) {
+  class Dlg : public wxDialog {
+   public:
+    Dlg(wxWindow* parent, const wxString& title, const wxString& message, const wxString& accept_label,
+        bool accept_default)
+        : wxDialog(parent, wxID_ANY, title) {
+      bind_escape_close(this);
+      auto* body = new wxPanel(this);
+      auto* msg = new wxStaticText(body, wxID_ANY, message);
+      msg->Wrap(FromDIP(420));
+      auto* accept = make_button(body, accept_label, BtnIcon::Check);
+      auto* cancel = make_button(body, L"Отмена", BtnIcon::Cancel, wxID_CANCEL);
+      if (accept_default) accept->SetDefault();
+      else cancel->SetDefault();
+      auto* btns = new wxBoxSizer(wxHORIZONTAL);
+      btns->AddStretchSpacer();
+      btns->Add(accept, 0, wxRIGHT, 8);
+      btns->Add(cancel);
+      auto* root = new wxBoxSizer(wxVERTICAL);
+      root->Add(msg, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 16);
+      root->Add(btns, 0, wxEXPAND | wxALL, 16);
+      body->SetSizer(root);
+      auto* outer = new wxBoxSizer(wxVERTICAL);
+      outer->Add(body, 1, wxEXPAND);
+      SetSizer(outer);
+      apply_dark(this);
+      outer->SetSizeHints(this);
+      if (parent) CentreOnParent();
+      accept->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { EndModal(wxID_OK); });
+    }
+  };
+  Dlg dlg(parent, title, message, accept_label, accept_default);
+  return dlg.ShowModal() == wxID_OK;
 }
 
 UpdateAvailableDialog::UpdateAvailableDialog(wxWindow* parent, const std::string& current, const std::string& latest)

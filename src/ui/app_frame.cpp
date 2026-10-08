@@ -34,6 +34,7 @@
 #include <wx/choicdlg.h>
 #include <wx/dialog.h>
 #include <wx/filedlg.h>
+#include <wx/filename.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
 #include <wx/panel.h>
@@ -270,31 +271,30 @@ void AppFrame::build_menu() {
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_journal(); }, 1002);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_health(); }, 1005);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    bool secrets = wxMessageBox(L"Включить пароли VPS в файл?", L"Экспорт", wxYES_NO, this) == wxYES;
-    if (secrets && wxMessageBox(L"Файл будет содержать пароли в открытом виде. Продолжить?", L"Экспорт", wxYES_NO, this) !=
-                       wxYES)
-      return;
-    bool settings = wxMessageBox(L"Включить настройки приложения?", L"Экспорт", wxYES_NO, this) == wxYES;
+    const ExportChoice opt = ask_export_options(this);
+    if (!opt.accepted) return;
     wxFileDialog dlg(this, L"Экспорт FaTTY", L"", L"fatty-backup.json", L"JSON|*.json", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
     if (dlg.ShowModal() != wxID_OK) return;
     try {
-      write_export(std::filesystem::path(dlg.GetPath().utf8_string()), config_, secrets, settings);
+      write_export(std::filesystem::path(dlg.GetPath().utf8_string()), config_, opt.secrets, opt.settings);
       wxMessageBox(L"Сохранено.", L"Экспорт", wxOK);
     } catch (const std::exception& exc) {
       wxMessageBox(wxString::FromUTF8(exc.what()), L"Экспорт", wxOK | wxICON_ERROR);
     }
   }, 1003);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    int choice = wxMessageBox(L"Да — добавить\nНет — заменить\nОтмена", L"Импорт", wxYES_NO | wxCANCEL, this);
-    if (choice == wxCANCEL) return;
     wxFileDialog dlg(this, L"Импорт", L"", L"", L"JSON|*.json", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dlg.ShowModal() != wxID_OK) return;
+    const wxString filename = wxFileName(dlg.GetPath()).GetFullName();
+    const ImportApply mode = ask_import_mode(this, filename);
+    if (mode == ImportApply::Cancel) return;
+    const char* how = mode == ImportApply::Merge ? "merge" : "replace";
     try {
       auto data = read_export(std::filesystem::path(dlg.GetPath().utf8_string()));
-      auto result = import_into_config(config_, data, choice == wxYES ? "merge" : "replace", true);
+      auto result = import_into_config(config_, data, how, true);
       persist();
       refresh_servers();
-      wxMessageBox(wxString::FromUTF8(format_import_summary(result, choice == wxYES ? "merge" : "replace")), L"Импорт");
+      wxMessageBox(wxString::FromUTF8(format_import_summary(result, how)), L"Импорт");
     } catch (const std::exception& exc) {
       wxMessageBox(wxString::FromUTF8(exc.what()), L"Импорт", wxOK | wxICON_ERROR);
     }

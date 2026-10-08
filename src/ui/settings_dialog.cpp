@@ -5,6 +5,7 @@
 #include "core/paths.hpp"
 #include "core/util.hpp"
 #include "ui/chrome.hpp"
+#include "ui/dialogs.hpp"
 #include "ui/striped_list.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
@@ -365,7 +366,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   backup_note->SetForegroundColour(Theme::muted());
   backup_note->Wrap(FromDIP(480));
   auto* open_backups = make_button(data, L"Открыть папку копий", BtnIcon::Folder);
-  export_secrets_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить пароли");
+  export_secrets_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить пароли (открытым текстом)");
   export_settings_ = new wxCheckBox(data, wxID_ANY, L"Экспорт: включить настройки");
   export_settings_->SetValue(true);
   import_settings_ = new wxCheckBox(data, wxID_ANY, L"Импорт: применять настройки");
@@ -454,6 +455,11 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   open_dir->Bind(wxEVT_BUTTON, [](wxCommandEvent&) { open_directory(app_dir()); });
   open_backups->Bind(wxEVT_BUTTON, [](wxCommandEvent&) { open_directory(backups_dir()); });
   exp->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+    if (export_secrets_->GetValue() &&
+        !ask_confirm(this, L"Экспорт", L"Пароли VPS попадут в файл открытым текстом.", L"Экспортировать с паролями",
+                     false)) {
+      return;
+    }
     wxFileDialog dlg(this, L"Экспорт FaTTY", L"", L"fatty-backup.json", L"JSON|*.json", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
     if (dlg.ShowModal() != wxID_OK) return;
     try {
@@ -465,12 +471,11 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
     }
   });
   imp->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    int choice = wxMessageBox(L"Да — добавить к текущим\nНет — заменить все\nОтмена", L"Импорт",
-                              wxYES_NO | wxCANCEL | wxICON_QUESTION, this);
-    if (choice == wxCANCEL) return;
-    std::string mode = choice == wxYES ? "merge" : "replace";
     wxFileDialog dlg(this, L"Импорт FaTTY", L"", L"", L"JSON|*.json", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dlg.ShowModal() != wxID_OK) return;
+    const ImportApply picked = ask_import_mode(this, wxFileName(dlg.GetPath()).GetFullName());
+    if (picked == ImportApply::Cancel) return;
+    std::string mode = picked == ImportApply::Merge ? "merge" : "replace";
     try {
       auto data = read_export(std::filesystem::path(dlg.GetPath().utf8_string()));
       auto result = import_into_config(config_, data, mode, import_settings_->GetValue());
