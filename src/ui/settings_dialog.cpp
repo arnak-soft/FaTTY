@@ -168,6 +168,19 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   theme_ = new wxChoice(general, wxID_ANY, wxDefaultPosition, wxDefaultSize, themes);
   theme_->SetSelection(st.theme == "light" ? 1 : 0);
   theme_row->Add(theme_, 0, wxLEFT, 8);
+  auto* font_row = new wxBoxSizer(wxHORIZONTAL);
+  font_row->Add(new wxStaticText(general, wxID_ANY, L"Шрифт терминала"), 0, wxALIGN_CENTER_VERTICAL);
+  wxArrayString font_sizes;
+  const int font_pts[] = {10, 12, 14, 16, 18};
+  int font_sel = 1;
+  for (int i = 0; i < 5; ++i) {
+    font_sizes.Add(std::to_wstring(font_pts[i]));
+    if (font_pts[i] == st.terminal_font_pt) font_sel = i;
+  }
+  terminal_font_ = new wxChoice(general, wxID_ANY, wxDefaultPosition, wxDefaultSize, font_sizes);
+  terminal_font_->SetSelection(font_sel);
+  terminal_font_->SetToolTip(L"Shell, панель «Вывод» и моноширинный текст. По умолчанию 12.");
+  font_row->Add(terminal_font_, 0, wxLEFT, 8);
   auto* trow = new wxBoxSizer(wxHORIZONTAL);
   trow->Add(new wxStaticText(general, wxID_ANY, L"Таймаут новых команд, с"), 0, wxALIGN_CENTER_VERTICAL);
   timeout_ = new wxTextCtrl(general, wxID_ANY, std::to_wstring(st.default_command_timeout));
@@ -184,6 +197,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   gsz->Add(advance_command_, 0, wxALL, 8);
   gsz->Add(show_folder_col_, 0, wxALL, 8);
   gsz->Add(theme_row, 0, wxALL, 8);
+  gsz->Add(font_row, 0, wxALL, 8);
   gsz->Add(trow, 0, wxALL, 8);
   gsz->Add(updates_, 0, wxALL, 8);
   gsz->Add(check_now, 0, wxALL, 8);
@@ -516,6 +530,11 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.backup_enabled = backup_->GetValue();
   const std::string old_theme = config_.settings.theme;
   config_.settings.theme = theme_->GetSelection() == 1 ? "light" : "dark";
+  {
+    const int font_pts[] = {10, 12, 14, 16, 18};
+    const int sel = terminal_font_->GetSelection();
+    config_.settings.terminal_font_pt = (sel >= 0 && sel < 5) ? font_pts[sel] : 12;
+  }
   if (config_.settings.theme != old_theme) {
     wxMessageBox(L"Тема применена. Системные элементы (меню, заголовки таблиц, скроллбары)\n"
                  L"полностью переключатся после перезапуска FaTTY.",

@@ -60,6 +60,7 @@ json portable_settings(const AppSettings& settings) {
       {"master_password_max_attempts", settings.master_password_max_attempts},
       {"master_password_lockout_minutes", settings.master_password_lockout_minutes},
       {"theme", settings.theme},
+      {"terminal_font_pt", settings.terminal_font_pt},
       {"show_command_folder_column", settings.show_command_folder_column},
       {"backup_enabled", settings.backup_enabled},
       {"health_auto", settings.health_auto},
@@ -103,6 +104,7 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   if (journal >= 100 && journal <= 50000) settings.journal_max_entries = journal;
   auto theme = raw.value("theme", settings.theme);
   if (theme == "light" || theme == "dark") settings.theme = theme;
+  settings.terminal_font_pt = clamp_int(raw.value("terminal_font_pt", settings.terminal_font_pt), 8, 24);
   settings.show_command_folder_column =
       raw.value("show_command_folder_column", settings.show_command_folder_column);
   settings.backup_enabled = raw.value("backup_enabled", settings.backup_enabled);

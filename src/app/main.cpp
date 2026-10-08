@@ -110,6 +110,7 @@ class FattyApp : public wxApp {
     }
     hide_splash();
     set_theme(config.settings.theme);
+    set_mono_point_size(config.settings.terminal_font_pt);
     MasterPasswordDialog dlg(nullptr, config, vault);
     dlg.setup_layout(&config.settings, "master");
     if (dlg.ShowModal() != wxID_OK || !dlg.ok || !vault.unlocked()) {

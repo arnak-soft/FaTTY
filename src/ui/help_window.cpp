@@ -66,7 +66,8 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
       L"Колёсико, полоса справа и Shift+Page Up/Down листают историю. "
       L"После команды приглашение встаёт сразу под выводом. "
       L"Настройки → Общие: «После команд переходить в Shell в ту же папку» (по умолчанию включено) — "
-      L"cd из команды становится текущим каталогом Shell.\n"
+      L"cd из команды становится текущим каталогом Shell. "
+      L"Там же размер шрифта терминала и панели «Вывод» (по умолчанию 12).\n"
       L"«Состояние» (Ctrl+H) — графики CPU, RAM, диска и нагрузки по последней проверке. "
       L"Автоопрос выключен, пока не включите его в Настройки → Состояние (по умолчанию не чаще раза в сутки). "
       L"В окне можно обновить выбранный VPS или все сразу. Последний замер запоминается. "
@@ -114,6 +115,7 @@ HelpWindow::HelpWindow(wxWindow* parent, std::function<void(const std::string&)>
   p1->SetName(L"card-page");
   auto* s1 = new wxBoxSizer(wxVERTICAL);
   auto* k = prose(p1, keys);
+  k->SetName(L"mono");
   k->SetFont(Theme::mono());
   s1->Add(k, 1, wxEXPAND | wxALL, 8);
   p1->SetSizer(s1);

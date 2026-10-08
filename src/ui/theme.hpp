@@ -45,6 +45,8 @@ struct Theme {
 void set_theme(const std::string& name);
 bool theme_is_dark();
 std::string theme_name();
+void set_mono_point_size(int pt);
+int mono_point_size();
 void apply_theme(wxWindow* window);
 void apply_dark(wxWindow* window);
 void apply_dark_titlebar(wxWindow* window);

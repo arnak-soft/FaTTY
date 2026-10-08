@@ -104,6 +104,7 @@ struct AppSettings {
   int master_password_max_attempts = 5;
   int master_password_lockout_minutes = 20;
   std::string theme = "dark";
+  int terminal_font_pt = 12;
   bool show_command_folder_column = true;
   bool backup_enabled = true;
   double last_backup = 0.0;

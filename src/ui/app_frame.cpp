@@ -120,6 +120,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     });
   });
   build_menu();
+  set_mono_point_size(config_.settings.terminal_font_pt);
   build_ui();
   init_run_controllers();
   init_health_monitor();
@@ -1261,6 +1262,7 @@ void AppFrame::restore_columns() {
 
 void AppFrame::apply_ui_theme() {
   set_theme(config_.settings.theme);
+  set_mono_point_size(config_.settings.terminal_font_pt);
   apply_theme(this);
   style_list(servers_);
   style_list(commands_);

@@ -68,10 +68,10 @@ void set_icon(wxWindow* window) {
 }
 
 wxStaticText* section_label(wxWindow* parent, const wxString& text) {
-  auto* label = new wxStaticText(parent, wxID_ANY, text.Upper());
+  auto* label = new wxStaticText(parent, wxID_ANY, text);
   label->SetName(L"section");
   label->SetFont(Theme::ui_section());
-  label->SetForegroundColour(Theme::muted());
+  label->SetForegroundColour(Theme::text());
   return label;
 }
 

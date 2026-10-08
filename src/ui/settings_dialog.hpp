@@ -40,6 +40,7 @@ class SettingsDialog : public PositionedDialog {
   wxCheckBox* show_folder_col_{};
   wxCheckBox* backup_{};
   wxChoice* theme_{};
+  wxChoice* terminal_font_{};
   wxTextCtrl* timeout_{};
   wxTextCtrl* journal_{};
   wxTextCtrl* putty_{};

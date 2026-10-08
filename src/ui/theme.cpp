@@ -31,6 +31,7 @@ namespace fatty {
 namespace {
 
 bool g_dark = true;
+int g_mono_pt = 12;
 
 struct Palette {
   wxColour bg;
@@ -84,6 +85,9 @@ void set_theme(const std::string& name) { g_dark = name != "light"; }
 bool theme_is_dark() { return g_dark; }
 std::string theme_name() { return g_dark ? "dark" : "light"; }
 
+void set_mono_point_size(int pt) { g_mono_pt = std::clamp(pt, 8, 24); }
+int mono_point_size() { return g_mono_pt; }
+
 wxColour Theme::bg() { return pal().bg; }
 wxColour Theme::chrome() { return pal().chrome; }
 wxColour Theme::elevated() { return pal().elevated; }
@@ -130,10 +134,12 @@ wxColour Theme::run_status(const std::string& status) {
 }
 wxFont Theme::ui() { return wxFont(10, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
 wxFont Theme::ui_small() { return wxFont(9, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
-wxFont Theme::ui_section() { return wxFont(8, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_SEMIBOLD, false, L"Segoe UI"); }
+wxFont Theme::ui_section() { return wxFont(11, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_SEMIBOLD, false, L"Segoe UI"); }
 wxFont Theme::ui_heading() { return wxFont(14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_SEMIBOLD, false, L"Segoe UI"); }
 wxFont Theme::ui_title() { return wxFont(18, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD, false, L"Segoe UI"); }
-wxFont Theme::mono() { return wxFont(10, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, mono_face()); }
+wxFont Theme::mono() {
+  return wxFont(g_mono_pt, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, mono_face());
+}
 
 void apply_dark_titlebar(wxWindow* window) {
 #ifdef _WIN32
@@ -145,11 +151,15 @@ void apply_dark_titlebar(wxWindow* window) {
 }
 
 // Роли задаются через SetName: "accent", "title", "section", "muted", "meta",
-// "chrome" (панель-полоса), "terminal" (моно-вывод), "mono" (не трогать шрифт).
+// "chrome" (панель-полоса), "terminal" (моно-вывод), "mono" (моноширинный шрифт).
 void apply_theme(wxWindow* window) {
   if (!window) return;
   const wxString name = window->GetName();
-  if (name != L"title" && name != L"mono" && name != L"section" && name != L"heading") window->SetFont(Theme::ui());
+  if (name == L"mono") {
+    window->SetFont(Theme::mono());
+  } else if (name != L"title" && name != L"section" && name != L"heading") {
+    window->SetFont(Theme::ui());
+  }
   wxWindow* parent = window->GetParent();
   const wxColour parent_bg = parent ? parent->GetBackgroundColour() : Theme::bg();
   if (dynamic_cast<RoundButton*>(window) || dynamic_cast<RoundedNotebook*>(window) ||
@@ -168,7 +178,10 @@ void apply_theme(wxWindow* window) {
   } else if (name == L"section") {
     window->SetFont(Theme::ui_section());
     window->SetBackgroundColour(parent_bg);
-    window->SetForegroundColour(Theme::muted());
+    window->SetForegroundColour(Theme::text());
+  } else if (name == L"mono") {
+    window->SetBackgroundColour(parent_bg);
+    window->SetForegroundColour(Theme::text());
   } else if (name == L"heading") {
     window->SetFont(Theme::ui_heading());
     window->SetBackgroundColour(parent_bg);
@@ -188,6 +201,7 @@ void apply_theme(wxWindow* window) {
     term->SetBackgroundColour(Theme::terminal());
     term->SetForegroundColour(Theme::text());
     term->SetFont(Theme::mono());
+    term->sync_font();
   } else if (auto* list = dynamic_cast<StripedListCtrl*>(window)) {
     list->restyle();
   } else if (dynamic_cast<wxListCtrl*>(window)) {

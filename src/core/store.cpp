@@ -600,6 +600,7 @@ Config load_config_from(const std::filesystem::path& path) {
   if (st.theme != "light" && st.theme != "dark") {
     st.theme = "dark";
   }
+  st.terminal_font_pt = json_int(settings_raw, "terminal_font_pt", 12, 8, 24);
   st.show_command_folder_column = settings_raw.value("show_command_folder_column", true);
   st.backup_enabled = settings_raw.value("backup_enabled", true);
   try {
@@ -746,6 +747,7 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"master_password_max_attempts", config.settings.master_password_max_attempts},
       {"master_password_lockout_minutes", config.settings.master_password_lockout_minutes},
       {"theme", config.settings.theme},
+      {"terminal_font_pt", config.settings.terminal_font_pt},
       {"show_command_folder_column", config.settings.show_command_folder_column},
       {"backup_enabled", config.settings.backup_enabled},
       {"last_backup", config.settings.last_backup},

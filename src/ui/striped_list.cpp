@@ -627,8 +627,8 @@ void StripedListCtrl::select_range(long from, long to) {
   if (to >= from) emit_selected(to);
 }
 
-int StripedListCtrl::row_height() const { return FromDIP(22); }
-int StripedListCtrl::header_height() const { return FromDIP(24); }
+int StripedListCtrl::row_height() const { return FromDIP(28); }
+int StripedListCtrl::header_height() const { return FromDIP(28); }
 
 void StripedListCtrl::refresh_body() {
   if (header_) header_->Refresh();

@@ -26,6 +26,8 @@ class TerminalView : public wxPanel {
   void expect_prompt_after(const std::string& echoed_line);
   void clear_screen();
   void reset();
+  // Пересчитать ячейки после смены Theme::mono() и сообщить PTY новый размер.
+  void sync_font();
   bool alt_screen() const { return alt_active_; }
 
   int cols() const { return cols_; }

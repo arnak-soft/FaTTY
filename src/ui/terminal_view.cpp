@@ -683,6 +683,14 @@ wxColour TerminalView::bg_colour(uint8_t idx) const {
   return colour256(idx);
 }
 
+void TerminalView::sync_font() {
+  SetFont(Theme::mono());
+  recompute_size();
+  emit_resize_if_needed();
+  update_scrollbar();
+  Refresh();
+}
+
 void TerminalView::recompute_size() {
   wxClientDC dc(this);
   dc.SetFont(Theme::mono());
