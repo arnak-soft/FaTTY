@@ -59,6 +59,7 @@ class AppFrame : public wxFrame {
   std::vector<std::string> command_column_ids() const;
   std::vector<std::string> server_column_ids() const;
   void sort_visible_commands(const std::string& by, bool toggle);
+  void apply_command_view_sort(std::vector<Command>& group);
   void apply_command_sort_visual();
   void clear_command_sort();
   void attach_commands_page(int index);
@@ -127,6 +128,10 @@ class AppFrame : public wxFrame {
   std::string busy_label_;
   std::string command_sort_by_;
   bool command_sort_asc_ = true;
+  // Сортировка списка — только показ. Эти id говорят, для какой группы она включена.
+  std::string command_sort_server_id_;
+  std::string command_sort_group_id_;
+  std::vector<std::string> visible_command_ids_;
   std::chrono::steady_clock::time_point run_start_{};
   std::shared_ptr<std::atomic<bool>> alive_ = std::make_shared<std::atomic<bool>>(true);
   std::shared_ptr<std::atomic<bool>> worker_running_ = std::make_shared<std::atomic<bool>>(false);

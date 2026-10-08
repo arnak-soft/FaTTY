@@ -1552,13 +1552,25 @@ void AppFrame::rebuild_group_tabs() {
 
 void AppFrame::refresh_commands() {
   commands_->DeleteAllItems();
+  visible_command_ids_.clear();
   auto* s = selected_server();
+  const std::string group = current_group_id();
+  if (!command_sort_by_.empty() &&
+      (!s || s->id != command_sort_server_id_ || group != command_sort_group_id_)) {
+    command_sort_by_.clear();
+    command_sort_asc_ = true;
+    command_sort_server_id_.clear();
+    command_sort_group_id_.clear();
+    if (status_) status_->SetLabel(L"Показан сохранённый порядок");
+  }
   if (!s) {
+    apply_command_sort_visual();
     update_cwd_label();
     refresh_bundles();
     return;
   }
-  auto cmds = config_.commands_for(s->id, current_group_id());
+  auto cmds = config_.commands_for(s->id, group);
+  if (!command_sort_by_.empty()) apply_command_view_sort(cmds);
   long sel = -1;
   for (std::size_t i = 0; i < cmds.size(); ++i) {
     const auto& c = cmds[i];
@@ -1586,8 +1598,10 @@ void AppFrame::refresh_commands() {
               {"last", last},
               {"avg", avg}});
     style_list_row(commands_, row, colour);
+    visible_command_ids_.push_back(c.id);
     if (c.id == config_.settings.last_command_id) sel = row;
   }
+  apply_command_sort_visual();
   if (sel >= 0) {
     commands_->SetItemState(sel, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
                             wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
@@ -1672,26 +1686,51 @@ void AppFrame::sort_visible_commands(const std::string& by, bool toggle) {
   if (by != "name" && by != "command" && by != "comment" && by != "folder" && by != "avg" && by != "last") {
     return;
   }
-  if (toggle && command_sort_by_ == by) {
-    command_sort_asc_ = !command_sort_asc_;
+  const bool same = toggle && command_sort_by_ == by && command_sort_server_id_ == s->id &&
+                    command_sort_group_id_ == current_group_id();
+  if (same) {
+    if (command_sort_asc_) {
+      command_sort_asc_ = false;
+    } else {
+      clear_command_sort();
+      refresh_commands();
+      if (status_) status_->SetLabel(L"Показан сохранённый порядок");
+      return;
+    }
   } else {
     command_sort_by_ = by;
     command_sort_asc_ = true;
   }
+  command_sort_server_id_ = s->id;
+  command_sort_group_id_ = current_group_id();
+  refresh_commands();
+  if (status_) status_->SetLabel(L"Список отсортирован — сохранённый порядок не изменился");
+}
+
+void AppFrame::apply_command_view_sort(std::vector<Command>& group) {
+  const std::string by = command_sort_by_;
   const bool asc = command_sort_asc_;
-  if (by == "avg" || by == "last") {
-    auto group = config_.commands_for(s->id, current_group_id());
-    auto avg_of = [this](const std::string& id) -> double {
-      auto it = command_stats_.find(id);
-      if (it == command_stats_.end() || it->second.run_count <= 0) return -1;
-      return it->second.average_sec;
-    };
-    auto last_of = [this](const std::string& id) -> std::string {
-      auto it = command_stats_.find(id);
-      if (it == command_stats_.end()) return {};
-      return it->second.latest.started_at;
-    };
-    std::sort(group.begin(), group.end(), [&](const Command& a, const Command& b) {
+  auto avg_of = [this](const std::string& id) -> double {
+    auto it = command_stats_.find(id);
+    if (it == command_stats_.end() || it->second.run_count <= 0) return -1;
+    return it->second.average_sec;
+  };
+  auto last_of = [this](const std::string& id) -> std::string {
+    auto it = command_stats_.find(id);
+    if (it == command_stats_.end()) return {};
+    return it->second.latest.started_at;
+  };
+  auto text_key = [this, &by](const Command& c) -> std::string {
+    if (by == "command") return to_lower(trim(c.command));
+    if (by == "comment") return to_lower(trim(c.comment));
+    if (by == "folder") {
+      if (c.cd_before_run) return to_lower(command_run_working_dir(config_, c));
+      return {};
+    }
+    return to_lower(trim(c.name));
+  };
+  std::sort(group.begin(), group.end(), [&](const Command& a, const Command& b) {
+    if (by == "avg" || by == "last") {
       if (by == "avg") {
         const double da = avg_of(a.id);
         const double db = avg_of(b.id);
@@ -1711,14 +1750,18 @@ void AppFrame::sort_visible_commands(const std::string& by, bool toggle) {
       auto nb = to_lower(trim(b.name));
       if (na != nb) return na < nb;
       return a.id < b.id;
-    });
-    config_.set_commands_for(s->id, current_group_id(), group);
-  } else {
-    config_.sort_commands_for(s->id, current_group_id(), by, asc);
-  }
-  persist();
-  refresh_commands();
-  apply_command_sort_visual();
+    }
+    auto ka = text_key(a);
+    auto kb = text_key(b);
+    if (ka != kb) return asc ? ka < kb : ka > kb;
+    auto na = to_lower(trim(a.name));
+    auto nb = to_lower(trim(b.name));
+    if (na != nb) return na < nb;
+    auto ca = to_lower(trim(a.command));
+    auto cb = to_lower(trim(b.command));
+    if (ca != cb) return ca < cb;
+    return a.id < b.id;
+  });
 }
 
 void AppFrame::apply_command_sort_visual() {
@@ -1740,6 +1783,8 @@ void AppFrame::apply_command_sort_visual() {
 void AppFrame::clear_command_sort() {
   command_sort_by_.clear();
   command_sort_asc_ = true;
+  command_sort_server_id_.clear();
+  command_sort_group_id_.clear();
   apply_command_sort_visual();
 }
 
@@ -1753,13 +1798,11 @@ Server* AppFrame::selected_server() {
 
 std::vector<Command*> AppFrame::selected_commands() {
   std::vector<Command*> out;
-  auto* s = selected_server();
-  if (!s || !commands_) return out;
-  auto cmds = config_.commands_for(s->id, current_group_id());
+  if (!commands_) return out;
   long i = -1;
   while ((i = commands_->GetNextItem(i, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED)) != wxNOT_FOUND) {
-    if (i < 0 || i >= static_cast<long>(cmds.size())) continue;
-    if (auto* c = config_.command_by_id(cmds[static_cast<std::size_t>(i)].id)) {
+    if (i < 0 || static_cast<std::size_t>(i) >= visible_command_ids_.size()) continue;
+    if (auto* c = config_.command_by_id(visible_command_ids_[static_cast<std::size_t>(i)])) {
       out.push_back(c);
     }
   }
@@ -2074,16 +2117,13 @@ void AppFrame::request_saved_runs() {
 }
 
 void AppFrame::advance_command_selection() {
-  auto* s = selected_server();
-  if (!s) return;
-  auto cmds = config_.commands_for(s->id, current_group_id());
-  if (cmds.size() < 2) return;
+  if (visible_command_ids_.size() < 2 || !commands_) return;
   long cur = commands_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
-  if (cur < 0 || cur + 1 >= static_cast<long>(cmds.size())) return;
+  if (cur < 0 || static_cast<std::size_t>(cur + 1) >= visible_command_ids_.size()) return;
   const long next = cur + 1;
   commands_->SetItemState(next, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
                           wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
-  config_.settings.last_command_id = cmds[static_cast<std::size_t>(next)].id;
+  config_.settings.last_command_id = visible_command_ids_[static_cast<std::size_t>(next)];
 }
 
 void AppFrame::run_command(const Server& server, const std::string& command, int timeout, bool login_shell,
