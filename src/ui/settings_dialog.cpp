@@ -554,7 +554,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
     config_.settings.terminal_font_pt = (sel >= 0 && sel < 5) ? font_pts[sel] : 12;
   }
   if (config_.settings.theme != old_theme) {
-    wxMessageBox(L"Тема применена. Галочки, списки и меню уже в новых цветах.\n"
+    wxMessageBox(L"Тема применена. Галочки, списки, меню, полосы прокрутки и индикатор уже в новых цветах.\n"
                  L"Окна выбора файла и системные сообщения остаются системными.",
                  L"Тема", wxOK | wxICON_INFORMATION, this);
   }

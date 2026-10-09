@@ -36,6 +36,7 @@ void show_splash() {
   st->SetForegroundColour(Theme::text());
   auto* bar = new wxGauge(body, wxID_ANY, 100, wxDefaultPosition, f->FromDIP(wxSize(260, 16)),
                           wxGA_HORIZONTAL | wxGA_SMOOTH);
+  polish_native_chrome(bar);
   bar->Pulse();
   auto* s = new wxBoxSizer(wxVERTICAL);
   s->AddStretchSpacer();

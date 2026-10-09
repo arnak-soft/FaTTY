@@ -7,9 +7,11 @@
 #include <wx/button.h>
 #include <wx/checkbox.h>
 #include <wx/fontenum.h>
+#include <wx/gauge.h>
 #include <wx/listctrl.h>
 #include <wx/notebook.h>
 #include <wx/panel.h>
+#include <wx/scrolwin.h>
 #include <wx/settings.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
@@ -21,7 +23,9 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <commctrl.h>
 #include <dwmapi.h>
+#include <uxtheme.h>
 #ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
@@ -141,6 +145,37 @@ wxFont Theme::mono() {
   return wxFont(g_mono_pt, wxFONTFAMILY_TELETYPE, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, mono_face());
 }
 
+void polish_native_chrome(wxWindow* window) {
+#ifdef _WIN32
+  if (!window) return;
+  HWND hwnd = static_cast<HWND>(window->GetHWND());
+  if (!hwnd) return;
+  if (dynamic_cast<wxGauge*>(window)) {
+    if (theme_is_dark()) {
+      SetWindowTheme(hwnd, L"", L"");
+      const wxColour bar = Theme::accent();
+      const wxColour track = Theme::btn();
+      SendMessageW(hwnd, PBM_SETBARCOLOR, 0, RGB(bar.Red(), bar.Green(), bar.Blue()));
+      SendMessageW(hwnd, PBM_SETBKCOLOR, 0, RGB(track.Red(), track.Green(), track.Blue()));
+    } else {
+      SetWindowTheme(hwnd, nullptr, nullptr);
+    }
+    return;
+  }
+  const long style = window->GetWindowStyle();
+  const bool scrolls = dynamic_cast<wxTextCtrl*>(window) || dynamic_cast<wxScrolledWindow*>(window) ||
+                       dynamic_cast<wxListCtrl*>(window) || (style & (wxVSCROLL | wxHSCROLL));
+  if (!scrolls) return;
+  if (theme_is_dark()) {
+    SetWindowTheme(hwnd, L"DarkMode_Explorer", nullptr);
+  } else {
+    SetWindowTheme(hwnd, nullptr, nullptr);
+  }
+#else
+  (void)window;
+#endif
+}
+
 void apply_dark_titlebar(wxWindow* window) {
 #ifdef _WIN32
   HWND hwnd = static_cast<HWND>(window->GetHWND());
@@ -154,6 +189,7 @@ void apply_dark_titlebar(wxWindow* window) {
 // "chrome" (панель-полоса), "terminal" (моно-вывод), "mono" (моноширинный шрифт).
 void apply_theme(wxWindow* window) {
   if (!window) return;
+  polish_native_chrome(window);
   const wxString name = window->GetName();
   if (name == L"mono") {
     window->SetFont(Theme::mono());

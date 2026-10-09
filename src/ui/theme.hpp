@@ -50,6 +50,8 @@ int mono_point_size();
 void apply_theme(wxWindow* window);
 void apply_dark(wxWindow* window);
 void apply_dark_titlebar(wxWindow* window);
+// Полоса прокрутки и wxGauge. На Windows 10 тёмная тема приложения их не красит.
+void polish_native_chrome(wxWindow* window);
 void style_list(StripedListCtrl* list);
 void style_list_row(StripedListCtrl* list, long row, const wxColour& text);
 void style_text(wxTextCtrl* ctrl, bool terminal = false);
