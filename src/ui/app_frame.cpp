@@ -485,7 +485,7 @@ void AppFrame::build_ui() {
   bottom_nb_ = new RoundedNotebook(bottom);
 
   auto* outp = new wxPanel(bottom_nb_);
-  cwd_label_ = new wxStaticText(outp, wxID_ANY, L"Папка: ~");
+  cwd_label_ = new wxStaticText(outp, wxID_ANY, L"Каталог: ~");
   cwd_label_->SetName(L"muted");
   cwd_reset_ = make_button(outp, L"Сбросить в ~", BtnIcon::Home);
   cwd_reset_->Enable(false);
@@ -820,7 +820,7 @@ void AppFrame::build_ui() {
     if (!s) return;
     remote_cwd_.erase(s->id);
     update_cwd_label();
-    status_->SetLabel(L"Рабочая папка сброшена в домашнюю");
+    status_->SetLabel(L"Рабочий каталог сброшен в домашний");
   });
   clear->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { output_->Clear(); });
   jbtn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { show_journal(); });
@@ -1487,7 +1487,7 @@ void AppFrame::setup_command_columns() {
     } else if (id == "comment") {
       commands_->AppendColumn(L"Комментарий", wxLIST_FORMAT_LEFT, FromDIP(180));
     } else if (id == "folder") {
-      commands_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(180));
+      commands_->AppendColumn(L"Каталог", wxLIST_FORMAT_LEFT, FromDIP(180));
     } else if (id == "command") {
       commands_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(320));
     } else if (id == "last") {
@@ -1929,10 +1929,10 @@ void AppFrame::update_cwd_label() {
   }
   auto it = remote_cwd_.find(s->id);
   if (it != remote_cwd_.end() && !it->second.empty()) {
-    cwd_label_->SetLabel(wxString::FromUTF8("Папка: " + it->second));
+    cwd_label_->SetLabel(wxString::FromUTF8("Каталог: " + it->second));
     cwd_reset_->Enable(true);
   } else {
-    cwd_label_->SetLabel(L"Папка: ~");
+    cwd_label_->SetLabel(L"Каталог: ~");
     cwd_reset_->Enable(false);
   }
 }
@@ -2119,10 +2119,10 @@ void AppFrame::edit_group_folder(const std::string& group_id) {
   auto* g = config_.group_by_id(group_id);
   if (!g) return;
   auto path = wxGetTextFromUser(
-      L"Папка по умолчанию для команд группы.\n"
-      L"Пусто — без cd (используется текущая папка сессии).\n"
-      L"У команды с собственной папкой она имеет приоритет.",
-      L"Папка группы: " + wxString::FromUTF8(g->name), wxString::FromUTF8(g->working_dir), this);
+      L"Каталог по умолчанию для команд группы.\n"
+      L"Пусто — без cd (используется текущий каталог сессии).\n"
+      L"У команды со своим каталогом он имеет приоритет.",
+      L"Каталог группы: " + wxString::FromUTF8(g->name), wxString::FromUTF8(g->working_dir), this);
   if (!path) return;
   g->working_dir = trim(std::string(path.utf8_string()));
   persist();
@@ -2454,7 +2454,7 @@ void AppFrame::show_group_tab_context_menu(int tab_index) {
   if (!gid.empty()) {
     menu.AppendSeparator();
     menu.Append(2031, L"Переименовать");
-    menu.Append(2032, L"Папка группы…");
+    menu.Append(2032, L"Каталог группы…");
     menu.Append(2033, L"Удалить группу");
   }
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { add_group(); }, 2030);
@@ -2476,7 +2476,7 @@ void AppFrame::show_sections_tab_context_menu(int tab_index, wxWindow* groups_pa
     if (!gid.empty()) {
       menu.AppendSeparator();
       menu.Append(2041, L"Переименовать группу");
-      menu.Append(2042, L"Папка группы…");
+      menu.Append(2042, L"Каталог группы…");
       menu.Append(2043, L"Удалить группу");
     }
     menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { add_group(); }, 2040);

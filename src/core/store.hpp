@@ -98,7 +98,7 @@ struct AppSettings {
   bool advance_command_after_run = true;
   // Если true — после подключения Shell сессионный переключатель «вывод команд в Shell» включается сам.
   bool automation_to_shell_when_connected = true;
-  // После F5/связки активный Shell переходит в ту же папку, что и команда.
+  // После F5/связки активный Shell переходит в тот же каталог, что и команда.
   bool shell_follow_command_cwd = true;
   bool allow_short_master_password = false;
   int master_password_max_attempts = 5;

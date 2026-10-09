@@ -320,10 +320,10 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
 
   auto* run = new wxFlexGridSizer(6, 2, gap, gap);
   run->AddGrowableCol(1);
-  working_dir_ = labeled_entry(body, run, L"Папка", wxString::FromUTF8(command.working_dir));
+  working_dir_ = labeled_entry(body, run, L"Каталог", wxString::FromUTF8(command.working_dir));
   working_dir_->SetHint(L"/var/www/app или относительный путь");
   run->Add(new wxStaticText(body, wxID_ANY, L""), 0);
-  cd_before_ = new ThemedCheckBox(body, wxID_ANY, L"Переходить в папку перед выполнением");
+  cd_before_ = new ThemedCheckBox(body, wxID_ANY, L"Переходить в каталог перед выполнением");
   cd_before_->SetValue(command.cd_before_run);
   run->Add(cd_before_, 1, wxEXPAND);
   run->Add(new wxStaticText(body, wxID_ANY, L"Shell"), 0, wxALIGN_CENTER_VERTICAL);

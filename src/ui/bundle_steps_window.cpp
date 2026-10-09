@@ -45,7 +45,7 @@ BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config, std::func
   list_->AppendColumn(L"#", wxLIST_FORMAT_LEFT, FromDIP(36));
   list_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(140));
   list_->AppendColumn(L"Группа", wxLIST_FORMAT_LEFT, FromDIP(100));
-  list_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(140));
+  list_->AppendColumn(L"Каталог", wxLIST_FORMAT_LEFT, FromDIP(140));
   list_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(220));
   list_->AppendColumn(L"Комментарий", wxLIST_FORMAT_LEFT, FromDIP(160));
   auto* list_sz = new wxBoxSizer(wxVERTICAL);
@@ -141,7 +141,7 @@ void BundleStepsWindow::show_detail() {
   text += "\nГруппа: " + group_label(c);
   const auto folder = command_display_folder(config_, c);
   if (folder != "—") {
-    text += "\nПапка: " + folder;
+    text += "\nКаталог: " + folder;
   }
   if (!c.comment.empty()) text += "\n\n" + c.comment;
   text += "\n\n" + c.command;

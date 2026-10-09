@@ -150,14 +150,14 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
                      L"После подключения Shell направлять вывод команд туда (постоянно)");
   automation_to_shell_->SetValue(st.automation_to_shell_when_connected);
   shell_follow_cwd_ =
-      new ThemedCheckBox(general, wxID_ANY, L"После команд переходить в Shell в ту же папку");
+      new ThemedCheckBox(general, wxID_ANY, L"После команд переходить в Shell в тот же каталог");
   shell_follow_cwd_->SetValue(st.shell_follow_command_cwd);
   shell_follow_cwd_->SetToolTip(
       L"Если команда или связка сменила каталог, активный Shell делает то же самое. "
       L"Приглашение появляется сразу под выводом, как после обычного ввода.");
   advance_command_ = new ThemedCheckBox(general, wxID_ANY, L"Переходить к следующей команде после запуска (F5 / двойной клик)");
   advance_command_->SetValue(st.advance_command_after_run);
-  show_folder_col_ = new ThemedCheckBox(general, wxID_ANY, L"Показывать столбец «Папка» (рабочий каталог) в списке команд");
+  show_folder_col_ = new ThemedCheckBox(general, wxID_ANY, L"Показывать столбец «Каталог» в списке команд");
   show_folder_col_->SetValue(st.show_command_folder_column);
   updates_ = new ThemedCheckBox(general, wxID_ANY, L"Проверять обновления при запуске (не чаще раза в сутки)");
   updates_->SetValue(st.check_updates_on_start);
