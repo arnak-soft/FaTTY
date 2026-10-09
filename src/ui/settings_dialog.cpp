@@ -137,8 +137,9 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* nb = new RoundedNotebook(this);
   auto& st = config.settings;
 
-  auto* general = new wxPanel(nb);
+  auto* general = new wxScrolledWindow(nb, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL);
   general->SetName(L"card-page");
+  general->SetScrollRate(0, 16);
   auto* gsz = new wxBoxSizer(wxVERTICAL);
   confirm_ = new ThemedCheckBox(general, wxID_ANY, L"Спрашивать подтверждение перед разовой командой");
   confirm_->SetValue(st.confirm_before_run);
@@ -190,18 +191,34 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   journal_ = new wxTextCtrl(general, wxID_ANY, std::to_wstring(st.journal_max_entries));
   jrow->Add(journal_, 0, wxLEFT, 8);
   auto* check_now = make_button(general, L"Проверить сейчас…", BtnIcon::Refresh);
-  gsz->Add(confirm_, 0, wxALL, 8);
-  gsz->Add(clear_output_, 0, wxALL, 8);
-  gsz->Add(automation_to_shell_, 0, wxALL, 8);
-  gsz->Add(shell_follow_cwd_, 0, wxALL, 8);
-  gsz->Add(advance_command_, 0, wxALL, 8);
-  gsz->Add(show_folder_col_, 0, wxALL, 8);
-  gsz->Add(theme_row, 0, wxALL, 8);
-  gsz->Add(font_row, 0, wxALL, 8);
-  gsz->Add(trow, 0, wxALL, 8);
-  gsz->Add(updates_, 0, wxALL, 8);
-  gsz->Add(check_now, 0, wxALL, 8);
-  gsz->Add(jrow, 0, wxALL, 8);
+  style_text(timeout_);
+  style_text(journal_);
+  const int pad = 8;
+  bool first_section = true;
+  auto add_section = [&](const wchar_t* title) {
+    if (!first_section) gsz->AddSpacer(10);
+    first_section = false;
+    gsz->Add(section_label(general, title), 0, wxLEFT | wxRIGHT | wxTOP, pad);
+  };
+  auto add_row = [&](wxSizer* line) { gsz->Add(line, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, pad); };
+  auto add_check = [&](ThemedCheckBox* box) { gsz->Add(box, 0, wxLEFT | wxRIGHT | wxTOP, pad); };
+  add_section(L"Запуск");
+  add_check(confirm_);
+  add_check(clear_output_);
+  add_check(advance_command_);
+  add_row(trow);
+  add_section(L"Shell");
+  add_check(automation_to_shell_);
+  add_check(shell_follow_cwd_);
+  add_section(L"Окно");
+  add_check(show_folder_col_);
+  add_row(theme_row);
+  add_row(font_row);
+  add_section(L"Журнал");
+  add_check(updates_);
+  gsz->Add(check_now, 0, wxLEFT | wxRIGHT | wxTOP, pad);
+  add_row(jrow);
+  gsz->AddSpacer(pad);
   general->SetSizer(gsz);
   nb->AddPage(general, L"Общие");
 
