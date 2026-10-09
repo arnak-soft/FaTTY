@@ -20,6 +20,8 @@ load15=0.01
 cpu=7.5
 mem_total_kb=1024000
 mem_avail_kb=512000
+swap_total_kb=512000
+swap_free_kb=256000
 uptime=90061
 disk=/ 123456 204800
 disk=/var 80000 100000
@@ -32,6 +34,9 @@ FATTYCWD_abc:/root
   expect(snap.cpu_pct > 7.4 && snap.cpu_pct < 7.6, "parse cpu");
   expect(snap.mem_total_kb == 1024000, "parse mem total");
   expect(snap.mem_pct > 49 && snap.mem_pct < 51, "ram used pct");
+  expect(snap.swap_total_kb == 512000, "parse swap total");
+  expect(snap.swap_pct > 49 && snap.swap_pct < 51, "swap used pct");
+  expect(health_load_pct(snap) >= 0 && health_load_pct(snap) < 1, "load15 << nproc");
   expect(snap.disks.size() == 2, "two disks");
   expect(snap.disks[0].mount == "/", "root mount");
   expect(snap.disks[1].mount == "/var", "var mount");
@@ -42,6 +47,33 @@ FATTYCWD_abc:/root
   t.disk_crit = 90;
   apply_health_thresholds(snap, t);
   expect(snap.level == HealthLevel::Warn, "/var 80% is warn at 70");
+
+  HealthSnapshot load_only;
+  load_only.nproc = 2;
+  load_only.load15 = 2.5;
+  load_only.checked_at = 1;
+  HealthThresholds load_t;
+  load_t.load_warn = 100;
+  load_t.load_crit = 150;
+  apply_health_thresholds(load_only, load_t);
+  expect(load_only.level == HealthLevel::Warn, "load 125% of cores is warn");
+  load_only.load15 = 3.2;
+  apply_health_thresholds(load_only, load_t);
+  expect(load_only.level == HealthLevel::Crit, "load 160% of cores is crit");
+
+  HealthSnapshot swap_only;
+  swap_only.swap_total_kb = 1000;
+  swap_only.swap_free_kb = 200;
+  swap_only.swap_pct = 80;
+  swap_only.checked_at = 1;
+  HealthThresholds swap_t;
+  swap_t.swap_warn = 50;
+  swap_t.swap_crit = 80;
+  apply_health_thresholds(swap_only, swap_t);
+  expect(swap_only.level == HealthLevel::Crit, "swap 80% is crit");
+
+  auto no_swap = parse_health_output("FATTYHEALTH v1\nnproc=1\nswap_total_kb=0\nswap_free_kb=0\nFATTYHEALTH_END\n");
+  expect(no_swap.swap_pct < 0, "zero swap is N/A");
 
   auto spaced = parse_health_output("FATTYHEALTH v1\ndisk=/home/user data 10 20\nFATTYHEALTH_END\n");
   expect(spaced.disks.size() == 1, "disk with spaces");
@@ -66,12 +98,14 @@ FATTYCWD_abc:/root
   expect(script.find("FATTYHEALTH v1") != std::string::npos, "script marker");
   expect(script.find("/proc/stat") != std::string::npos, "script cpu");
   expect(script.find("df -Pk") != std::string::npos, "script df");
+  expect(script.find("SwapTotal") != std::string::npos, "script swap");
   expect(script.find("overlay2") != std::string::npos, "skip overlay by default");
   auto with_docker = health_remote_script({true, true, true, true, true});
   expect(with_docker.find("overlay2") == std::string::npos, "keep overlay when enabled");
-  auto slim = health_remote_script({false, false, false, false});
+  auto slim = health_remote_script({false, false, false, false, false, false});
   expect(slim.find("/proc/stat") == std::string::npos, "cpu off");
   expect(slim.find("df -Pk") == std::string::npos, "disk off");
+  expect(slim.find("SwapTotal") == std::string::npos, "swap off");
   expect(slim.find("os=other") != std::string::npos, "still detects non-linux");
 
   expect(format_pct(-1) == "—", "missing pct");
@@ -115,6 +149,7 @@ FATTYCWD_abc:/root
   auto loaded = load_health_cache(path);
   expect(loaded.count("s1") == 1, "cache load");
   expect(loaded["s1"].nproc == 2, "cache nproc");
+  expect(loaded["s1"].swap_total_kb == 512000, "cache swap");
   expect(loaded["s1"].disks.size() == 2, "cache disks");
   expect(loaded["s1"].checked_at == 12345, "cache time");
   HealthSnapshot bogus;

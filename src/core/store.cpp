@@ -627,10 +627,15 @@ Config load_config_from(const std::filesystem::path& path) {
   st.health_disk_crit = json_int(settings_raw, "health_disk_crit", 90, 1, 100);
   st.health_ram_warn = json_int(settings_raw, "health_ram_warn", 80, 1, 100);
   st.health_ram_crit = json_int(settings_raw, "health_ram_crit", 90, 1, 100);
+  st.health_swap_warn = json_int(settings_raw, "health_swap_warn", 50, 1, 100);
+  st.health_swap_crit = json_int(settings_raw, "health_swap_crit", 80, 1, 100);
   st.health_cpu_warn = json_int(settings_raw, "health_cpu_warn", 80, 1, 100);
   st.health_cpu_crit = json_int(settings_raw, "health_cpu_crit", 95, 1, 100);
+  st.health_load_warn = json_int(settings_raw, "health_load_warn", 100, 1, 500);
+  st.health_load_crit = json_int(settings_raw, "health_load_crit", 150, 1, 500);
   st.health_show_cpu = settings_raw.value("health_show_cpu", true);
   st.health_show_ram = settings_raw.value("health_show_ram", true);
+  st.health_show_swap = settings_raw.value("health_show_swap", true);
   st.health_show_disk = settings_raw.value("health_show_disk", true);
   st.health_show_load = settings_raw.value("health_show_load", true);
   st.health_show_docker_disks = settings_raw.value("health_show_docker_disks", false);
@@ -759,10 +764,15 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"health_disk_crit", config.settings.health_disk_crit},
       {"health_ram_warn", config.settings.health_ram_warn},
       {"health_ram_crit", config.settings.health_ram_crit},
+      {"health_swap_warn", config.settings.health_swap_warn},
+      {"health_swap_crit", config.settings.health_swap_crit},
       {"health_cpu_warn", config.settings.health_cpu_warn},
       {"health_cpu_crit", config.settings.health_cpu_crit},
+      {"health_load_warn", config.settings.health_load_warn},
+      {"health_load_crit", config.settings.health_load_crit},
       {"health_show_cpu", config.settings.health_show_cpu},
       {"health_show_ram", config.settings.health_show_ram},
+      {"health_show_swap", config.settings.health_show_swap},
       {"health_show_disk", config.settings.health_show_disk},
       {"health_show_load", config.settings.health_show_load},
       {"health_show_docker_disks", config.settings.health_show_docker_disks},

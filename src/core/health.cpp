@@ -68,8 +68,8 @@ std::tm local_from_unix(double unix_ts) {
 }
 
 bool health_has_readings(const HealthSnapshot& snap) {
-  return snap.nproc > 0 || snap.cpu_pct >= 0 || snap.mem_pct >= 0 || snap.mem_total_kb > 0 || !snap.disks.empty() ||
-         snap.load1 >= 0 || snap.uptime_sec >= 0;
+  return snap.nproc > 0 || snap.cpu_pct >= 0 || snap.mem_pct >= 0 || snap.mem_total_kb > 0 || snap.swap_total_kb > 0 ||
+         snap.swap_pct >= 0 || !snap.disks.empty() || snap.load1 >= 0 || snap.uptime_sec >= 0;
 }
 
 }  // namespace
@@ -107,6 +107,16 @@ HealthLevel level_from_pct(double pct, int warn, int crit) {
   return HealthLevel::Ok;
 }
 
+double health_load_pct(const HealthSnapshot& snap) {
+  if (snap.nproc <= 0) return -1;
+  double load = -1;
+  if (snap.load15 >= 0) load = snap.load15;
+  else if (snap.load5 >= 0) load = snap.load5;
+  else if (snap.load1 >= 0) load = snap.load1;
+  if (load < 0) return -1;
+  return 100.0 * load / static_cast<double>(snap.nproc);
+}
+
 void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thresholds) {
   if (snap.level == HealthLevel::Offline || snap.level == HealthLevel::Unsupported ||
       snap.level == HealthLevel::Checking) {
@@ -119,8 +129,15 @@ void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thres
   if (snap.mem_pct >= 0) {
     lvl = worse_health(lvl, level_from_pct(snap.mem_pct, thresholds.ram_warn, thresholds.ram_crit));
   }
+  if (snap.swap_pct >= 0) {
+    lvl = worse_health(lvl, level_from_pct(snap.swap_pct, thresholds.swap_warn, thresholds.swap_crit));
+  }
   for (const auto& disk : snap.disks) {
     lvl = worse_health(lvl, level_from_pct(disk.pct(), thresholds.disk_warn, thresholds.disk_crit));
+  }
+  const double load_pct = health_load_pct(snap);
+  if (load_pct >= 0) {
+    lvl = worse_health(lvl, level_from_pct(load_pct, thresholds.load_warn, thresholds.load_crit));
   }
   if (lvl == HealthLevel::Unknown && snap.checked_at > 0 && snap.error.empty() && health_has_readings(snap)) {
     lvl = HealthLevel::Ok;
@@ -200,6 +217,10 @@ HealthSnapshot parse_health_output(std::string_view text) {
       parse_ll(val, snap.mem_total_kb);
     } else if (key == "mem_avail_kb") {
       parse_ll(val, snap.mem_avail_kb);
+    } else if (key == "swap_total_kb") {
+      parse_ll(val, snap.swap_total_kb);
+    } else if (key == "swap_free_kb") {
+      parse_ll(val, snap.swap_free_kb);
     } else if (key == "uptime") {
       parse_double(val, snap.uptime_sec);
     } else if (key == "disk") {
@@ -220,6 +241,11 @@ HealthSnapshot parse_health_output(std::string_view text) {
   if (snap.mem_total_kb > 0) {
     const auto used = snap.mem_total_kb - std::min(snap.mem_avail_kb, snap.mem_total_kb);
     snap.mem_pct = 100.0 * static_cast<double>(used) / static_cast<double>(snap.mem_total_kb);
+  }
+  if (snap.swap_total_kb > 0) {
+    const auto free = std::min(snap.swap_free_kb, snap.swap_total_kb);
+    const auto used = snap.swap_total_kb - free;
+    snap.swap_pct = 100.0 * static_cast<double>(used) / static_cast<double>(snap.swap_total_kb);
   }
   if (other_os) {
     snap.level = HealthLevel::Unsupported;
@@ -255,6 +281,12 @@ std::string health_remote_script(const HealthCollect& collect) {
     s += "fi\n";
     s += "printf 'mem_total_kb=%s\\n' \"$mem_total_kb\"\n";
     s += "printf 'mem_avail_kb=%s\\n' \"$mem_avail_kb\"\n";
+  }
+  if (collect.swap) {
+    s += "swap_total_kb=$(awk '/^SwapTotal:/ {print $2; exit}' /proc/meminfo 2>/dev/null)\n";
+    s += "swap_free_kb=$(awk '/^SwapFree:/ {print $2; exit}' /proc/meminfo 2>/dev/null)\n";
+    s += "printf 'swap_total_kb=%s\\n' \"${swap_total_kb:-0}\"\n";
+    s += "printf 'swap_free_kb=%s\\n' \"${swap_free_kb:-0}\"\n";
   }
   if (collect.cpu) {
     s += "if [ -r /proc/stat ]; then\n";
@@ -487,11 +519,19 @@ HealthSnapshot snapshot_from_json(const json& raw, const std::string& id) {
   snap.mem_total_kb = raw.value("mem_total_kb", 0LL);
   snap.mem_avail_kb = raw.value("mem_avail_kb", 0LL);
   snap.mem_pct = raw.value("mem_pct", -1.0);
+  snap.swap_total_kb = raw.value("swap_total_kb", 0LL);
+  snap.swap_free_kb = raw.value("swap_free_kb", 0LL);
+  snap.swap_pct = raw.value("swap_pct", -1.0);
   snap.uptime_sec = raw.value("uptime", -1.0);
   snap.checked_at = raw.value("checked_at", 0.0);
   if (snap.mem_pct < 0 && snap.mem_total_kb > 0) {
     const auto used = snap.mem_total_kb - std::min(snap.mem_avail_kb, snap.mem_total_kb);
     snap.mem_pct = 100.0 * static_cast<double>(used) / static_cast<double>(snap.mem_total_kb);
+  }
+  if (snap.swap_pct < 0 && snap.swap_total_kb > 0) {
+    const auto free = std::min(snap.swap_free_kb, snap.swap_total_kb);
+    const auto used = snap.swap_total_kb - free;
+    snap.swap_pct = 100.0 * static_cast<double>(used) / static_cast<double>(snap.swap_total_kb);
   }
   if (raw.contains("disks") && raw["disks"].is_array()) {
     for (const auto& d : raw["disks"]) {
@@ -526,6 +566,9 @@ json snapshot_to_json(const HealthSnapshot& snap) {
       {"mem_total_kb", snap.mem_total_kb},
       {"mem_avail_kb", snap.mem_avail_kb},
       {"mem_pct", snap.mem_pct},
+      {"swap_total_kb", snap.swap_total_kb},
+      {"swap_free_kb", snap.swap_free_kb},
+      {"swap_pct", snap.swap_pct},
       {"uptime", snap.uptime_sec},
       {"checked_at", snap.checked_at},
       {"disks", std::move(disks)},

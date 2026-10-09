@@ -8,6 +8,7 @@
 #include <wx/dcgraph.h>
 #include <wx/display.h>
 #include <wx/event.h>
+#include <wx/eventfilter.h>
 #include <wx/evtloop.h>
 #include <wx/graphics.h>
 #include <wx/menu.h>
@@ -935,6 +936,14 @@ class ThemedPopup : public wxPopupTransientWindow {
 
   bool finished() const { return finished_; }
   int result() const { return result_; }
+  void nudge(int delta) { move_hover(delta); }
+  void accept_current() { accept(hover_); }
+  void cancel() {
+    if (finished_) return;
+    result_ = -1;
+    finished_ = true;
+    if (IsShown()) Dismiss();
+  }
 
   wxSize preferred_size(wxWindow* measure, int min_width) const {
     wxClientDC dc(measure);
@@ -1090,6 +1099,113 @@ class ThemedPopup : public wxPopupTransientWindow {
   bool finished_ = false;
 };
 
+struct MenuSwitch {
+  int current = -1;
+  int count = 0;
+  int next = -1;
+  bool busy = false;
+  ThemedPopup* pop = nullptr;
+};
+
+MenuSwitch* g_menu_switch = nullptr;
+
+void menu_bar_switch_to(int index) {
+  if (!g_menu_switch) return;
+  if (index < 0 || index >= g_menu_switch->count || index == g_menu_switch->current) return;
+  g_menu_switch->next = index;
+  if (g_menu_switch->busy || !g_menu_switch->pop || g_menu_switch->pop->finished()) return;
+  g_menu_switch->busy = true;
+  g_menu_switch->pop->cancel();
+  g_menu_switch->busy = false;
+}
+
+void menu_bar_switch_delta(int delta) {
+  if (!g_menu_switch || g_menu_switch->count <= 1) return;
+  int next = g_menu_switch->current + delta;
+  if (next < 0) next = g_menu_switch->count - 1;
+  if (next >= g_menu_switch->count) next = 0;
+  menu_bar_switch_to(next);
+}
+
+void menu_bar_cancel() {
+  if (!g_menu_switch || g_menu_switch->busy) return;
+  g_menu_switch->next = -1;
+  if (!g_menu_switch->pop || g_menu_switch->pop->finished()) return;
+  g_menu_switch->busy = true;
+  g_menu_switch->pop->cancel();
+  g_menu_switch->busy = false;
+}
+
+bool menu_switch_armed() {
+  return g_menu_switch && g_menu_switch->pop && !g_menu_switch->pop->finished();
+}
+
+bool pointer_over_menu_popup() {
+  if (!menu_switch_armed()) return false;
+  return g_menu_switch->pop->GetScreenRect().Contains(wxGetMousePosition());
+}
+
+class MenuKeyFilter : public wxEventFilter {
+ public:
+  int FilterEvent(wxEvent& event) override {
+    if (event.GetEventType() != wxEVT_CHAR_HOOK || !menu_switch_armed()) return Event_Skip;
+    auto* key = static_cast<wxKeyEvent*>(&event);
+    if (key->ControlDown() || key->AltDown()) return Event_Skip;
+    switch (key->GetKeyCode()) {
+      case WXK_ESCAPE:
+        menu_bar_cancel();
+        return Event_Processed;
+      case WXK_LEFT:
+      case WXK_NUMPAD_LEFT:
+        menu_bar_switch_delta(-1);
+        return Event_Processed;
+      case WXK_RIGHT:
+      case WXK_NUMPAD_RIGHT:
+        menu_bar_switch_delta(1);
+        return Event_Processed;
+      case WXK_UP:
+      case WXK_NUMPAD_UP:
+        g_menu_switch->pop->nudge(-1);
+        return Event_Processed;
+      case WXK_DOWN:
+      case WXK_NUMPAD_DOWN:
+        g_menu_switch->pop->nudge(1);
+        return Event_Processed;
+      case WXK_RETURN:
+      case WXK_NUMPAD_ENTER:
+      case WXK_SPACE:
+        g_menu_switch->pop->accept_current();
+        return Event_Processed;
+      default:
+        return Event_Skip;
+    }
+  }
+};
+
+class MenuFilterGuard {
+ public:
+  MenuFilterGuard(wxEventFilter* filter, MenuSwitch* track) {
+    if (!track) return;
+    active_ = true;
+    prev_ = g_menu_switch;
+    g_menu_switch = track;
+    filter_ = filter;
+    wxEvtHandler::AddFilter(filter_);
+  }
+  ~MenuFilterGuard() {
+    if (!active_) return;
+    wxEvtHandler::RemoveFilter(filter_);
+    g_menu_switch = prev_;
+  }
+  MenuFilterGuard(const MenuFilterGuard&) = delete;
+  MenuFilterGuard& operator=(const MenuFilterGuard&) = delete;
+
+ private:
+  wxEventFilter* filter_ = nullptr;
+  MenuSwitch* prev_ = nullptr;
+  bool active_ = false;
+};
+
 wxPoint clamp_popup(const wxPoint& screen, const wxSize& size, int anchor_h) {
   const int display = wxDisplay::GetFromPoint(screen);
   wxRect area = display == wxNOT_FOUND ? wxRect(0, 0, 1280, 800) : wxDisplay(display).GetClientArea();
@@ -1102,7 +1218,7 @@ wxPoint clamp_popup(const wxPoint& screen, const wxSize& size, int anchor_h) {
 }
 
 int run_popup(wxWindow* parent, std::vector<PopupRow> rows, const wxPoint& screen, int min_width, int anchor_h,
-              int preselect) {
+              int preselect, MenuSwitch* track = nullptr) {
   if (!parent || rows.empty()) return -1;
   wxWindow* owner = wxGetTopLevelParent(parent);
   if (!owner) owner = parent;
@@ -1110,17 +1226,64 @@ int run_popup(wxWindow* parent, std::vector<PopupRow> rows, const wxPoint& scree
   const wxSize size = pop->preferred_size(owner, min_width);
   pop->SetSize(size);
   pop->SetPosition(clamp_popup(screen, size, anchor_h));
-  pop->Popup();
-  pop->SetFocus();
-  pop->Update();
-  wxEventLoop loop;
-  wxEventLoopActivator activator(&loop);
-  while (!pop->finished()) {
-    if (!loop.Dispatch()) break;
+  if (track) {
+    track->pop = pop;
+    track->next = -1;
   }
-  const int id = pop->result();
+  int id = -1;
+  {
+    MenuKeyFilter filter;
+    MenuFilterGuard guard(track ? &filter : nullptr, track);
+    pop->Popup();
+    pop->SetFocus();
+    pop->Update();
+    wxEventLoop loop;
+    wxEventLoopActivator activator(&loop);
+    while (!pop->finished()) {
+      if (!loop.Dispatch()) break;
+    }
+    id = pop->result();
+    if (track) track->pop = nullptr;
+  }
   if (!pop->IsBeingDeleted()) pop->Destroy();
   return id;
+}
+
+std::vector<PopupRow> menu_rows(wxMenu* menu) {
+  std::vector<PopupRow> rows;
+  if (!menu) return rows;
+  rows.reserve(menu->GetMenuItemCount());
+  for (size_t i = 0; i < menu->GetMenuItemCount(); ++i) {
+    wxMenuItem* item = menu->FindItemByPosition(i);
+    if (!item) continue;
+    PopupRow row;
+    if (item->IsSeparator()) {
+      row.separator = true;
+      rows.push_back(std::move(row));
+      continue;
+    }
+    row.label = item->GetItemLabelText();
+    row.id = item->GetId();
+    row.enabled = item->IsEnabled();
+    if (auto* accel = item->GetAccel()) row.hint = accel->ToString();
+    if (row.hint.empty()) {
+      const wxString full = item->GetItemLabel();
+      const int tab = full.Find(wxUniChar('\t'));
+      if (tab != wxNOT_FOUND) row.hint = full.Mid(tab + 1);
+    }
+    rows.push_back(std::move(row));
+  }
+  return rows;
+}
+
+void dispatch_menu(wxWindow* parent, wxMenu* menu, int id) {
+  if (!parent || !menu || id < 0) return;
+  wxCommandEvent ev(wxEVT_MENU, id);
+  ev.SetEventObject(menu);
+  if (!menu->ProcessEvent(ev)) {
+    ev.SetEventObject(parent);
+    parent->ProcessWindowEvent(ev);
+  }
 }
 
 void draw_check(wxGraphicsContext* gfx, double x, double y, double size, const wxColour& colour) {
@@ -1429,12 +1592,15 @@ ThemedMenuBar::ThemedMenuBar(wxWindow* parent) : wxPanel(parent, wxID_ANY) {
   SetMinSize(wxSize(-1, FromDIP(32)));
   SetCursor(wxCURSOR_HAND);
   Bind(wxEVT_PAINT, &ThemedMenuBar::on_paint, this);
+  Bind(wxEVT_LEFT_DOWN, &ThemedMenuBar::on_mouse, this);
   Bind(wxEVT_LEFT_UP, &ThemedMenuBar::on_mouse, this);
   Bind(wxEVT_MOTION, &ThemedMenuBar::on_mouse, this);
   Bind(wxEVT_LEAVE_WINDOW, &ThemedMenuBar::on_mouse, this);
+  track_timer_.Bind(wxEVT_TIMER, &ThemedMenuBar::on_track_timer, this);
 }
 
 ThemedMenuBar::~ThemedMenuBar() {
+  track_timer_.Stop();
   for (auto& entry : entries_) delete entry.menu;
 }
 
@@ -1459,7 +1625,8 @@ void ThemedMenuBar::on_paint(wxPaintEvent&) {
     const wxSize text = gc.GetTextExtent(entry.title);
     const int w = text.x + pad_x * 2;
     entry.rect = wxRect(x, 0, w, h);
-    if (index == hover_) {
+    const int lit = hover_ >= 0 ? hover_ : open_index_;
+    if (index == lit) {
       gc.SetPen(*wxTRANSPARENT_PEN);
       gc.SetBrush(wxBrush(Theme::hover()));
       gc.DrawRectangle(entry.rect);
@@ -1472,72 +1639,100 @@ void ThemedMenuBar::on_paint(wxPaintEvent&) {
   gc.DrawLine(0, h - 1, sz.x, h - 1);
 }
 
+int ThemedMenuBar::index_at(const wxPoint& client) const {
+  for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
+    if (entries_[static_cast<std::size_t>(i)].rect.Contains(client)) return i;
+  }
+  return -1;
+}
+
 void ThemedMenuBar::on_mouse(wxMouseEvent& e) {
   if (e.Leaving()) {
-    hover_ = -1;
-    Refresh();
+    if (hover_ != -1) {
+      hover_ = -1;
+      Refresh();
+    }
     return;
   }
-  int found = -1;
-  for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
-    if (entries_[static_cast<std::size_t>(i)].rect.Contains(e.GetPosition())) found = i;
+  const int found = index_at(e.GetPosition());
+  if (e.LeftDown()) {
+    if (open_index_ >= 0 && found >= 0) {
+      // Отпускание этой кнопки не должно сразу открыть меню заново.
+      swallow_up_ = true;
+      if (found == open_index_) menu_bar_cancel();
+      else menu_bar_switch_to(found);
+      return;
+    }
+    swallow_up_ = false;
   }
-  if (e.Moving() && found != hover_) {
+  if (e.LeftUp()) {
+    const bool swallow = swallow_up_;
+    swallow_up_ = false;
+    if (!swallow && found >= 0 && open_index_ < 0) open_at(found);
+    return;
+  }
+  if ((e.Moving() || e.Dragging()) && open_index_ >= 0 && found >= 0 && found != open_index_ &&
+      menu_switch_armed()) {
+    hover_ = found;
+    Refresh();
+    menu_bar_switch_to(found);
+    return;
+  }
+  if ((e.Moving() || e.Dragging()) && found != hover_) {
     hover_ = found;
     Refresh();
   }
-  if (e.LeftUp() && found >= 0) open_at(found);
+}
+
+void ThemedMenuBar::on_track_timer(wxTimerEvent&) {
+  if (!menu_switch_armed() || pointer_over_menu_popup()) return;
+  const int found = index_at(ScreenToClient(wxGetMousePosition()));
+  if (found < 0 || found == open_index_) return;
+  hover_ = found;
+  Refresh();
+  menu_bar_switch_to(found);
 }
 
 void ThemedMenuBar::open_at(int index) {
-  if (index < 0 || index >= static_cast<int>(entries_.size())) return;
-  auto& entry = entries_[static_cast<std::size_t>(index)];
-  if (!entry.menu) return;
-  const wxPoint screen = ClientToScreen(wxPoint(entry.rect.x, GetClientSize().y));
-  hover_ = index;
-  Refresh();
-  Update();
-  show_themed_menu(wxGetTopLevelParent(this), entry.menu, screen);
-  const wxPoint pt = ScreenToClient(wxGetMousePosition());
-  hover_ = -1;
-  for (int i = 0; i < static_cast<int>(entries_.size()); ++i) {
-    if (entries_[static_cast<std::size_t>(i)].rect.Contains(pt)) hover_ = i;
+  if (open_index_ >= 0 || index < 0 || index >= static_cast<int>(entries_.size())) return;
+  wxWindow* parent = wxGetTopLevelParent(this);
+  if (!parent) return;
+  int chosen = -1;
+  wxMenu* chosen_menu = nullptr;
+  track_timer_.Start(32);
+  while (index >= 0 && index < static_cast<int>(entries_.size())) {
+    wxMenu* menu = entries_[static_cast<std::size_t>(index)].menu;
+    if (!menu) break;
+    open_index_ = index;
+    hover_ = index;
+    Refresh();
+    Update();
+    const wxPoint screen = ClientToScreen(wxPoint(entries_[static_cast<std::size_t>(index)].rect.x, GetClientSize().y));
+    MenuSwitch track;
+    track.current = index;
+    track.count = static_cast<int>(entries_.size());
+    const int id =
+        run_popup(parent, menu_rows(menu), screen, parent->FromDIP(180), GetClientSize().y, -1, &track);
+    if (track.next >= 0 && track.next != index && track.next < track.count) {
+      index = track.next;
+      continue;
+    }
+    chosen = id;
+    chosen_menu = menu;
+    break;
   }
+  track_timer_.Stop();
+  open_index_ = -1;
+  hover_ = index_at(ScreenToClient(wxGetMousePosition()));
   Refresh();
+  if (chosen_menu && chosen >= 0) dispatch_menu(parent, chosen_menu, chosen);
 }
 
 void show_themed_menu(wxWindow* parent, wxMenu* menu, const wxPoint& screen_pos) {
   if (!parent || !menu) return;
-  std::vector<PopupRow> rows;
-  for (size_t i = 0; i < menu->GetMenuItemCount(); ++i) {
-    wxMenuItem* item = menu->FindItemByPosition(i);
-    if (!item) continue;
-    PopupRow row;
-    if (item->IsSeparator()) {
-      row.separator = true;
-      rows.push_back(std::move(row));
-      continue;
-    }
-    row.label = item->GetItemLabelText();
-    row.id = item->GetId();
-    row.enabled = item->IsEnabled();
-    if (auto* accel = item->GetAccel()) row.hint = accel->ToString();
-    if (row.hint.empty()) {
-      const wxString full = item->GetItemLabel();
-      const int tab = full.Find(wxUniChar('\t'));
-      if (tab != wxNOT_FOUND) row.hint = full.Mid(tab + 1);
-    }
-    rows.push_back(std::move(row));
-  }
   const wxPoint screen = screen_pos == wxDefaultPosition ? wxGetMousePosition() : screen_pos;
-  const int id = run_popup(parent, std::move(rows), screen, parent->FromDIP(180), 0, -1);
-  if (id < 0) return;
-  wxCommandEvent ev(wxEVT_MENU, id);
-  ev.SetEventObject(menu);
-  if (!menu->ProcessEvent(ev)) {
-    ev.SetEventObject(parent);
-    parent->ProcessWindowEvent(ev);
-  }
+  const int id = run_popup(parent, menu_rows(menu), screen, parent->FromDIP(180), 0, -1);
+  if (id >= 0) dispatch_menu(parent, menu, id);
 }
 
 }  // namespace fatty

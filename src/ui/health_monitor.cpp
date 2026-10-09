@@ -78,14 +78,18 @@ HealthThresholds HealthMonitor::thresholds_from(const AppSettings& st) const {
   t.disk_crit = st.health_disk_crit;
   t.ram_warn = st.health_ram_warn;
   t.ram_crit = st.health_ram_crit;
+  t.swap_warn = st.health_swap_warn;
+  t.swap_crit = st.health_swap_crit;
   t.cpu_warn = st.health_cpu_warn;
   t.cpu_crit = st.health_cpu_crit;
+  t.load_warn = st.health_load_warn;
+  t.load_crit = st.health_load_crit;
   return t;
 }
 
 HealthCollect HealthMonitor::collect_from(const AppSettings& st) const {
   return {st.health_show_cpu, st.health_show_ram, st.health_show_disk, st.health_show_load,
-          st.health_show_docker_disks};
+          st.health_show_docker_disks, st.health_show_swap};
 }
 
 void HealthMonitor::tick() {
@@ -190,7 +194,8 @@ void HealthMonitor::start_check(Server server) {
       if (snap.level != HealthLevel::Unsupported) {
         apply_health_thresholds(snap, thresholds);
       }
-      if (snap.cpu_pct < 0 && snap.mem_pct < 0 && snap.disks.empty() && snap.load1 < 0 && snap.uptime_sec < 0) {
+      if (snap.cpu_pct < 0 && snap.mem_pct < 0 && snap.swap_pct < 0 && snap.disks.empty() && snap.load1 < 0 &&
+          snap.uptime_sec < 0) {
         if (result.exit_code == 124) {
           snap.level = HealthLevel::Unknown;
           snap.error = "таймаут проверки";

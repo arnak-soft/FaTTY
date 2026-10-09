@@ -70,10 +70,15 @@ json portable_settings(const AppSettings& settings) {
       {"health_disk_crit", settings.health_disk_crit},
       {"health_ram_warn", settings.health_ram_warn},
       {"health_ram_crit", settings.health_ram_crit},
+      {"health_swap_warn", settings.health_swap_warn},
+      {"health_swap_crit", settings.health_swap_crit},
       {"health_cpu_warn", settings.health_cpu_warn},
       {"health_cpu_crit", settings.health_cpu_crit},
+      {"health_load_warn", settings.health_load_warn},
+      {"health_load_crit", settings.health_load_crit},
       {"health_show_cpu", settings.health_show_cpu},
       {"health_show_ram", settings.health_show_ram},
+      {"health_show_swap", settings.health_show_swap},
       {"health_show_disk", settings.health_show_disk},
       {"health_show_load", settings.health_show_load},
       {"health_show_docker_disks", settings.health_show_docker_disks},
@@ -116,10 +121,15 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   settings.health_disk_crit = clamp_int(raw.value("health_disk_crit", settings.health_disk_crit), 1, 100);
   settings.health_ram_warn = clamp_int(raw.value("health_ram_warn", settings.health_ram_warn), 1, 100);
   settings.health_ram_crit = clamp_int(raw.value("health_ram_crit", settings.health_ram_crit), 1, 100);
+  settings.health_swap_warn = clamp_int(raw.value("health_swap_warn", settings.health_swap_warn), 1, 100);
+  settings.health_swap_crit = clamp_int(raw.value("health_swap_crit", settings.health_swap_crit), 1, 100);
   settings.health_cpu_warn = clamp_int(raw.value("health_cpu_warn", settings.health_cpu_warn), 1, 100);
   settings.health_cpu_crit = clamp_int(raw.value("health_cpu_crit", settings.health_cpu_crit), 1, 100);
+  settings.health_load_warn = clamp_int(raw.value("health_load_warn", settings.health_load_warn), 1, 500);
+  settings.health_load_crit = clamp_int(raw.value("health_load_crit", settings.health_load_crit), 1, 500);
   settings.health_show_cpu = raw.value("health_show_cpu", settings.health_show_cpu);
   settings.health_show_ram = raw.value("health_show_ram", settings.health_show_ram);
+  settings.health_show_swap = raw.value("health_show_swap", settings.health_show_swap);
   settings.health_show_disk = raw.value("health_show_disk", settings.health_show_disk);
   settings.health_show_load = raw.value("health_show_load", settings.health_show_load);
   settings.health_show_docker_disks = raw.value("health_show_docker_disks", settings.health_show_docker_disks);

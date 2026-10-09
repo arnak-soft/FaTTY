@@ -116,10 +116,15 @@ struct AppSettings {
   int health_disk_crit = 90;
   int health_ram_warn = 80;
   int health_ram_crit = 90;
+  int health_swap_warn = 50;
+  int health_swap_crit = 80;
   int health_cpu_warn = 80;
   int health_cpu_crit = 95;
+  int health_load_warn = 100;
+  int health_load_crit = 150;
   bool health_show_cpu = true;
   bool health_show_ram = true;
+  bool health_show_swap = true;
   bool health_show_disk = true;
   bool health_show_load = true;
   bool health_show_docker_disks = false;

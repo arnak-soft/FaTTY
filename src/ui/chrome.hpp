@@ -217,7 +217,9 @@ class ThemedMenuBar : public wxPanel {
  private:
   void on_paint(wxPaintEvent&);
   void on_mouse(wxMouseEvent&);
+  void on_track_timer(wxTimerEvent&);
   void open_at(int index);
+  int index_at(const wxPoint& client) const;
 
   struct Entry {
     wxString title;
@@ -225,7 +227,10 @@ class ThemedMenuBar : public wxPanel {
     wxRect rect;
   };
   std::vector<Entry> entries_;
+  wxTimer track_timer_;
   int hover_ = -1;
+  int open_index_ = -1;
+  bool swallow_up_ = false;
 };
 
 // Модальное меню в цветах темы. Событие wxEVT_MENU уходит в menu, затем в parent.

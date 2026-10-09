@@ -394,25 +394,31 @@ void AppFrame::build_ui() {
   first_page->SetSizer(page_sz);
   groups_nb_->AddPage(first_page, L"Общее");
   group_tab_ids_.push_back("");
-  auto* cleft = new wxWrapSizer(wxHORIZONTAL);
   auto* cadd = make_button(groups_page, L"Добавить", BtnIcon::Plus);
   auto* presets = make_button(groups_page, L"Пресеты…", BtnIcon::List);
   auto* gadd = make_button(groups_page, L"Группа", BtnIcon::FolderPlus);
   gadd->SetToolTip(L"Новая группа. Правый клик по вкладке — переименовать или удалить.");
-  add_btn(cleft, cadd);
-  add_btn(cleft, presets);
-  add_btn(cleft, gadd);
-  stop_btn_ = make_button(groups_page, L"Стоп", BtnIcon::Stop);
-  run_btn_ = accent_button(groups_page, L"Запустить", BtnIcon::Play);
+  // Пара — одно окно для переноса: на узкой панели «Запустить» и «Стоп» не разъезжаются.
+  auto* run_pair = new wxPanel(groups_page, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
+  run_pair->SetName(L"card-page");
+  run_pair->SetBackgroundColour(Theme::elevated());
+  stop_btn_ = make_button(run_pair, L"Стоп", BtnIcon::Stop);
+  run_btn_ = accent_button(run_pair, L"Запустить", BtnIcon::Play);
   run_btn_->SetToolTip(L"F5, Enter или двойной клик");
   stop_btn_->Enable(false);
-  auto* cbtns = new wxBoxSizer(wxHORIZONTAL);
-  cbtns->Add(cleft, 1, wxEXPAND);
-  cbtns->Add(run_btn_, 0, wxRIGHT, gap);
-  cbtns->Add(stop_btn_, 0, wxALIGN_CENTER_VERTICAL);
+  auto* pair_sz = new wxBoxSizer(wxHORIZONTAL);
+  pair_sz->Add(run_btn_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
+  pair_sz->Add(stop_btn_, 0, wxALIGN_CENTER_VERTICAL);
+  run_pair->SetSizer(pair_sz);
+  // Без wxEXTEND_LAST_ON_EACH_LINE: иначе последняя кнопка ряда растягивается на всю ширину.
+  auto* cbtns = new wxWrapSizer(wxHORIZONTAL, wxREMOVE_LEADING_SPACES);
+  add_btn(cbtns, cadd);
+  add_btn(cbtns, presets);
+  add_btn(cbtns, gadd);
+  add_btn(cbtns, run_pair);
   auto* gs = new wxBoxSizer(wxVERTICAL);
   gs->Add(groups_nb_, 1, wxEXPAND);
-  gs->Add(cbtns, 0, wxTOP, pad);
+  gs->Add(cbtns, 0, wxEXPAND | wxTOP, pad);
   groups_page->SetSizer(gs);
 
   auto* bundles_page = new wxPanel(right_nb);

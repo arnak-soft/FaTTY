@@ -272,9 +272,11 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   health_cpu_->SetValue(st.health_show_cpu);
   health_ram_ = new ThemedCheckBox(health_page, wxID_ANY, L"RAM");
   health_ram_->SetValue(st.health_show_ram);
+  health_swap_ = new ThemedCheckBox(health_page, wxID_ANY, L"Swap");
+  health_swap_->SetValue(st.health_show_swap);
   health_disk_ = new ThemedCheckBox(health_page, wxID_ANY, L"Диск");
   health_disk_->SetValue(st.health_show_disk);
-  health_load_ = new ThemedCheckBox(health_page, wxID_ANY, L"Нагрузка (load average)");
+  health_load_ = new ThemedCheckBox(health_page, wxID_ANY, L"Нагрузка (load / ядра)");
   health_load_->SetValue(st.health_show_load);
   health_docker_disks_ = new ThemedCheckBox(health_page, wxID_ANY, L"Тома Docker overlay / snap");
   health_docker_disks_->SetValue(st.health_show_docker_disks);
@@ -284,12 +286,15 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* mrow = new wxBoxSizer(wxHORIZONTAL);
   mrow->Add(health_cpu_, 0, wxRIGHT, 12);
   mrow->Add(health_ram_, 0, wxRIGHT, 12);
+  mrow->Add(health_swap_, 0, wxRIGHT, 12);
   mrow->Add(health_disk_, 0, wxRIGHT, 12);
   mrow->Add(health_load_);
   auto* color_label = new wxStaticText(health_page, wxID_ANY, L"Цвета шкал: жёлтый с … %, красный с … %");
   color_label->SetName(L"section");
   auto* color_hint = new wxStaticText(
-      health_page, wxID_ANY, L"Это только окраска диаграмм, не уведомления. Можно подогнать под свои серверы.");
+      health_page, wxID_ANY,
+      L"Это только окраска диаграмм, не уведомления. Нагрузка — в процентах от числа ядер "
+      L"(100 = load равен числу CPU).");
   color_hint->SetName(L"muted");
   color_hint->SetForegroundColour(Theme::muted());
   color_hint->Wrap(FromDIP(520));
@@ -305,7 +310,10 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   };
   auto* disk_row = thresh_row(L"Диск", st.health_disk_warn, st.health_disk_crit, &health_disk_warn_, &health_disk_crit_);
   auto* ram_row = thresh_row(L"RAM", st.health_ram_warn, st.health_ram_crit, &health_ram_warn_, &health_ram_crit_);
+  auto* swap_row = thresh_row(L"Swap", st.health_swap_warn, st.health_swap_crit, &health_swap_warn_, &health_swap_crit_);
   auto* cpu_row = thresh_row(L"CPU", st.health_cpu_warn, st.health_cpu_crit, &health_cpu_warn_, &health_cpu_crit_);
+  auto* load_row =
+      thresh_row(L"Нагрузка", st.health_load_warn, st.health_load_crit, &health_load_warn_, &health_load_crit_);
   hsz->Add(health_auto_, 0, wxALL, 8);
   hsz->Add(health_hint, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
   hsz->Add(irow, 0, wxALL, 8);
@@ -317,7 +325,9 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   hsz->Add(color_hint, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
   hsz->Add(disk_row, 0, wxALL, 8);
   hsz->Add(ram_row, 0, wxALL, 8);
+  hsz->Add(swap_row, 0, wxALL, 8);
   hsz->Add(cpu_row, 0, wxALL, 8);
+  hsz->Add(load_row, 0, wxALL, 8);
   health_page->SetSizer(hsz);
   nb->AddPage(health_page, L"Состояние");
   health_interval_->Bind(wxEVT_CHOICE, [this](wxCommandEvent&) {
@@ -574,26 +584,39 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   int disk_crit = config_.settings.health_disk_crit;
   int ram_warn = config_.settings.health_ram_warn;
   int ram_crit = config_.settings.health_ram_crit;
+  int swap_warn = config_.settings.health_swap_warn;
+  int swap_crit = config_.settings.health_swap_crit;
   int cpu_warn = config_.settings.health_cpu_warn;
   int cpu_crit = config_.settings.health_cpu_crit;
+  int load_warn = config_.settings.health_load_warn;
+  int load_crit = config_.settings.health_load_crit;
   parse_int(std::string(health_interval_sec_->GetValue().utf8_string()), health_interval);
   parse_int(std::string(health_timeout_->GetValue().utf8_string()), health_timeout);
   parse_int(std::string(health_disk_warn_->GetValue().utf8_string()), disk_warn);
   parse_int(std::string(health_disk_crit_->GetValue().utf8_string()), disk_crit);
   parse_int(std::string(health_ram_warn_->GetValue().utf8_string()), ram_warn);
   parse_int(std::string(health_ram_crit_->GetValue().utf8_string()), ram_crit);
+  parse_int(std::string(health_swap_warn_->GetValue().utf8_string()), swap_warn);
+  parse_int(std::string(health_swap_crit_->GetValue().utf8_string()), swap_crit);
   parse_int(std::string(health_cpu_warn_->GetValue().utf8_string()), cpu_warn);
   parse_int(std::string(health_cpu_crit_->GetValue().utf8_string()), cpu_crit);
+  parse_int(std::string(health_load_warn_->GetValue().utf8_string()), load_warn);
+  parse_int(std::string(health_load_crit_->GetValue().utf8_string()), load_crit);
   config_.settings.health_interval_sec = clamp_int(health_interval, 300, 30 * 24 * 3600);
   config_.settings.health_timeout_sec = clamp_int(health_timeout, 5, 120);
   config_.settings.health_disk_warn = clamp_int(disk_warn, 1, 100);
   config_.settings.health_disk_crit = clamp_int(std::max(disk_crit, config_.settings.health_disk_warn), 1, 100);
   config_.settings.health_ram_warn = clamp_int(ram_warn, 1, 100);
   config_.settings.health_ram_crit = clamp_int(std::max(ram_crit, config_.settings.health_ram_warn), 1, 100);
+  config_.settings.health_swap_warn = clamp_int(swap_warn, 1, 100);
+  config_.settings.health_swap_crit = clamp_int(std::max(swap_crit, config_.settings.health_swap_warn), 1, 100);
   config_.settings.health_cpu_warn = clamp_int(cpu_warn, 1, 100);
   config_.settings.health_cpu_crit = clamp_int(std::max(cpu_crit, config_.settings.health_cpu_warn), 1, 100);
+  config_.settings.health_load_warn = clamp_int(load_warn, 1, 500);
+  config_.settings.health_load_crit = clamp_int(std::max(load_crit, config_.settings.health_load_warn), 1, 500);
   config_.settings.health_show_cpu = health_cpu_->GetValue();
   config_.settings.health_show_ram = health_ram_->GetValue();
+  config_.settings.health_show_swap = health_swap_->GetValue();
   config_.settings.health_show_disk = health_disk_->GetValue();
   config_.settings.health_show_load = health_load_->GetValue();
   config_.settings.health_show_docker_disks = health_docker_disks_->GetValue();

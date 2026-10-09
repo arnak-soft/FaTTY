@@ -37,8 +37,13 @@ struct HealthThresholds {
   int disk_crit = 90;
   int ram_warn = 80;
   int ram_crit = 90;
+  int swap_warn = 50;
+  int swap_crit = 80;
   int cpu_warn = 80;
   int cpu_crit = 95;
+  // Нагрузка как % от числа ядер (load / nproc * 100). Может быть > 100.
+  int load_warn = 100;
+  int load_crit = 150;
 };
 
 struct HealthCollect {
@@ -47,6 +52,7 @@ struct HealthCollect {
   bool disk = true;
   bool load = true;
   bool docker_disks = false;
+  bool swap = true;
 };
 
 struct HealthSnapshot {
@@ -63,6 +69,9 @@ struct HealthSnapshot {
   long long mem_total_kb = 0;
   long long mem_avail_kb = 0;
   double mem_pct = -1;
+  long long swap_total_kb = 0;
+  long long swap_free_kb = 0;
+  double swap_pct = -1;
   double uptime_sec = -1;
   std::vector<HealthDisk> disks;
   double checked_at = 0;
@@ -70,6 +79,8 @@ struct HealthSnapshot {
 
 HealthLevel worse_health(HealthLevel a, HealthLevel b);
 HealthLevel level_from_pct(double pct, int warn, int crit);
+/// load15 (иначе load5 / load1) / nproc * 100; −1 если нет данных.
+double health_load_pct(const HealthSnapshot& snap);
 void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thresholds);
 
 HealthSnapshot parse_health_output(std::string_view text);

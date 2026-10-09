@@ -40,8 +40,12 @@ HealthThresholds thresholds_of(const AppSettings& st) {
   t.disk_crit = st.health_disk_crit;
   t.ram_warn = st.health_ram_warn;
   t.ram_crit = st.health_ram_crit;
+  t.swap_warn = st.health_swap_warn;
+  t.swap_crit = st.health_swap_crit;
   t.cpu_warn = st.health_cpu_warn;
   t.cpu_crit = st.health_cpu_crit;
+  t.load_warn = st.health_load_warn;
+  t.load_crit = st.health_load_crit;
   return t;
 }
 
@@ -206,11 +210,13 @@ class LoadChart : public wxPanel {
     });
   }
 
-  void set_load(int nproc, double l1, double l5, double l15) {
+  void set_load(int nproc, double l1, double l5, double l15, int warn, int crit) {
     nproc_ = nproc;
     l1_ = l1;
     l5_ = l5;
     l15_ = l15;
+    warn_ = warn > 0 ? warn : 100;
+    crit_ = crit > warn_ ? crit : warn_ + 50;
     Refresh();
   }
 
@@ -221,18 +227,14 @@ class LoadChart : public wxPanel {
   void bar(wxGraphicsContext* gfx, wxGCDC& gc, int x, int w, int top, int h, double value, const wxString& label) {
     const double scale = nproc_ > 0 ? static_cast<double>(nproc_) : 1.0;
     const double pct = value < 0 ? -1 : 100.0 * value / scale;
-    HealthLevel lvl = HealthLevel::Unknown;
-    if (pct >= 0) {
-      if (pct >= 150) lvl = HealthLevel::Crit;
-      else if (pct >= 100) lvl = HealthLevel::Warn;
-      else lvl = HealthLevel::Ok;
-    }
+    const HealthLevel lvl = bar_level(pct, warn_, crit_);
+    const double ceil_pct = std::max(150.0, static_cast<double>(crit_));
     if (gfx) {
       gfx->SetPen(wxNullPen);
       gfx->SetBrush(wxBrush(Theme::btn()));
       gfx->DrawRoundedRectangle(x, top, w, h, 4);
       if (pct >= 0) {
-        const double fh = h * std::clamp(pct, 0.0, 150.0) / 150.0;
+        const double fh = h * std::clamp(pct, 0.0, ceil_pct) / ceil_pct;
         gfx->SetBrush(wxBrush(health_colour(lvl)));
         gfx->DrawRoundedRectangle(x, top + (h - fh), w, fh, 4);
       }
@@ -261,7 +263,16 @@ class LoadChart : public wxPanel {
     gc.SetFont(Theme::ui_small());
     gc.SetTextForeground(Theme::muted());
     wxString head = L"Нагрузка";
-    if (nproc_ > 0) head += wxString::Format(L"  •  %d CPU", nproc_);
+    if (nproc_ > 0) {
+      head += wxString::Format(L"  •  %d CPU", nproc_);
+      HealthSnapshot util_snap;
+      util_snap.nproc = nproc_;
+      util_snap.load1 = l1_;
+      util_snap.load5 = l5_;
+      util_snap.load15 = l15_;
+      const double util = health_load_pct(util_snap);
+      if (util >= 0) head += wxString::Format(L"  •  %.0f%% ядер", util);
+    }
     gc.DrawText(head, FromDIP(4), FromDIP(2));
     const int top = FromDIP(28);
     const int h = std::max(FromDIP(36), sz.y - FromDIP(52));
@@ -276,6 +287,8 @@ class LoadChart : public wxPanel {
   double l1_ = -1;
   double l5_ = -1;
   double l15_ = -1;
+  int warn_ = 100;
+  int crit_ = 150;
 };
 
 class HostCard : public wxPanel {
@@ -300,11 +313,14 @@ class HostCard : public wxPanel {
     selected_ = selected;
     show_cpu_ = st.health_show_cpu;
     show_ram_ = st.health_show_ram;
+    show_swap_ = st.health_show_swap;
     show_disk_ = st.health_show_disk;
     disk_warn_ = st.health_disk_warn;
     disk_crit_ = st.health_disk_crit;
     ram_warn_ = st.health_ram_warn;
     ram_crit_ = st.health_ram_crit;
+    swap_warn_ = st.health_swap_warn;
+    swap_crit_ = st.health_swap_crit;
     cpu_warn_ = st.health_cpu_warn;
     cpu_crit_ = st.health_cpu_crit;
     enabled_ = server.health_enabled;
@@ -315,7 +331,10 @@ class HostCard : public wxPanel {
   const std::string& id() const { return id_; }
 
  protected:
-  wxSize DoGetBestSize() const override { return FromDIP(wxSize(260, 118)); }
+  wxSize DoGetBestSize() const override {
+    int bars = (show_cpu_ ? 1 : 0) + (show_ram_ ? 1 : 0) + (show_swap_ ? 1 : 0) + (show_disk_ ? 1 : 0);
+    return FromDIP(wxSize(260, 86 + bars * 16));
+  }
 
  private:
   void mini_bar(wxGraphicsContext* gfx, wxGCDC& gc, int x, int y, int w, const wxString& label, double pct,
@@ -323,7 +342,7 @@ class HostCard : public wxPanel {
     gc.SetFont(Theme::ui_small());
     gc.SetTextForeground(Theme::muted());
     gc.DrawText(label, x, y - FromDIP(2));
-    if (gfx) draw_h_bar(gfx, wxRect(x + FromDIP(36), y + FromDIP(2), w - FromDIP(36), FromDIP(9)), pct,
+    if (gfx) draw_h_bar(gfx, wxRect(x + FromDIP(40), y + FromDIP(2), w - FromDIP(40), FromDIP(9)), pct,
                         health_colour(level), Theme::btn());
   }
 
@@ -367,6 +386,10 @@ class HostCard : public wxPanel {
       mini_bar(gfx, gc, x, y, w, L"RAM", snap_.mem_pct, bar_level(snap_.mem_pct, ram_warn_, ram_crit_));
       y += FromDIP(16);
     }
+    if (show_swap_) {
+      mini_bar(gfx, gc, x, y, w, L"Swap", snap_.swap_pct, bar_level(snap_.swap_pct, swap_warn_, swap_crit_));
+      y += FromDIP(16);
+    }
     if (show_disk_) {
       double dp = -1;
       if (auto* d = health_root_or_worst(snap_)) dp = d->pct();
@@ -383,11 +406,14 @@ class HostCard : public wxPanel {
   bool enabled_ = true;
   bool show_cpu_ = true;
   bool show_ram_ = true;
+  bool show_swap_ = true;
   bool show_disk_ = true;
   int disk_warn_ = 80;
   int disk_crit_ = 90;
   int ram_warn_ = 80;
   int ram_crit_ = 90;
+  int swap_warn_ = 50;
+  int swap_crit_ = 80;
   int cpu_warn_ = 80;
   int cpu_crit_ = 95;
 };
@@ -570,6 +596,19 @@ void HealthWindow::show_detail() {
     ram->set(snap.mem_pct, cap, bar_level(snap.mem_pct, st.health_ram_warn, st.health_ram_crit));
     root->Add(ram, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
+  if (st.health_show_swap) {
+    auto* swap = new MetricBar(detail_, L"Swap", 52);
+    wxString cap = L"—";
+    if (snap.swap_total_kb <= 0 && snap.checked_at > 0) {
+      cap = L"нет";
+    } else if (snap.swap_pct >= 0) {
+      const auto used = snap.swap_total_kb - std::min(snap.swap_free_kb, snap.swap_total_kb);
+      cap = wxString::FromUTF8(format_pct(snap.swap_pct) + "  " + format_kib(used) + " / " +
+                               format_kib(snap.swap_total_kb));
+    }
+    swap->set(snap.swap_pct, cap, bar_level(snap.swap_pct, st.health_swap_warn, st.health_swap_crit));
+    root->Add(swap, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  }
   if (st.health_show_disk) {
     auto* disks = new DiskChart(detail_);
     std::vector<DiskChart::Col> cols;
@@ -586,7 +625,7 @@ void HealthWindow::show_detail() {
   }
   if (st.health_show_load) {
     auto* load = new LoadChart(detail_);
-    load->set_load(snap.nproc, snap.load1, snap.load5, snap.load15);
+    load->set_load(snap.nproc, snap.load1, snap.load5, snap.load15, st.health_load_warn, st.health_load_crit);
     root->Add(load, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
   auto* meta = new wxStaticText(detail_, wxID_ANY,

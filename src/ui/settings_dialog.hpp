@@ -61,10 +61,15 @@ class SettingsDialog : public PositionedDialog {
   wxTextCtrl* health_disk_crit_{};
   wxTextCtrl* health_ram_warn_{};
   wxTextCtrl* health_ram_crit_{};
+  wxTextCtrl* health_swap_warn_{};
+  wxTextCtrl* health_swap_crit_{};
   wxTextCtrl* health_cpu_warn_{};
   wxTextCtrl* health_cpu_crit_{};
+  wxTextCtrl* health_load_warn_{};
+  wxTextCtrl* health_load_crit_{};
   ThemedCheckBox* health_cpu_{};
   ThemedCheckBox* health_ram_{};
+  ThemedCheckBox* health_swap_{};
   ThemedCheckBox* health_disk_{};
   ThemedCheckBox* health_load_{};
   ThemedCheckBox* health_docker_disks_{};
