@@ -231,9 +231,8 @@ std::string JournalEntry::duration_display() const {
 }
 
 std::string JournalEntry::status_display() const {
-  if (exit_code && (status == "ok" || status == "failed")) {
-    return std::to_string(*exit_code);
-  }
+  if (status == "ok") return "OK";
+  if (exit_code && status == "failed") return "ошибка " + std::to_string(*exit_code);
   return status_label(status);
 }
 
@@ -273,7 +272,7 @@ std::string JournalEntry::last_run_label() const {
   if (status == "ok") {
     result = "OK";
   } else if (exit_code && status == "failed") {
-    result = std::to_string(*exit_code);
+    result = "ошибка " + std::to_string(*exit_code);
   } else {
     result = status_label(status);
   }

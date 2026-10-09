@@ -137,7 +137,7 @@ void test_journal() {
     expect(bundles.count("avg-cmd") == 1, "bundle stats present");
     expect(bundles["avg-cmd"].run_count == 1, "bundle run count");
     expect(bundles["avg-cmd"].latest.status == "failed", "bundle latest status");
-    expect(bundles["avg-cmd"].latest.last_run_label().find("2") == 0, "bundle last run label");
+    expect(bundles["avg-cmd"].latest.last_run_label().find("ошибка 2") == 0, "bundle last run label");
     expect(kind_label("bundle") == "связка", "bundle kind label");
     auto snap = timed.stats_snapshot();
     expect(snap.commands["avg-cmd"].run_count == 2, "snapshot commands");

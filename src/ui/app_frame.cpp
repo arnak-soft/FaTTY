@@ -1380,17 +1380,20 @@ void AppFrame::refresh_commands() {
     long row = commands_->InsertItem(static_cast<long>(i), L"");
     wxString last = L"—";
     wxString avg = L"—";
+    wxString result = L"—";
     wxColour colour = Theme::text();
     auto it = command_stats_.find(c.id);
     if (it != command_stats_.end()) {
       last = wxString::FromUTF8(it->second.latest.last_run_label());
+      result = wxString::FromUTF8(status_label(it->second.latest.status));
       colour = Theme::run_status(it->second.latest.status);
       if (it->second.run_count > 0) {
         avg = wxString::FromUTF8(format_duration(it->second.average_sec));
       }
     }
     fill_row(commands_, row, command_column_ids(),
-             {{"name", wxString::FromUTF8(c.name)},
+             {{"result", result},
+              {"name", wxString::FromUTF8(c.name)},
               {"comment", wxString::FromUTF8(comment)},
               {"folder", wxString::FromUTF8(command_display_folder(config_, c))},
               {"command", wxString::FromUTF8(preview)},
@@ -1426,9 +1429,9 @@ void AppFrame::update_server_heading() {
 }
 
 std::vector<std::string> AppFrame::command_column_ids() const {
-  std::vector<std::string> available{"name", "command", "comment", "last", "avg"};
+  std::vector<std::string> available{"result", "name", "command", "comment", "last", "avg"};
   if (config_.settings.show_command_folder_column) {
-    available = {"folder", "name", "command", "comment", "last", "avg"};
+    available = {"result", "folder", "name", "command", "comment", "last", "avg"};
   }
   auto it = config_.settings.column_order.find("commands");
   if (it == config_.settings.column_order.end()) return available;
@@ -1436,7 +1439,12 @@ std::vector<std::string> AppFrame::command_column_ids() const {
   static const std::vector<std::string> old_default_with_folder{"name", "comment", "folder", "command", "last"};
   static const std::vector<std::string> old_default_no_folder{"name", "comment", "command", "last"};
   if (saved == old_default_with_folder || saved == old_default_no_folder) return available;
-  return prefer_order(available, saved);
+  auto order = prefer_order(available, saved);
+  if (std::find(saved.begin(), saved.end(), "result") == saved.end()) {
+    order.erase(std::remove(order.begin(), order.end(), "result"), order.end());
+    order.insert(order.begin(), "result");
+  }
+  return order;
 }
 
 std::vector<std::string> AppFrame::server_column_ids() const {
@@ -1474,7 +1482,9 @@ void AppFrame::setup_command_columns() {
   }
   const auto ids = command_column_ids();
   for (const auto& id : ids) {
-    if (id == "comment") {
+    if (id == "result") {
+      commands_->AppendColumn(L"Итог", wxLIST_FORMAT_LEFT, FromDIP(88));
+    } else if (id == "comment") {
       commands_->AppendColumn(L"Комментарий", wxLIST_FORMAT_LEFT, FromDIP(180));
     } else if (id == "folder") {
       commands_->AppendColumn(L"Папка", wxLIST_FORMAT_LEFT, FromDIP(180));
@@ -1498,7 +1508,8 @@ void AppFrame::setup_command_columns() {
 void AppFrame::sort_visible_commands(const std::string& by, bool toggle) {
   auto* s = selected_server();
   if (!s) return;
-  if (by != "name" && by != "command" && by != "comment" && by != "folder" && by != "avg" && by != "last") {
+  if (by != "name" && by != "command" && by != "comment" && by != "folder" && by != "avg" &&
+      by != "last" && by != "result") {
     return;
   }
   const bool same = toggle && command_sort_by_ == by && command_sort_server_id_ == s->id &&
@@ -1535,6 +1546,11 @@ void AppFrame::apply_command_view_sort(std::vector<Command>& group) {
     if (it == command_stats_.end()) return {};
     return it->second.latest.started_at;
   };
+  auto result_of = [this](const std::string& id) -> std::string {
+    auto it = command_stats_.find(id);
+    if (it == command_stats_.end()) return {};
+    return status_label(it->second.latest.status);
+  };
   auto text_key = [this, &by](const Command& c) -> std::string {
     if (by == "command") return to_lower(trim(c.command));
     if (by == "comment") return to_lower(trim(c.comment));
@@ -1545,7 +1561,7 @@ void AppFrame::apply_command_view_sort(std::vector<Command>& group) {
     return to_lower(trim(c.name));
   };
   std::sort(group.begin(), group.end(), [&](const Command& a, const Command& b) {
-    if (by == "avg" || by == "last") {
+    if (by == "avg" || by == "last" || by == "result") {
       if (by == "avg") {
         const double da = avg_of(a.id);
         const double db = avg_of(b.id);
@@ -1553,6 +1569,13 @@ void AppFrame::apply_command_view_sort(std::vector<Command>& group) {
         const bool b_missing = db < 0;
         if (a_missing != b_missing) return !a_missing;
         if (da != db) return asc ? da < db : da > db;
+      } else if (by == "result") {
+        const auto ra = result_of(a.id);
+        const auto rb = result_of(b.id);
+        const bool a_missing = ra.empty();
+        const bool b_missing = rb.empty();
+        if (a_missing != b_missing) return !a_missing;
+        if (ra != rb) return asc ? ra < rb : ra > rb;
       } else {
         const auto sa = last_of(a.id);
         const auto sb = last_of(b.id);

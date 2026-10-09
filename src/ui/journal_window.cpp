@@ -42,7 +42,7 @@ JournalWindow::JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
   list_->AppendColumn(L"Время", wxLIST_FORMAT_LEFT, FromDIP(150));
   list_->AppendColumn(L"VPS", wxLIST_FORMAT_LEFT, FromDIP(140));
   list_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(280));
-  list_->AppendColumn(L"Результат", wxLIST_FORMAT_LEFT, FromDIP(100));
+  list_->AppendColumn(L"Результат", wxLIST_FORMAT_LEFT, FromDIP(120));
   list_->AppendColumn(L"Длит.", wxLIST_FORMAT_LEFT, FromDIP(90));
   auto* list_sz = new wxBoxSizer(wxVERTICAL);
   list_sz->Add(list_, 1, wxEXPAND);
