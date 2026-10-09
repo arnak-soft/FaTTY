@@ -277,14 +277,33 @@ void PresetDialog::on_ok(wxCommandEvent&) {
 
 CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std::vector<Server>& servers,
                              const std::vector<CommandGroup>& groups, const wxString& title)
-    : PositionedDialog(parent, title, wxSize(640, 660)), command_(command), servers_(servers), groups_(groups) {
+    : PositionedDialog(parent, title, wxSize(680, 680)), command_(command), servers_(servers), groups_(groups) {
   auto* body = new wxPanel(this);
-  auto* form = new wxFlexGridSizer(10, 2, 6, 8);
-  form->AddGrowableCol(1);
-  name_ = labeled_entry(body, form, L"Название", wxString::FromUTF8(command.name));
-  comment_ = labeled_entry(body, form, L"Комментарий", wxString::FromUTF8(command.comment));
+  const int gap = FromDIP(8);
+
+  presets_ = all_presets();
+  wxArrayString pname;
+  for (const auto& p : presets_) pname.Add(wxString::FromUTF8(p.name));
+  preset_ = new ThemedChoice(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, pname);
+
+  auto* script_head = new wxBoxSizer(wxHORIZONTAL);
+  script_head->Add(new wxStaticText(body, wxID_ANY, L"Команда"), 0, wxALIGN_CENTER_VERTICAL);
+  script_head->AddStretchSpacer();
+  script_head->Add(new wxStaticText(body, wxID_ANY, L"Пресет"), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
+  script_head->Add(preset_, 0, wxALIGN_CENTER_VERTICAL);
+
+  text_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(command.command), wxDefaultPosition, wxDefaultSize,
+                         wxTE_MULTILINE | wxHSCROLL);
+  style_text(text_, true);
+  text_->SetMinSize(FromDIP(wxSize(480, 200)));
+  text_->SetHint(L"Текст, который уйдёт на VPS");
+
+  auto* who = new wxFlexGridSizer(4, 2, gap, gap);
+  who->AddGrowableCol(1);
+  name_ = labeled_entry(body, who, L"Название", wxString::FromUTF8(command.name));
+  comment_ = labeled_entry(body, who, L"Комментарий", wxString::FromUTF8(command.comment));
   comment_->SetHint(L"Необязательно — видно в списке");
-  form->Add(new wxStaticText(body, wxID_ANY, L"VPS"), 0, wxALIGN_CENTER_VERTICAL);
+  who->Add(new wxStaticText(body, wxID_ANY, L"VPS"), 0, wxALIGN_CENTER_VERTICAL);
   wxArrayString names;
   wxString current;
   for (const auto& s : servers) {
@@ -292,68 +311,61 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
     if (s.id == command.server_id) current = wxString::FromUTF8(s.name);
   }
   server_ = new ThemedChoice(body, wxID_ANY, current, wxDefaultPosition, wxDefaultSize, names);
-  form->Add(server_, 1, wxEXPAND);
-  form->Add(new wxStaticText(body, wxID_ANY, L"Группа"), 0, wxALIGN_CENTER_VERTICAL);
+  who->Add(server_, 1, wxEXPAND);
+  who->Add(new wxStaticText(body, wxID_ANY, L"Группа"), 0, wxALIGN_CENTER_VERTICAL);
   group_ = new ThemedChoice(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxArrayString());
-  form->Add(group_, 1, wxEXPAND);
+  who->Add(group_, 1, wxEXPAND);
   fill_groups();
-  working_dir_ = labeled_entry(body, form, L"Папка", wxString::FromUTF8(command.working_dir));
+
+  auto* run = new wxFlexGridSizer(6, 2, gap, gap);
+  run->AddGrowableCol(1);
+  working_dir_ = labeled_entry(body, run, L"Папка", wxString::FromUTF8(command.working_dir));
   working_dir_->SetHint(L"/var/www/app или относительный путь");
-  form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
+  run->Add(new wxStaticText(body, wxID_ANY, L""), 0);
   cd_before_ = new ThemedCheckBox(body, wxID_ANY, L"Переходить в папку перед выполнением");
   cd_before_->SetValue(command.cd_before_run);
-  form->Add(cd_before_, 1);
-  timeout_ = labeled_entry(body, form, L"Таймаут, с", wxString::FromUTF8(std::to_string(command.timeout_sec)));
-  form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
-  login_ = new ThemedCheckBox(body, wxID_ANY, L"Login-shell (bash -lc) — подхватывает PATH из .bashrc");
-  login_->SetValue(command.login_shell);
-  form->Add(login_, 1);
-  form->Add(new wxStaticText(body, wxID_ANY, L"Shell"), 0, wxALIGN_CENTER_VERTICAL);
+  run->Add(cd_before_, 1, wxEXPAND);
+  run->Add(new wxStaticText(body, wxID_ANY, L"Shell"), 0, wxALIGN_CENTER_VERTICAL);
   shell_ = new ThemedChoice(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize,
-                          wxArrayString{L"как у VPS", L"bash", L"sh"});
+                            wxArrayString{L"как у VPS", L"bash", L"sh"});
   if (command.remote_shell.empty()) {
     shell_->SetSelection(0);
   } else {
     shell_->SetSelection(normalize_remote_shell(command.remote_shell) == "sh" ? 2 : 1);
   }
-  form->Add(shell_, 1, wxEXPAND);
-  form->Add(new wxStaticText(body, wxID_ANY, L""), 0);
+  run->Add(shell_, 1, wxEXPAND);
+  timeout_ = labeled_entry(body, run, L"Таймаут, с", wxString::FromUTF8(std::to_string(command.timeout_sec)));
+  run->Add(new wxStaticText(body, wxID_ANY, L""), 0);
+  login_ = new ThemedCheckBox(body, wxID_ANY, L"Login-shell (bash -lc) — подхватывает PATH из .bashrc");
+  login_->SetValue(command.login_shell);
+  run->Add(login_, 1, wxEXPAND);
+  run->Add(new wxStaticText(body, wxID_ANY, L""), 0);
   confirm_ = new ThemedCheckBox(body, wxID_ANY, L"Предупреждать перед запуском");
   confirm_->SetValue(command.confirm_before_run);
-  form->Add(confirm_, 1);
-  form->Add(new wxStaticText(body, wxID_ANY, L"Пресет"), 0, wxALIGN_CENTER_VERTICAL);
-  presets_ = all_presets();
-  wxArrayString pname;
-  for (const auto& p : presets_) pname.Add(wxString::FromUTF8(p.name));
-  preset_ = new ThemedChoice(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, pname);
-  form->Add(preset_, 1, wxEXPAND);
-
-  text_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(command.command), wxDefaultPosition,
-                         wxSize(-1, FromDIP(160)), wxTE_MULTILINE | wxTE_WORDWRAP);
-  style_text(text_, true);
-  text_->SetMinSize(wxSize(-1, FromDIP(120)));
+  run->Add(confirm_, 1, wxEXPAND);
 
   auto* btns = new wxBoxSizer(wxHORIZONTAL);
   btns->AddStretchSpacer();
   auto* save = accent_button(body, L"Сохранить", BtnIcon::Save);
-  btns->Add(save, 0, wxRIGHT, 8);
+  btns->Add(save, 0, wxRIGHT, gap);
   btns->Add(make_button(body, L"Отмена", BtnIcon::Cancel, wxID_CANCEL));
-
   save->SetDefault();
+
   auto* root = new wxBoxSizer(wxVERTICAL);
-  root->Add(form, 0, wxEXPAND | wxALL, 12);
-  root->Add(new wxStaticText(body, wxID_ANY, L"Команда"), 0, wxLEFT | wxRIGHT, 12);
+  root->Add(script_head, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 12);
   root->Add(text_, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 12);
-  // Buttons stay at the bottom and never shrink away.
-  root->Add(btns, 0, wxEXPAND | wxALL, 12);
+  root->Add(who, 0, wxEXPAND | wxALL, 12);
+  root->Add(section_label(body, L"Запуск"), 0, wxLEFT | wxRIGHT, 12);
+  root->Add(run, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP | wxBOTTOM, 12);
+  root->Add(btns, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
   body->SetSizer(root);
   auto* outer = new wxBoxSizer(wxVERTICAL);
   outer->Add(body, 1, wxEXPAND);
   SetSizerAndFit(outer);
-  SetMinSize(FromDIP(wxSize(520, 460)));
-  if (GetSize().GetHeight() < FromDIP(460)) {
-    SetSize(GetSize().GetWidth(), FromDIP(560));
-  }
+  SetMinSize(FromDIP(wxSize(560, 520)));
+  // Лишняя высота уходит тексту команды: у него доля 1, остальное — по содержимому.
+  const wxSize fitted = GetSize();
+  SetSize(std::max(fitted.GetWidth(), FromDIP(680)), std::max(fitted.GetHeight(), FromDIP(680)));
   apply_dark(this);
   sync_cd_ui();
   server_->Bind(wxEVT_COMBOBOX, [this](wxCommandEvent&) { fill_groups(); });
