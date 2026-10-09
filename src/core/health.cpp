@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <ctime>
 #include <iomanip>
 #include <nlohmann/json.hpp>
@@ -459,6 +460,99 @@ std::string format_pct(double pct) {
   return ss.str();
 }
 
+std::string format_signed_kib(long long delta_kb) {
+  if (delta_kb == 0) return "без изменений";
+  const char* sign = delta_kb > 0 ? "+" : "−";
+  return std::string(sign) + format_kib(delta_kb > 0 ? delta_kb : -delta_kb);
+}
+
+std::string format_signed_pct(double delta_pct) {
+  if (std::fabs(delta_pct) < 0.05) return "без изменений";
+  std::ostringstream ss;
+  ss.setf(std::ios::fixed);
+  ss.precision(std::fabs(delta_pct) >= 10 ? 0 : 1);
+  if (delta_pct > 0) ss << "+";
+  ss << delta_pct << "%";
+  return ss.str();
+}
+
+long long health_mem_used_kb(const HealthSnapshot& snap) {
+  if (snap.mem_total_kb <= 0) return -1;
+  return snap.mem_total_kb - std::min(snap.mem_avail_kb, snap.mem_total_kb);
+}
+
+long long health_swap_used_kb(const HealthSnapshot& snap) {
+  if (snap.swap_total_kb <= 0) return -1;
+  return snap.swap_total_kb - std::min(snap.swap_free_kb, snap.swap_total_kb);
+}
+
+HealthTrend health_trend(const HealthSnapshot& current, const HealthSnapshot& previous) {
+  HealthTrend t;
+  if (previous.checked_at <= 0 || current.checked_at <= 0) return t;
+  t.has_prev = true;
+  t.prev_checked_at = previous.checked_at;
+  const auto cur_mem = health_mem_used_kb(current);
+  const auto prev_mem = health_mem_used_kb(previous);
+  if (cur_mem >= 0 && prev_mem >= 0) {
+    t.mem = true;
+    t.mem_used_delta_kb = cur_mem - prev_mem;
+  }
+  const auto cur_swap = health_swap_used_kb(current);
+  const auto prev_swap = health_swap_used_kb(previous);
+  if (cur_swap >= 0 && prev_swap >= 0) {
+    t.swap = true;
+    t.swap_used_delta_kb = cur_swap - prev_swap;
+  }
+  const HealthDisk* cur_disk = health_root_or_worst(current);
+  if (cur_disk) {
+    const HealthDisk* prev_disk = nullptr;
+    for (const auto& d : previous.disks) {
+      if (d.mount == cur_disk->mount) {
+        prev_disk = &d;
+        break;
+      }
+    }
+    if (!prev_disk) prev_disk = health_root_or_worst(previous);
+    if (prev_disk && prev_disk->total_kb > 0 && cur_disk->total_kb > 0) {
+      t.disk = true;
+      t.disk_mount = cur_disk->mount;
+      t.disk_used_delta_kb = cur_disk->used_kb - prev_disk->used_kb;
+      const double cur_pct = cur_disk->pct();
+      const double prev_pct = prev_disk->pct();
+      if (cur_pct >= 0 && prev_pct >= 0) t.disk_pct_delta = cur_pct - prev_pct;
+    }
+  }
+  return t;
+}
+
+void health_history_push(HealthCacheEntry& entry, HealthSnapshot previous, int max_keep) {
+  if (max_keep < 1) max_keep = kHealthHistoryMax;
+  if (previous.checked_at <= 0) return;
+  if (previous.level == HealthLevel::Checking || previous.checking) return;
+  previous.checking = false;
+  if (!entry.history.empty() &&
+      std::fabs(entry.history.front().checked_at - previous.checked_at) < 0.5) {
+    return;
+  }
+  entry.history.insert(entry.history.begin(), std::move(previous));
+  if (static_cast<int>(entry.history.size()) > max_keep) {
+    entry.history.resize(static_cast<std::size_t>(max_keep));
+  }
+}
+
+std::string format_health_span(double older_ts, double newer_ts) {
+  if (older_ts <= 0 || newer_ts <= 0 || newer_ts < older_ts) return {};
+  const double span = newer_ts - older_ts;
+  if (span < 90) return "за минуту";
+  if (span < 3600) return "за " + std::to_string(static_cast<int>(span / 60)) + " мин";
+  if (span < 90 * 60) return "за час";
+  if (span < 24 * 3600) return "за " + std::to_string(static_cast<int>(span / 3600)) + " ч";
+  const int days = static_cast<int>(span / 86400);
+  if (days == 1) return "за 1 день";
+  if (days == 2 || days == 3 || days == 4) return "за " + std::to_string(days) + " дня";
+  return "за " + std::to_string(days) + " дней";
+}
+
 std::string format_uptime_sec(double seconds) {
   if (seconds < 0) return "—";
   const auto total = static_cast<long long>(seconds);
@@ -577,8 +671,8 @@ json snapshot_to_json(const HealthSnapshot& snap) {
 
 }  // namespace
 
-std::map<std::string, HealthSnapshot> load_health_cache(const std::filesystem::path& path) {
-  std::map<std::string, HealthSnapshot> out;
+std::map<std::string, HealthCacheEntry> load_health_cache(const std::filesystem::path& path) {
+  std::map<std::string, HealthCacheEntry> out;
   if (!std::filesystem::exists(path)) return out;
   json data;
   try {
@@ -591,19 +685,39 @@ std::map<std::string, HealthSnapshot> load_health_cache(const std::filesystem::p
   if (!servers.is_object()) return out;
   for (auto it = servers.begin(); it != servers.end(); ++it) {
     if (!it.value().is_object()) continue;
-    auto snap = snapshot_from_json(it.value(), it.key());
-    if (!snap.server_id.empty()) out[snap.server_id] = std::move(snap);
+    HealthCacheEntry entry;
+    entry.latest = snapshot_from_json(it.value(), it.key());
+    if (entry.latest.server_id.empty()) continue;
+    if (it.value().contains("history") && it.value()["history"].is_array()) {
+      for (const auto& h : it.value()["history"]) {
+        if (!h.is_object()) continue;
+        auto past = snapshot_from_json(h, it.key());
+        past.server_id = it.key();
+        if (past.checked_at <= 0) continue;
+        entry.history.push_back(std::move(past));
+      }
+      if (static_cast<int>(entry.history.size()) > kHealthHistoryMax) {
+        entry.history.resize(static_cast<std::size_t>(kHealthHistoryMax));
+      }
+    }
+    out[entry.latest.server_id] = std::move(entry);
   }
   return out;
 }
 
-void save_health_cache(const std::filesystem::path& path, const std::map<std::string, HealthSnapshot>& snaps) {
+void save_health_cache(const std::filesystem::path& path, const std::map<std::string, HealthCacheEntry>& entries) {
   json servers = json::object();
-  for (const auto& [id, snap] : snaps) {
+  for (const auto& [id, entry] : entries) {
     if (id.empty()) continue;
-    servers[id] = snapshot_to_json(snap);
+    json raw = snapshot_to_json(entry.latest);
+    json hist = json::array();
+    for (const auto& h : entry.history) {
+      hist.push_back(snapshot_to_json(h));
+    }
+    raw["history"] = std::move(hist);
+    servers[id] = std::move(raw);
   }
-  json payload = {{"v", 1}, {"servers", std::move(servers)}};
+  json payload = {{"v", 2}, {"servers", std::move(servers)}};
   atomic_write_text(path, payload.dump(2));
 }
 

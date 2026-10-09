@@ -38,6 +38,8 @@ class HealthMonitor : public wxEvtHandler {
   void refresh_all();
 
   HealthSnapshot snapshot(const std::string& server_id) const;
+  /// Ближайший прошлый замер (если есть).
+  HealthSnapshot previous(const std::string& server_id) const;
   std::map<std::string, HealthSnapshot> snapshots() const;
   bool worker_busy() const { return running_->load(); }
   std::string checking_id() const;
@@ -55,7 +57,7 @@ class HealthMonitor : public wxEvtHandler {
   std::shared_ptr<std::atomic<bool>> running_ = std::make_shared<std::atomic<bool>>(false);
   std::shared_ptr<SSHSession> session_;
   mutable std::mutex mutex_;
-  std::map<std::string, HealthSnapshot> snaps_;
+  std::map<std::string, HealthCacheEntry> entries_;
   std::set<std::string> force_;
   std::size_t next_ = 0;
   std::string checking_id_;

@@ -14,6 +14,8 @@ inline constexpr int kHealthIntervalDefault = 24 * 3600;
 inline constexpr int kHealthTimeoutMin = 5;
 inline constexpr int kHealthTimeoutMax = 120;
 inline constexpr int kHealthTimeoutDefault = 20;
+/// Сколько прошлых замеров хранить на VPS (без текущего).
+inline constexpr int kHealthHistoryMax = 48;
 
 enum class HealthLevel {
   Unknown = 0,
@@ -77,6 +79,25 @@ struct HealthSnapshot {
   double checked_at = 0;
 };
 
+struct HealthCacheEntry {
+  HealthSnapshot latest;
+  /// Прошлые замеры, от новых к старым. Текущий `latest` сюда не входит.
+  std::vector<HealthSnapshot> history;
+};
+
+struct HealthTrend {
+  bool has_prev = false;
+  double prev_checked_at = 0;
+  bool mem = false;
+  long long mem_used_delta_kb = 0;
+  bool swap = false;
+  long long swap_used_delta_kb = 0;
+  bool disk = false;
+  std::string disk_mount;
+  long long disk_used_delta_kb = 0;
+  double disk_pct_delta = 0;
+};
+
 HealthLevel worse_health(HealthLevel a, HealthLevel b);
 HealthLevel level_from_pct(double pct, int warn, int crit);
 /// load15 (иначе load5 / load1) / nproc * 100; −1 если нет данных.
@@ -99,11 +120,19 @@ std::string health_level_label(HealthLevel level);
 
 std::string format_kib(long long kb);
 std::string format_pct(double pct);
+std::string format_signed_kib(long long delta_kb);
+std::string format_signed_pct(double delta_pct);
 std::string format_uptime_sec(double seconds);
 std::string format_health_when(double unix_ts, double now_unix = 0);
+std::string format_health_span(double older_ts, double newer_ts);
 std::string format_interval_label(int seconds);
 
-std::map<std::string, HealthSnapshot> load_health_cache(const std::filesystem::path& path);
-void save_health_cache(const std::filesystem::path& path, const std::map<std::string, HealthSnapshot>& snaps);
+long long health_mem_used_kb(const HealthSnapshot& snap);
+long long health_swap_used_kb(const HealthSnapshot& snap);
+HealthTrend health_trend(const HealthSnapshot& current, const HealthSnapshot& previous);
+void health_history_push(HealthCacheEntry& entry, HealthSnapshot previous, int max_keep = kHealthHistoryMax);
+
+std::map<std::string, HealthCacheEntry> load_health_cache(const std::filesystem::path& path);
+void save_health_cache(const std::filesystem::path& path, const std::map<std::string, HealthCacheEntry>& entries);
 
 }  // namespace fatty

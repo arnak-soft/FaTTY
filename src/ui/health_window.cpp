@@ -13,6 +13,7 @@
 #include <wx/splitter.h>
 #include <algorithm>
 #include <cmath>
+#include <string>
 #include <vector>
 
 namespace fatty {
@@ -628,6 +629,40 @@ void HealthWindow::show_detail() {
     load->set_load(snap.nproc, snap.load1, snap.load5, snap.load15, st.health_load_warn, st.health_load_crit);
     root->Add(load, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
+
+  auto prev = view_snap(monitor_->previous(s->id), st);
+  const auto trend = health_trend(snap, prev);
+  if (trend.has_prev && (trend.mem || trend.swap || trend.disk)) {
+    std::string head = "С прошлой проверки";
+    const auto span = format_health_span(trend.prev_checked_at, snap.checked_at);
+    if (!span.empty()) head += " (" + span + ")";
+    head += ":";
+    auto* trend_title = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(head));
+    trend_title->SetForegroundColour(Theme::muted());
+    root->Add(trend_title, 0, wxLEFT | wxRIGHT | wxTOP, 12);
+    std::string line;
+    if (st.health_show_ram && trend.mem) {
+      line += "RAM " + format_signed_kib(trend.mem_used_delta_kb);
+    }
+    if (st.health_show_swap && trend.swap) {
+      if (!line.empty()) line += "   ";
+      line += "Swap " + format_signed_kib(trend.swap_used_delta_kb);
+    }
+    if (st.health_show_disk && trend.disk) {
+      if (!line.empty()) line += "   ";
+      line += "Диск " + trend.disk_mount + " " + format_signed_kib(trend.disk_used_delta_kb);
+      if (std::fabs(trend.disk_pct_delta) >= 0.05) {
+        line += " (" + format_signed_pct(trend.disk_pct_delta) + ")";
+      }
+    }
+    if (!line.empty()) {
+      auto* trend_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(line));
+      trend_line->SetForegroundColour(Theme::text());
+      trend_line->Wrap(FromDIP(420));
+      root->Add(trend_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    }
+  }
+
   auto* meta = new wxStaticText(detail_, wxID_ANY,
                                 wxString::FromUTF8("Аптайм: " + format_uptime_sec(snap.uptime_sec)));
   meta->SetForegroundColour(Theme::muted());

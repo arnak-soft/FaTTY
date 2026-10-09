@@ -144,23 +144,57 @@ FATTYCWD_abc:/root
   snap.server_name = "alpha";
   snap.checked_at = 12345;
   snap.level = HealthLevel::Ok;
-  std::map<std::string, HealthSnapshot> cache{{"s1", snap}};
+  HealthCacheEntry e1;
+  e1.latest = snap;
+  HealthSnapshot older = snap;
+  older.checked_at = 12000;
+  older.mem_avail_kb = 600000;
+  older.mem_pct = 100.0 * (1024000 - 600000) / 1024000.0;
+  older.disks[0].used_kb = 100000;
+  e1.history.push_back(older);
+  std::map<std::string, HealthCacheEntry> cache{{"s1", e1}};
   save_health_cache(path, cache);
   auto loaded = load_health_cache(path);
   expect(loaded.count("s1") == 1, "cache load");
-  expect(loaded["s1"].nproc == 2, "cache nproc");
-  expect(loaded["s1"].swap_total_kb == 512000, "cache swap");
-  expect(loaded["s1"].disks.size() == 2, "cache disks");
-  expect(loaded["s1"].checked_at == 12345, "cache time");
+  expect(loaded["s1"].latest.nproc == 2, "cache nproc");
+  expect(loaded["s1"].latest.swap_total_kb == 512000, "cache swap");
+  expect(loaded["s1"].latest.disks.size() == 2, "cache disks");
+  expect(loaded["s1"].latest.checked_at == 12345, "cache time");
+  expect(loaded["s1"].history.size() == 1, "cache history");
+  expect(loaded["s1"].history[0].checked_at == 12000, "history time");
+  auto trend = health_trend(loaded["s1"].latest, loaded["s1"].history[0]);
+  expect(trend.has_prev && trend.mem && trend.disk, "trend fields");
+  expect(trend.mem_used_delta_kb > 0, "ram grew");
+  expect(trend.disk_used_delta_kb > 0, "disk grew");
+  expect(format_signed_kib(1024).find('+') != std::string::npos, "signed kib plus");
+  expect(format_health_span(12000, 12345).find("за") != std::string::npos, "span label");
+
+  HealthCacheEntry push_e;
+  push_e.latest = snap;
+  for (int i = 0; i < kHealthHistoryMax + 5; ++i) {
+    HealthSnapshot p = snap;
+    p.checked_at = 1000.0 + i;
+    health_history_push(push_e, p, kHealthHistoryMax);
+  }
+  expect(static_cast<int>(push_e.history.size()) == kHealthHistoryMax, "history trim");
+
   HealthSnapshot bogus;
   bogus.server_id = "s2";
   bogus.level = HealthLevel::Ok;
   bogus.checked_at = 99;
-  cache["s2"] = bogus;
+  cache["s2"] = HealthCacheEntry{bogus, {}};
   save_health_cache(path, cache);
   loaded = load_health_cache(path);
-  expect(loaded["s2"].level == HealthLevel::Unknown, "empty ok cache demoted");
+  expect(loaded["s2"].latest.level == HealthLevel::Unknown, "empty ok cache demoted");
   expect(load_health_cache(dir / "missing.json").empty(), "missing cache");
+
+  // Старый health.json без history (v1) читается как один latest.
+  const auto v1_path = dir / "health_v1.json";
+  atomic_write_text(v1_path, R"({"v":1,"servers":{"old":{"name":"o","level":"ok","checked_at":1,"cpu":1.0,"nproc":1}}})");
+  auto v1 = load_health_cache(v1_path);
+  expect(v1.count("old") == 1 && v1["old"].history.empty(), "v1 cache no history");
+  expect(v1["old"].latest.cpu_pct > 0.9, "v1 latest cpu");
+
   std::filesystem::remove_all(dir, ec);
 
   HealthSnapshot empty;

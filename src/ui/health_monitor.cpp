@@ -5,13 +5,14 @@
 
 #include <wx/app.h>
 
+#include <cmath>
 #include <functional>
 #include <thread>
 
 namespace fatty {
 
 HealthMonitor::HealthMonitor(Deps deps) : deps_(std::move(deps)) {
-  snaps_ = load_health_cache(health_cache_path());
+  entries_ = load_health_cache(health_cache_path());
   timer_.SetOwner(this);
   Bind(wxEVT_TIMER, &HealthMonitor::on_timer, this);
 }
@@ -55,14 +56,23 @@ void HealthMonitor::refresh_all() {
 
 HealthSnapshot HealthMonitor::snapshot(const std::string& server_id) const {
   std::lock_guard lock(mutex_);
-  auto it = snaps_.find(server_id);
-  if (it == snaps_.end()) return {};
-  return it->second;
+  auto it = entries_.find(server_id);
+  if (it == entries_.end()) return {};
+  return it->second.latest;
+}
+
+HealthSnapshot HealthMonitor::previous(const std::string& server_id) const {
+  std::lock_guard lock(mutex_);
+  auto it = entries_.find(server_id);
+  if (it == entries_.end() || it->second.history.empty()) return {};
+  return it->second.history.front();
 }
 
 std::map<std::string, HealthSnapshot> HealthMonitor::snapshots() const {
   std::lock_guard lock(mutex_);
-  return snaps_;
+  std::map<std::string, HealthSnapshot> out;
+  for (const auto& [id, entry] : entries_) out[id] = entry.latest;
+  return out;
 }
 
 std::string HealthMonitor::checking_id() const {
@@ -132,8 +142,8 @@ void HealthMonitor::tick() {
       HealthSnapshot prev;
       {
         std::lock_guard lock(mutex_);
-        auto it = snaps_.find(s.id);
-        if (it != snaps_.end()) prev = it->second;
+        auto it = entries_.find(s.id);
+        if (it != entries_.end()) prev = it->second.latest;
       }
       if (!health_is_due(prev, settings.health_interval_sec, now)) continue;
       chosen = s;
@@ -151,11 +161,11 @@ void HealthMonitor::start_check(Server server) {
   {
     std::lock_guard lock(mutex_);
     checking_id_ = server.id;
-    auto& snap = snaps_[server.id];
+    auto& snap = entries_[server.id].latest;
     snap.server_id = server.id;
     snap.server_name = server.name;
     snap.checking = true;
-    snap.level = HealthLevel::Checking;
+    // level не трогаем: UI рисует «проверка…» по checking_id_, а метрики остаются для истории
   }
   if (deps_.on_change) deps_.on_change();
 
@@ -233,11 +243,19 @@ void HealthMonitor::start_check(Server server) {
 }
 
 void HealthMonitor::store_snapshot(HealthSnapshot snap, bool persist_now) {
-  std::map<std::string, HealthSnapshot> copy;
+  std::map<std::string, HealthCacheEntry> copy;
   {
     std::lock_guard lock(mutex_);
-    snaps_[snap.server_id] = std::move(snap);
-    copy = snaps_;
+    auto& entry = entries_[snap.server_id];
+    HealthSnapshot prior = entry.latest;
+    prior.checking = false;
+    if (prior.checked_at > 0 && snap.checked_at > 0 &&
+        std::fabs(prior.checked_at - snap.checked_at) >= 0.5) {
+      health_history_push(entry, std::move(prior));
+    }
+    snap.checking = false;
+    entry.latest = std::move(snap);
+    copy = entries_;
   }
   if (!persist_now) return;
   if (deps_.servers) {
