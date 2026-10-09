@@ -68,7 +68,7 @@ wxString run_confirm_message(const Command& cmd, const std::string& server_name 
 
 bool confirm_saved_run(wxWindow* parent, const Command& cmd, const std::string& server_name = {}) {
   if (!cmd.confirm_before_run) return true;
-  return wxMessageBox(run_confirm_message(cmd, server_name), L"Запуск", wxYES_NO, parent) == wxYES;
+  return ask_confirm(parent, L"Запуск", run_confirm_message(cmd, server_name), L"Запустить", true, BtnIcon::Play);
 }
 
 std::vector<std::string> moved_ids(std::vector<std::string> ids, int from, int to_before) {
@@ -144,7 +144,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
   refresh_servers(config_.settings.last_server_id);
   Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
     if (busy_ && e.CanVeto() && !closing_for_install_) {
-      if (wxMessageBox(L"Команда ещё выполняется. Выйти?", L"Выход", wxYES_NO, this) != wxYES) {
+      if (!ask_confirm(this, L"Выход", L"Команда ещё выполняется. Выйти?", L"Выйти", false)) {
         e.Veto();
         return;
       }
@@ -680,9 +680,9 @@ void AppFrame::build_ui() {
       open_putty_console(*s, config_.settings.putty_path);
       status_->SetLabel(wxString::FromUTF8("PuTTY открыт → " + s->name));
     } catch (const PuttyNotFoundError&) {
-      int c = wxMessageBox(L"PuTTY не найден.\nДа — скачать\nНет — указать putty.exe", L"PuTTY", wxYES_NO | wxCANCEL, this);
-      if (c == wxYES) open_url(kPuttyDownloadUrl);
-      else if (c == wxNO) {
+      const auto choice = ask_missing_tool(this, L"PuTTY");
+      if (choice == MissingTool::Download) open_url(kPuttyDownloadUrl);
+      else if (choice == MissingTool::Locate) {
         wxFileDialog dlg(this, L"putty.exe", L"", L"putty.exe", L"PuTTY|putty.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
         if (dlg.ShowModal() == wxID_OK) {
           config_.settings.putty_path = std::string(dlg.GetPath().utf8_string());
@@ -701,10 +701,9 @@ void AppFrame::build_ui() {
       open_winscp(*s, config_.settings.winscp_path);
       status_->SetLabel(wxString::FromUTF8("WinSCP открыт → " + s->name));
     } catch (const WinSCPNotFoundError&) {
-      int c = wxMessageBox(L"WinSCP не найден.\nДа — скачать\nНет — указать WinSCP.exe", L"WinSCP",
-                           wxYES_NO | wxCANCEL, this);
-      if (c == wxYES) open_url(kWinscpDownloadUrl);
-      else if (c == wxNO) {
+      const auto choice = ask_missing_tool(this, L"WinSCP");
+      if (choice == MissingTool::Download) open_url(kWinscpDownloadUrl);
+      else if (choice == MissingTool::Locate) {
         wxFileDialog dlg(this, L"WinSCP.exe", L"", L"WinSCP.exe", L"WinSCP|WinSCP.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
         if (dlg.ShowModal() == wxID_OK) {
           config_.settings.winscp_path = std::string(dlg.GetPath().utf8_string());
@@ -808,7 +807,7 @@ void AppFrame::build_ui() {
     auto cmd = trim(std::string(quick_->GetValue().utf8_string()));
     if (!s || cmd.empty()) return;
     if (config_.settings.confirm_before_run &&
-        wxMessageBox(L"Выполнить разовую команду?", L"Запуск", wxYES_NO, this) != wxYES)
+        !ask_confirm(this, L"Запуск", L"Выполнить разовую команду?", L"Запустить", true, BtnIcon::Play))
       return;
     run_command(*s, cmd, config_.settings.default_command_timeout, true, "разовая команда", "", "quick");
   });
@@ -866,8 +865,8 @@ void AppFrame::build_ui() {
   bdel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* b = selected_bundle();
     if (!b) return;
-    if (wxMessageBox(L"Удалить связку «" + wxString::FromUTF8(b->name) + L"»?", L"Связка", wxYES_NO, this) !=
-        wxYES)
+    if (!ask_confirm(this, L"Связка", L"Удалить связку «" + wxString::FromUTF8(b->name) + L"»?", L"Удалить",
+                     false, BtnIcon::Trash))
       return;
     auto id = b->id;
     config_.bundles.erase(std::remove_if(config_.bundles.begin(), config_.bundles.end(),
@@ -910,7 +909,8 @@ void AppFrame::show_journal() {
         return;
       }
       if (config_.settings.confirm_before_run) {
-        if (wxMessageBox(L"Повторить команду из журнала?", L"Запуск", wxYES_NO, this) != wxYES) return;
+        if (!ask_confirm(this, L"Запуск", L"Повторить команду из журнала?", L"Запустить", true, BtnIcon::Play))
+          return;
       }
       run_command(*s, e.command, e.timeout_sec, e.login_shell, e.title.empty() ? "журнал" : e.title, e.command_id,
                   e.kind);
@@ -1011,7 +1011,7 @@ void AppFrame::check_updates_async(bool interactive) {
       if (!err.empty()) {
         if (interactive) {
           auto text = wxString::FromUTF8(err) + L"\n\nОткрыть страницу релизов в браузере?";
-          if (wxMessageBox(text, L"Обновления", wxYES_NO | wxICON_ERROR, this) == wxYES) {
+          if (ask_confirm(this, L"Обновления", text, L"Открыть страницу", true)) {
             open_url(std::string("https://github.com/") + kGithubOwner + "/" + kGithubRepo + "/releases");
           }
         } else {
@@ -1048,7 +1048,7 @@ void AppFrame::check_updates_async(bool interactive) {
                 checking_updates_ = false;
                 if (!err.empty()) {
                   auto text = wxString::FromUTF8(err) + L"\n\nОткрыть страницу релизов в браузере?";
-                  if (wxMessageBox(text, L"Обновления", wxYES_NO | wxICON_ERROR, this) == wxYES) {
+                  if (ask_confirm(this, L"Обновления", text, L"Открыть страницу", true)) {
                     open_url(std::string("https://github.com/") + kGithubOwner + "/" + kGithubRepo + "/releases");
                   }
                   status_->SetLabel(L"Готово");
@@ -2046,7 +2046,7 @@ void AppFrame::start_bundle(const std::string& bundle_id_override) {
   const int pause = b->interval_sec;
   auto msg = wxString::Format(L"Запустить связку «%s»?\n%d команд, пауза %d с.", wxString::FromUTF8(b->name),
                               static_cast<int>(cmds.size()), pause);
-  if (wxMessageBox(msg, L"Связка", wxYES_NO, this) != wxYES) return;
+  if (!ask_confirm(this, L"Связка", msg, L"Запустить", true, BtnIcon::Play)) return;
   if (busy_) {
     for (const auto& c : cmds) {
       run_command(*s, c.command, c.timeout_sec, c.login_shell, c.name, c.id, "command", {},
@@ -2102,9 +2102,10 @@ void AppFrame::delete_group(const std::string& group_id) {
   }
   auto* f = config_.group_by_id(group_id);
   if (!f) return;
-  if (wxMessageBox(L"Удалить группу «" + wxString::FromUTF8(f->name) +
+  if (!ask_confirm(this, L"Группа",
+                   L"Удалить группу «" + wxString::FromUTF8(f->name) +
                        L"»? Команды останутся во вкладке «Общее».",
-                   L"Группа", wxYES_NO, this) != wxYES)
+                   L"Удалить", false, BtnIcon::Trash))
     return;
   if (auto* s = selected_server()) config_.settings.last_group_by_server[s->id].clear();
   config_.remove_group(group_id);
@@ -2236,9 +2237,9 @@ void AppFrame::show_servers_context_menu(long row) {
       open_putty_console(*s, config_.settings.putty_path);
       status_->SetLabel(wxString::FromUTF8("PuTTY открыт → " + s->name));
     } catch (const PuttyNotFoundError&) {
-      int c = wxMessageBox(L"PuTTY не найден.\nДа — скачать\nНет — указать putty.exe", L"PuTTY", wxYES_NO | wxCANCEL, this);
-      if (c == wxYES) open_url(kPuttyDownloadUrl);
-      else if (c == wxNO) {
+      const auto choice = ask_missing_tool(this, L"PuTTY");
+      if (choice == MissingTool::Download) open_url(kPuttyDownloadUrl);
+      else if (choice == MissingTool::Locate) {
         wxFileDialog dlg(this, L"putty.exe", L"", L"putty.exe", L"PuTTY|putty.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
         if (dlg.ShowModal() == wxID_OK) {
           config_.settings.putty_path = std::string(dlg.GetPath().utf8_string());
@@ -2257,10 +2258,9 @@ void AppFrame::show_servers_context_menu(long row) {
       open_winscp(*s, config_.settings.winscp_path);
       status_->SetLabel(wxString::FromUTF8("WinSCP открыт → " + s->name));
     } catch (const WinSCPNotFoundError&) {
-      int c = wxMessageBox(L"WinSCP не найден.\nДа — скачать\nНет — указать WinSCP.exe", L"WinSCP",
-                           wxYES_NO | wxCANCEL, this);
-      if (c == wxYES) open_url(kWinscpDownloadUrl);
-      else if (c == wxNO) {
+      const auto choice = ask_missing_tool(this, L"WinSCP");
+      if (choice == MissingTool::Download) open_url(kWinscpDownloadUrl);
+      else if (choice == MissingTool::Locate) {
         wxFileDialog dlg(this, L"WinSCP.exe", L"", L"WinSCP.exe", L"WinSCP|WinSCP.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
         if (dlg.ShowModal() == wxID_OK) {
           config_.settings.winscp_path = std::string(dlg.GetPath().utf8_string());
@@ -2283,7 +2283,9 @@ void AppFrame::show_servers_context_menu(long row) {
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) return;
-    if (wxMessageBox(L"Удалить «" + wxString::FromUTF8(s->name) + L"»?", L"Удалить VPS", wxYES_NO, this) != wxYES) return;
+    if (!ask_confirm(this, L"Удалить VPS", L"Удалить «" + wxString::FromUTF8(s->name) + L"»?", L"Удалить", false,
+                     BtnIcon::Trash))
+      return;
     auto id = s->id;
     config_.servers.erase(std::remove_if(config_.servers.begin(), config_.servers.end(),
                                          [&](const Server& x) { return x.id == id; }),
@@ -2346,7 +2348,7 @@ void AppFrame::show_commands_context_menu(long row) {
     } else {
       msg = wxString::Format(L"Удалить выбранные команды (%d)?", static_cast<int>(sel.size()));
     }
-    if (wxMessageBox(msg, L"Удалить команду", wxYES_NO, this) != wxYES) return;
+    if (!ask_confirm(this, L"Удалить команду", msg, L"Удалить", false, BtnIcon::Trash)) return;
     std::vector<std::string> ids;
     ids.reserve(sel.size());
     for (auto* c : sel) ids.push_back(c->id);
@@ -2431,8 +2433,8 @@ void AppFrame::show_bundles_context_menu(long row) {
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* b = selected_bundle();
     if (!b) return;
-    if (wxMessageBox(L"Удалить связку «" + wxString::FromUTF8(b->name) + L"»?", L"Связка", wxYES_NO, this) !=
-        wxYES)
+    if (!ask_confirm(this, L"Связка", L"Удалить связку «" + wxString::FromUTF8(b->name) + L"»?", L"Удалить",
+                     false, BtnIcon::Trash))
       return;
     auto id = b->id;
     config_.bundles.erase(std::remove_if(config_.bundles.begin(), config_.bundles.end(),

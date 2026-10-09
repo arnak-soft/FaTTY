@@ -11,7 +11,7 @@ inline constexpr std::string_view kWhatsNew =
     "• В списке команд колонка «Итог»: OK, ошибка, таймаут, прервано или сбой\n"
     "• Клик по заголовку сортирует список команд и не меняет сохранённый порядок\n"
     "• Импорт спрашивает «Добавить» или «Заменить», пароли в экспорт сами не попадают\n"
-    "• В правке команды текст сверху, папка и shell — в блоке «Запуск»";
+    "• Удаление и выход подтверждаются своими кнопками, Enter их не нажимает";
 
 std::string release_version_id(std::string_view version);
 bool should_show_whats_new(std::string_view last_seen, std::string_view current,

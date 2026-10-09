@@ -1,6 +1,7 @@
 #include "ui/files_window.hpp"
 
 #include "core/util.hpp"
+#include "ui/dialogs.hpp"
 #include "ui/layout.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
@@ -128,7 +129,9 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
     long i = list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
     if (i <= 0) return;
     auto& ent = entries_[static_cast<std::size_t>(i - 1)];
-    if (wxMessageBox(L"Удалить «" + wxString::FromUTF8(ent.name) + L"»?", L"Файлы", wxYES_NO, this) != wxYES) return;
+    if (!ask_confirm(this, L"Файлы", L"Удалить «" + wxString::FromUTF8(ent.name) + L"»?", L"Удалить", false,
+                     BtnIcon::Trash))
+      return;
     try {
       session_->remove(ent);
       refresh();

@@ -1,6 +1,7 @@
 #include "ui/journal_window.hpp"
 
 #include "core/util.hpp"
+#include "ui/dialogs.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
@@ -104,7 +105,7 @@ JournalWindow::JournalWindow(wxWindow* parent, std::shared_ptr<Journal> journal,
   });
   del->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { delete_selected(); });
   clear->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    if (wxMessageBox(L"Очистить журнал?", L"Журнал", wxYES_NO, this) != wxYES) return;
+    if (!ask_confirm(this, L"Журнал", L"Очистить журнал?", L"Очистить", false, BtnIcon::Trash)) return;
     journal_->clear();
     detail_->Clear();
     reload();
@@ -177,7 +178,7 @@ void JournalWindow::delete_selected() {
   auto preview = e.command_preview(48);
   auto msg = preview.empty() ? wxString(L"Удалить эту запись из журнала?")
                              : wxString::FromUTF8("Удалить запись «" + preview + "»?");
-  if (wxMessageBox(msg, L"Журнал", wxYES_NO | wxNO_DEFAULT, this) != wxYES) return;
+  if (!ask_confirm(this, L"Журнал", msg, L"Удалить", false, BtnIcon::Trash)) return;
   journal_->remove(e.id);
   detail_->Clear();
   reload();

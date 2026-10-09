@@ -474,9 +474,10 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   extra_del->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     long i = extra_list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
     if (i < 0 || i >= static_cast<long>(extra_programs_.size())) return;
-    if (wxMessageBox(L"Удалить программу «" + wxString::FromUTF8(extra_programs_[static_cast<std::size_t>(i)].name) +
+    if (!ask_confirm(this, L"Удалить",
+                     L"Удалить программу «" + wxString::FromUTF8(extra_programs_[static_cast<std::size_t>(i)].name) +
                          L"»?",
-                     L"Удалить", wxYES_NO | wxICON_QUESTION, this) != wxYES) {
+                     L"Удалить", false, BtnIcon::Trash)) {
       return;
     }
     extra_programs_.erase(extra_programs_.begin() + i);

@@ -154,9 +154,13 @@ struct ExportChoice {
 ImportApply ask_import_mode(wxWindow* parent, const wxString& filename);
 // Экспорт: пароли выключены, пока их явно не отметили.
 ExportChoice ask_export_options(wxWindow* parent);
-// accept_default == false — Enter и Escape оставляют отказ.
+// accept_default == false — Enter и Escape оставляют отказ. Кнопка согласия тогда без акцента.
 bool ask_confirm(wxWindow* parent, const wxString& title, const wxString& message, const wxString& accept_label,
-                 bool accept_default);
+                 bool accept_default, BtnIcon accept_icon = BtnIcon::Check);
+
+// PuTTY / WinSCP не найдены: не «Да/Нет», а скачать или указать файл.
+enum class MissingTool { Cancel, Download, Locate };
+MissingTool ask_missing_tool(wxWindow* parent, const wxString& app_name);
 
 class UpdateAvailableDialog : public wxDialog {
  public:

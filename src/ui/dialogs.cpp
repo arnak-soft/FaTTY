@@ -182,8 +182,9 @@ void ServerDialog::on_ok(wxCommandEvent&) {
   }
   auto key_path = trim(std::string(key_->GetValue().utf8_string()));
   if (password.empty() && key_path.empty()) {
-    if (wxMessageBox(L"Пароль и ключ пустые. Подключаться через ssh-agent / ключи по умолчанию?", L"Без пароля и ключа",
-                     wxYES_NO | wxICON_QUESTION, this) != wxYES) {
+    if (!ask_confirm(this, L"Без пароля и ключа",
+                     L"Пароль и ключ пустые. Подключаться через ssh-agent или ключи по умолчанию?",
+                     L"Подключаться так", true, BtnIcon::Key)) {
       return;
     }
   }
@@ -804,8 +805,9 @@ void ChangeMasterDialog::on_submit(wxCommandEvent&) {
     return;
   }
   if (allow_short_ && static_cast<int>(new_pw.size()) < kMinPasswordLen) {
-    if (wxMessageBox(wxString::Format(L"Пароль короче %d символов — его проще подобрать.\n\nВы уверены?", kMinPasswordLen),
-                     L"Мастер-пароль", wxYES_NO | wxICON_WARNING, this) != wxYES) {
+    if (!ask_confirm(this, L"Мастер-пароль",
+                     wxString::Format(L"Пароль короче %d символов — его проще подобрать.", kMinPasswordLen),
+                     L"Всё равно сохранить", false)) {
       return;
     }
   }
@@ -944,17 +946,18 @@ ExportChoice ask_export_options(wxWindow* parent) {
 }
 
 bool ask_confirm(wxWindow* parent, const wxString& title, const wxString& message, const wxString& accept_label,
-                 bool accept_default) {
+                 bool accept_default, BtnIcon accept_icon) {
   class Dlg : public wxDialog {
    public:
     Dlg(wxWindow* parent, const wxString& title, const wxString& message, const wxString& accept_label,
-        bool accept_default)
+        bool accept_default, BtnIcon accept_icon)
         : wxDialog(parent, wxID_ANY, title) {
       bind_escape_close(this);
       auto* body = new wxPanel(this);
       auto* msg = new wxStaticText(body, wxID_ANY, message);
       msg->Wrap(FromDIP(420));
-      auto* accept = make_button(body, accept_label, BtnIcon::Check);
+      auto* accept = accept_default ? accent_button(body, accept_label, accept_icon)
+                                    : make_button(body, accept_label, accept_icon);
       auto* cancel = make_button(body, L"Отмена", BtnIcon::Cancel, wxID_CANCEL);
       if (accept_default) accept->SetDefault();
       else cancel->SetDefault();
@@ -975,8 +978,51 @@ bool ask_confirm(wxWindow* parent, const wxString& title, const wxString& messag
       accept->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { EndModal(wxID_OK); });
     }
   };
-  Dlg dlg(parent, title, message, accept_label, accept_default);
+  Dlg dlg(parent, title, message, accept_label, accept_default, accept_icon);
   return dlg.ShowModal() == wxID_OK;
+}
+
+MissingTool ask_missing_tool(wxWindow* parent, const wxString& app_name) {
+  class Dlg : public wxDialog {
+   public:
+    MissingTool choice = MissingTool::Cancel;
+    explicit Dlg(wxWindow* parent, const wxString& app_name) : wxDialog(parent, wxID_ANY, app_name) {
+      bind_escape_close(this);
+      auto* body = new wxPanel(this);
+      auto* msg = new wxStaticText(body, wxID_ANY, app_name + L" не найден.");
+      msg->Wrap(FromDIP(420));
+      auto* download = accent_button(body, L"Скачать", BtnIcon::Download);
+      auto* locate = make_button(body, L"Указать файл", BtnIcon::Folder);
+      auto* cancel = make_button(body, L"Отмена", BtnIcon::Cancel, wxID_CANCEL);
+      download->SetDefault();
+      auto* btns = new wxBoxSizer(wxHORIZONTAL);
+      btns->AddStretchSpacer();
+      btns->Add(download, 0, wxRIGHT, 8);
+      btns->Add(locate, 0, wxRIGHT, 8);
+      btns->Add(cancel);
+      auto* root = new wxBoxSizer(wxVERTICAL);
+      root->Add(msg, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 16);
+      root->Add(btns, 0, wxEXPAND | wxALL, 16);
+      body->SetSizer(root);
+      auto* outer = new wxBoxSizer(wxVERTICAL);
+      outer->Add(body, 1, wxEXPAND);
+      SetSizer(outer);
+      apply_dark(this);
+      outer->SetSizeHints(this);
+      if (parent) CentreOnParent();
+      download->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        choice = MissingTool::Download;
+        EndModal(wxID_OK);
+      });
+      locate->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+        choice = MissingTool::Locate;
+        EndModal(wxID_OK);
+      });
+    }
+  };
+  Dlg dlg(parent, app_name);
+  if (dlg.ShowModal() != wxID_OK) return MissingTool::Cancel;
+  return dlg.choice;
 }
 
 UpdateAvailableDialog::UpdateAvailableDialog(wxWindow* parent, const std::string& current, const std::string& latest)
