@@ -150,15 +150,37 @@ FATTYCWD_abc:/root
   expect(script.find("SwapTotal") != std::string::npos, "script swap");
   expect(script.find("reboot-required") != std::string::npos, "script reboot flag");
   expect(script.find("systemctl list-units") != std::string::npos, "script failed units");
+  expect(script.find("docker ps") == std::string::npos, "docker off by default");
   expect(script.find("overlay2") != std::string::npos, "skip overlay by default");
-  auto with_docker = health_remote_script({true, true, true, true, true});
-  expect(with_docker.find("overlay2") == std::string::npos, "keep overlay when enabled");
-  auto slim = health_remote_script({false, false, false, false, false, false});
+  auto with_docker_disks = health_remote_script({true, true, true, true, true});
+  expect(with_docker_disks.find("overlay2") == std::string::npos, "keep overlay when enabled");
+  auto with_docker = health_remote_script({true, true, true, true, false, true, true});
+  expect(with_docker.find("docker_running=") != std::string::npos, "script docker counts");
+  expect(with_docker.find("health=unhealthy") != std::string::npos, "script unhealthy filter");
+  auto slim = health_remote_script({false, false, false, false, false, false, false});
   expect(slim.find("/proc/stat") == std::string::npos, "cpu off");
   expect(slim.find("df -Pk") == std::string::npos, "disk off");
   expect(slim.find("SwapTotal") == std::string::npos, "swap off");
+  expect(slim.find("docker ps") == std::string::npos, "docker off in slim");
   expect(slim.find("reboot-required") != std::string::npos, "reboot always collected");
   expect(slim.find("os=other") != std::string::npos, "still detects non-linux");
+
+  auto docker_snap = parse_health_output(
+      "FATTYHEALTH v1\nnproc=1\ndocker=1\ndocker_running=2\ndocker_exited=1\ndocker_unhealthy=1\n"
+      "docker_exited_name=old-job\ndocker_unhealthy_name=api\nFATTYHEALTH_END\n");
+  expect(docker_snap.docker_present, "docker present");
+  expect(docker_snap.docker_running == 2 && docker_snap.docker_exited == 1, "docker counts");
+  expect(docker_snap.docker_unhealthy == 1, "docker unhealthy count");
+  expect(docker_snap.docker_unhealthy_names.size() == 1 && docker_snap.docker_unhealthy_names[0] == "api",
+         "unhealthy name");
+  docker_snap.checked_at = 1;
+  apply_health_thresholds(docker_snap, {});
+  expect(docker_snap.level == HealthLevel::Warn, "1 unhealthy is warn");
+  docker_snap.docker_unhealthy = 3;
+  apply_health_thresholds(docker_snap, {});
+  expect(docker_snap.level == HealthLevel::Crit, "3 unhealthy is crit");
+  auto no_docker = parse_health_output("FATTYHEALTH v1\nnproc=1\ndocker=0\nFATTYHEALTH_END\n");
+  expect(!no_docker.docker_present && no_docker.docker_running < 0, "docker absent");
 
   expect(format_pct(-1) == "—", "missing pct");
   expect(format_kib(512) == "512 КБ", "bytes kb");

@@ -131,6 +131,7 @@ struct AppSettings {
   bool health_show_swap = true;
   bool health_show_disk = true;
   bool health_show_load = true;
+  bool health_show_docker = false;
   bool health_show_docker_disks = false;
 };
 

@@ -76,6 +76,7 @@ class SettingsDialog : public PositionedDialog {
   ThemedCheckBox* health_swap_{};
   ThemedCheckBox* health_disk_{};
   ThemedCheckBox* health_load_{};
+  ThemedCheckBox* health_docker_{};
   ThemedCheckBox* health_docker_disks_{};
 };
 

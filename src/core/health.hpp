@@ -18,6 +18,8 @@ inline constexpr int kHealthTimeoutDefault = 20;
 inline constexpr int kHealthHistoryMax = 48;
 /// Сколько имён упавших юнитов systemd сохранять в снимке.
 inline constexpr int kHealthFailedUnitsMax = 8;
+/// Сколько имён контейнеров Docker (exited / unhealthy) сохранять.
+inline constexpr int kHealthDockerNamesMax = 6;
 
 enum class HealthLevel {
   Unknown = 0,
@@ -61,6 +63,7 @@ struct HealthCollect {
   bool load = true;
   bool docker_disks = false;
   bool swap = true;
+  bool docker = false;
 };
 
 struct HealthSnapshot {
@@ -87,6 +90,13 @@ struct HealthSnapshot {
   /// Аптайм короче, чем ожидалось после прошлого замера — машина перезагружалась.
   bool rebooted = false;
   std::vector<std::string> failed_units;
+  /// true, если `docker` на сервере ответил (есть бинарь и права).
+  bool docker_present = false;
+  int docker_running = -1;
+  int docker_exited = -1;
+  int docker_unhealthy = -1;
+  std::vector<std::string> docker_exited_names;
+  std::vector<std::string> docker_unhealthy_names;
   std::vector<HealthDisk> disks;
   double checked_at = 0;
 };

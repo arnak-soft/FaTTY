@@ -702,6 +702,48 @@ void HealthWindow::show_detail() {
     units->Wrap(FromDIP(420));
     root->Add(units, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
+  if (st.health_show_docker) {
+    if (snap.docker_present) {
+      std::string docker = "Docker: " + std::to_string(std::max(0, snap.docker_running)) + " running, " +
+                           std::to_string(std::max(0, snap.docker_exited)) + " exited, " +
+                           std::to_string(std::max(0, snap.docker_unhealthy)) + " unhealthy";
+      auto* dline = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(docker));
+      dline->SetForegroundColour(snap.docker_unhealthy > 0
+                                     ? (snap.docker_unhealthy >= 3 ? Theme::err() : Theme::warn())
+                                     : Theme::text());
+      dline->Wrap(FromDIP(420));
+      root->Add(dline, 0, wxLEFT | wxRIGHT | wxTOP, 12);
+      if (!snap.docker_unhealthy_names.empty()) {
+        std::string names = "unhealthy: ";
+        for (std::size_t i = 0; i < snap.docker_unhealthy_names.size(); ++i) {
+          if (i) names += ", ";
+          names += snap.docker_unhealthy_names[i];
+        }
+        auto* nline = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(names));
+        nline->SetForegroundColour(Theme::warn());
+        nline->Wrap(FromDIP(420));
+        root->Add(nline, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+      } else if (!snap.docker_exited_names.empty() && snap.docker_exited > 0) {
+        std::string names = "exited: ";
+        for (std::size_t i = 0; i < snap.docker_exited_names.size(); ++i) {
+          if (i) names += ", ";
+          names += snap.docker_exited_names[i];
+        }
+        auto* nline = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(names));
+        nline->SetForegroundColour(Theme::muted());
+        nline->Wrap(FromDIP(420));
+        root->Add(nline, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+      } else {
+        root->AddSpacer(FromDIP(12));
+      }
+    } else if (snap.checked_at > 0) {
+      auto* absent = new wxStaticText(detail_, wxID_ANY,
+                                      L"Docker: нет на сервере или нет прав (нужен доступ к docker.sock).");
+      absent->SetForegroundColour(Theme::muted());
+      absent->Wrap(FromDIP(420));
+      root->Add(absent, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    }
+  }
   if (!snap.error.empty() && snap.level != HealthLevel::Ok) {
     auto* err = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(snap.error));
     err->SetForegroundColour(Theme::err());

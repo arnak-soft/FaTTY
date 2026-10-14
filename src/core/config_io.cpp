@@ -85,6 +85,7 @@ json portable_settings(const AppSettings& settings) {
       {"health_show_swap", settings.health_show_swap},
       {"health_show_disk", settings.health_show_disk},
       {"health_show_load", settings.health_show_load},
+      {"health_show_docker", settings.health_show_docker},
       {"health_show_docker_disks", settings.health_show_docker_disks},
   };
 }
@@ -140,6 +141,7 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   settings.health_show_swap = raw.value("health_show_swap", settings.health_show_swap);
   settings.health_show_disk = raw.value("health_show_disk", settings.health_show_disk);
   settings.health_show_load = raw.value("health_show_load", settings.health_show_load);
+  settings.health_show_docker = raw.value("health_show_docker", settings.health_show_docker);
   settings.health_show_docker_disks = raw.value("health_show_docker_disks", settings.health_show_docker_disks);
 }
 

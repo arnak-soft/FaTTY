@@ -278,6 +278,11 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   health_disk_->SetValue(st.health_show_disk);
   health_load_ = new ThemedCheckBox(health_page, wxID_ANY, L"Нагрузка (load / ядра)");
   health_load_->SetValue(st.health_show_load);
+  health_docker_ = new ThemedCheckBox(health_page, wxID_ANY, L"Docker (контейнеры)");
+  health_docker_->SetValue(st.health_show_docker);
+  health_docker_->SetToolTip(
+      L"Число running / exited / unhealthy. Нужны docker и права на сокет. "
+      L"После включения нажмите «Обновить» в окне Состояние.");
   health_docker_disks_ = new ThemedCheckBox(health_page, wxID_ANY, L"Тома Docker overlay / snap");
   health_docker_disks_->SetValue(st.health_show_docker_disks);
   health_docker_disks_->SetToolTip(
@@ -289,6 +294,8 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   mrow->Add(health_swap_, 0, wxRIGHT, 12);
   mrow->Add(health_disk_, 0, wxRIGHT, 12);
   mrow->Add(health_load_);
+  auto* mrow2 = new wxBoxSizer(wxHORIZONTAL);
+  mrow2->Add(health_docker_);
   auto* color_label = new wxStaticText(health_page, wxID_ANY, L"Цвета шкал: жёлтый с … %, красный с … %");
   color_label->SetName(L"section");
   auto* color_hint = new wxStaticText(
@@ -324,6 +331,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   hsz->Add(trow_h, 0, wxALL, 8);
   hsz->Add(metrics_label, 0, wxLEFT | wxRIGHT | wxTOP, 8);
   hsz->Add(mrow, 0, wxALL, 8);
+  hsz->Add(mrow2, 0, wxLEFT | wxRIGHT | wxBOTTOM, 8);
   hsz->Add(health_docker_disks_, 0, wxLEFT | wxRIGHT | wxBOTTOM, 8);
   hsz->Add(color_label, 0, wxLEFT | wxRIGHT | wxTOP, 8);
   hsz->Add(color_hint, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
@@ -637,6 +645,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.health_show_swap = health_swap_->GetValue();
   config_.settings.health_show_disk = health_disk_->GetValue();
   config_.settings.health_show_load = health_load_->GetValue();
+  config_.settings.health_show_docker = health_docker_->GetValue();
   config_.settings.health_show_docker_disks = health_docker_disks_->GetValue();
   if (on_apply_) on_apply_();
   EndModal(wxID_OK);

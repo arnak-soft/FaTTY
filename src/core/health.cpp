@@ -71,7 +71,8 @@ std::tm local_from_unix(double unix_ts) {
 bool health_has_readings(const HealthSnapshot& snap) {
   return snap.nproc > 0 || snap.cpu_pct >= 0 || snap.iowait_pct >= 0 || snap.steal_pct >= 0 || snap.mem_pct >= 0 ||
          snap.mem_total_kb > 0 || snap.swap_total_kb > 0 || snap.swap_pct >= 0 || !snap.disks.empty() ||
-         snap.load1 >= 0 || snap.uptime_sec >= 0 || snap.reboot_required || !snap.failed_units.empty();
+         snap.load1 >= 0 || snap.uptime_sec >= 0 || snap.reboot_required || !snap.failed_units.empty() ||
+         snap.docker_present || snap.docker_running >= 0;
 }
 
 }  // namespace
@@ -153,6 +154,9 @@ void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thres
   if (!snap.failed_units.empty()) {
     const auto n = static_cast<int>(snap.failed_units.size());
     lvl = worse_health(lvl, n >= 3 ? HealthLevel::Crit : HealthLevel::Warn);
+  }
+  if (snap.docker_unhealthy > 0) {
+    lvl = worse_health(lvl, snap.docker_unhealthy >= 3 ? HealthLevel::Crit : HealthLevel::Warn);
   }
   if (lvl == HealthLevel::Unknown && snap.checked_at > 0 && snap.error.empty() && health_has_readings(snap)) {
     lvl = HealthLevel::Ok;
@@ -249,6 +253,35 @@ HealthSnapshot parse_health_output(std::string_view text) {
       auto name = trim(val);
       if (!name.empty() && static_cast<int>(snap.failed_units.size()) < kHealthFailedUnitsMax) {
         snap.failed_units.push_back(std::move(name));
+      }
+    } else if (key == "docker") {
+      int flag = 0;
+      if (parse_int(val, flag)) {
+        snap.docker_present = flag != 0;
+        if (snap.docker_present) {
+          if (snap.docker_running < 0) snap.docker_running = 0;
+          if (snap.docker_exited < 0) snap.docker_exited = 0;
+          if (snap.docker_unhealthy < 0) snap.docker_unhealthy = 0;
+        }
+      }
+    } else if (key == "docker_running") {
+      int n = 0;
+      if (parse_int(val, n) && n >= 0) snap.docker_running = n;
+    } else if (key == "docker_exited") {
+      int n = 0;
+      if (parse_int(val, n) && n >= 0) snap.docker_exited = n;
+    } else if (key == "docker_unhealthy") {
+      int n = 0;
+      if (parse_int(val, n) && n >= 0) snap.docker_unhealthy = n;
+    } else if (key == "docker_exited_name") {
+      auto name = trim(val);
+      if (!name.empty() && static_cast<int>(snap.docker_exited_names.size()) < kHealthDockerNamesMax) {
+        snap.docker_exited_names.push_back(std::move(name));
+      }
+    } else if (key == "docker_unhealthy_name") {
+      auto name = trim(val);
+      if (!name.empty() && static_cast<int>(snap.docker_unhealthy_names.size()) < kHealthDockerNamesMax) {
+        snap.docker_unhealthy_names.push_back(std::move(name));
       }
     } else if (key == "disk") {
       auto parts = split_ws(val);
@@ -367,6 +400,27 @@ std::string health_remote_script(const HealthCollect& collect) {
   s += std::to_string(kHealthFailedUnitsMax);
   s += ") exit } }'\n";
   s += "fi\n";
+  if (collect.docker) {
+    s += "if command -v docker >/dev/null 2>&1 && docker ps -q >/dev/null 2>&1; then\n";
+    s += "printf 'docker=1\\n'\n";
+    s += "docker_running=$(docker ps -q 2>/dev/null | wc -l | tr -d ' \\t')\n";
+    s += "docker_exited=$(docker ps -aq -f status=exited 2>/dev/null | wc -l | tr -d ' \\t')\n";
+    s += "docker_unhealthy=$(docker ps -aq -f health=unhealthy 2>/dev/null | wc -l | tr -d ' \\t')\n";
+    s += "printf 'docker_running=%s\\n' \"${docker_running:-0}\"\n";
+    s += "printf 'docker_exited=%s\\n' \"${docker_exited:-0}\"\n";
+    s += "printf 'docker_unhealthy=%s\\n' \"${docker_unhealthy:-0}\"\n";
+    s += "docker ps -a --filter status=exited --format '{{.Names}}' 2>/dev/null | ";
+    s += "awk 'NF { print \"docker_exited_name=\" $0; if (++c >= ";
+    s += std::to_string(kHealthDockerNamesMax);
+    s += ") exit }'\n";
+    s += "docker ps -a --filter health=unhealthy --format '{{.Names}}' 2>/dev/null | ";
+    s += "awk 'NF { print \"docker_unhealthy_name=\" $0; if (++c >= ";
+    s += std::to_string(kHealthDockerNamesMax);
+    s += ") exit }'\n";
+    s += "else\n";
+    s += "printf 'docker=0\\n'\n";
+    s += "fi\n";
+  }
   s += "printf '%s\\n' 'FATTYHEALTH_END'\n";
   return s;
 }
@@ -704,6 +758,27 @@ HealthSnapshot snapshot_from_json(const json& raw, const std::string& id) {
       snap.failed_units.push_back(std::move(name));
     }
   }
+  snap.docker_present = raw.value("docker", false);
+  snap.docker_running = raw.value("docker_running", -1);
+  snap.docker_exited = raw.value("docker_exited", -1);
+  snap.docker_unhealthy = raw.value("docker_unhealthy", -1);
+  if (snap.docker_present) {
+    if (snap.docker_running < 0) snap.docker_running = 0;
+    if (snap.docker_exited < 0) snap.docker_exited = 0;
+    if (snap.docker_unhealthy < 0) snap.docker_unhealthy = 0;
+  }
+  auto load_names = [&](const char* key, std::vector<std::string>& out) {
+    if (!raw.contains(key) || !raw[key].is_array()) return;
+    for (const auto& u : raw[key]) {
+      if (!u.is_string()) continue;
+      auto name = trim(u.get<std::string>());
+      if (name.empty()) continue;
+      if (static_cast<int>(out.size()) >= kHealthDockerNamesMax) break;
+      out.push_back(std::move(name));
+    }
+  };
+  load_names("docker_exited_names", snap.docker_exited_names);
+  load_names("docker_unhealthy_names", snap.docker_unhealthy_names);
   if (snap.mem_pct < 0 && snap.mem_total_kb > 0) {
     const auto used = snap.mem_total_kb - std::min(snap.mem_avail_kb, snap.mem_total_kb);
     snap.mem_pct = 100.0 * static_cast<double>(used) / static_cast<double>(snap.mem_total_kb);
@@ -736,6 +811,10 @@ json snapshot_to_json(const HealthSnapshot& snap) {
   }
   json failed = json::array();
   for (const auto& u : snap.failed_units) failed.push_back(u);
+  json exited_names = json::array();
+  for (const auto& u : snap.docker_exited_names) exited_names.push_back(u);
+  json unhealthy_names = json::array();
+  for (const auto& u : snap.docker_unhealthy_names) unhealthy_names.push_back(u);
   return {
       {"name", snap.server_name},
       {"level", health_level_id(snap.level)},
@@ -757,6 +836,12 @@ json snapshot_to_json(const HealthSnapshot& snap) {
       {"reboot_required", snap.reboot_required},
       {"rebooted", snap.rebooted},
       {"failed_units", std::move(failed)},
+      {"docker", snap.docker_present},
+      {"docker_running", snap.docker_running},
+      {"docker_exited", snap.docker_exited},
+      {"docker_unhealthy", snap.docker_unhealthy},
+      {"docker_exited_names", std::move(exited_names)},
+      {"docker_unhealthy_names", std::move(unhealthy_names)},
       {"checked_at", snap.checked_at},
       {"disks", std::move(disks)},
   };
