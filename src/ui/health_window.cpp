@@ -13,6 +13,7 @@
 #include <wx/splitter.h>
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -708,7 +709,7 @@ void HealthWindow::show_detail() {
 
   auto prev = view_snap(monitor_->previous(s->id), st);
   const auto trend = health_trend(snap, prev);
-  if (trend.has_prev && (trend.mem || trend.swap || trend.disk)) {
+  if (trend.has_prev && (trend.mem || trend.swap || trend.disk || trend.net)) {
     std::string head = "С прошлой проверки";
     const auto span = format_health_span(trend.prev_checked_at, snap.checked_at);
     if (!span.empty()) head += " (" + span + ")";
@@ -735,7 +736,17 @@ void HealthWindow::show_detail() {
       auto* trend_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(line));
       trend_line->SetForegroundColour(Theme::text());
       trend_line->Wrap(FromDIP(420));
-      root->Add(trend_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+      root->Add(trend_line, 0, wxLEFT | wxRIGHT | (trend.net ? wxTOP : wxBOTTOM), 12);
+    }
+    if (trend.net) {
+      std::string net = "Сеть ↓" + format_bps(trend.net_rx_bps) + "  ↑" + format_bps(trend.net_tx_bps);
+      if (trend.net_err_delta > 0) {
+        net += "  +" + std::to_string(trend.net_err_delta) + " ошибок/дропов";
+      }
+      auto* net_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(net));
+      net_line->SetForegroundColour(trend.net_err_delta > 0 ? Theme::warn() : Theme::text());
+      net_line->Wrap(FromDIP(420));
+      root->Add(net_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
     }
   }
 
@@ -763,6 +774,79 @@ void HealthWindow::show_detail() {
     oom_line->Wrap(FromDIP(420));
     root->Add(oom_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
+  if (snap.net_rx_bytes >= 0 || snap.net_tx_bytes >= 0) {
+    std::string net = "Сеть";
+    if (!snap.net_if.empty()) net += " (" + snap.net_if + ")";
+    net += ": ↓" + format_bytes(std::max(0LL, snap.net_rx_bytes)) + "  ↑" +
+           format_bytes(std::max(0LL, snap.net_tx_bytes));
+    const auto errs = health_net_errs(snap);
+    if (errs > 0) {
+      net += "  ошибок/дропов: " + std::to_string(errs);
+      if (snap.net_err_delta > 0) net += " (+" + std::to_string(snap.net_err_delta) + ")";
+    }
+    auto* net_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(net));
+    net_line->SetForegroundColour(snap.net_err_delta >= kHealthNetErrCrit
+                                      ? Theme::err()
+                                      : (snap.net_err_delta >= kHealthNetErrWarn ? Theme::warn() : Theme::muted()));
+    net_line->Wrap(FromDIP(420));
+    root->Add(net_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  }
+  if (snap.ssh_fail_count >= 0) {
+    std::string ssh = "SSH: " + std::to_string(snap.ssh_fail_count) + " неудачных входов за сутки";
+    auto* ssh_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(ssh));
+    ssh_line->SetForegroundColour(snap.ssh_fail_count >= kHealthSshFailCrit
+                                      ? Theme::err()
+                                      : (snap.ssh_fail_count >= kHealthSshFailWarn ? Theme::warn() : Theme::muted()));
+    ssh_line->Wrap(FromDIP(420));
+    root->Add(ssh_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  }
+  if (snap.time_synced >= 0 || snap.time_offset_known) {
+    std::string time = "Время: ";
+    if (snap.time_synced == 1) {
+      time += "синхронизировано";
+    } else if (snap.time_synced == 0) {
+      time += "нет синхронизации";
+    } else {
+      time += "статус неизвестен";
+    }
+    if (snap.time_offset_known) {
+      std::ostringstream oss;
+      oss.setf(std::ios::fixed);
+      oss.precision(std::fabs(snap.time_offset_sec) >= 1 ? 1 : 3);
+      oss << snap.time_offset_sec;
+      time += ", смещение " + oss.str() + " с";
+    }
+    const double off = snap.time_offset_known ? std::fabs(snap.time_offset_sec) : 0;
+    auto* time_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(time));
+    time_line->SetForegroundColour(
+        (snap.time_synced == 0 || off >= kHealthTimeOffsetCritSec)
+            ? (off >= kHealthTimeOffsetCritSec ? Theme::err() : Theme::warn())
+            : (off >= kHealthTimeOffsetWarnSec ? Theme::warn() : Theme::muted()));
+    time_line->Wrap(FromDIP(420));
+    root->Add(time_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  }
+  auto add_top = [&](const char* title, const std::vector<HealthProc>& procs) {
+    if (procs.empty()) return;
+    auto* head = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(title));
+    head->SetForegroundColour(Theme::muted());
+    root->Add(head, 0, wxLEFT | wxRIGHT | wxTOP, 12);
+    for (const auto& p : procs) {
+      std::string line = std::to_string(p.pid) + "  " + p.name + "  " + format_kib(p.rss_kb);
+      if (p.cpu_pct >= 0) {
+        std::ostringstream oss;
+        oss.setf(std::ios::fixed);
+        oss.precision(p.cpu_pct >= 10 ? 0 : 1);
+        oss << p.cpu_pct;
+        line += "  " + oss.str() + "% CPU";
+      }
+      auto* row = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(line));
+      row->SetForegroundColour(Theme::text());
+      row->Wrap(FromDIP(420));
+      root->Add(row, 0, wxLEFT | wxRIGHT | wxBOTTOM, 4);
+    }
+  };
+  add_top("Топ по RAM:", snap.top_mem);
+  add_top("Топ по CPU:", snap.top_cpu);
   if (!snap.failed_units.empty()) {
     std::string failed = "Упавшие службы (" + std::to_string(snap.failed_units.size()) + "): ";
     for (std::size_t i = 0; i < snap.failed_units.size(); ++i) {

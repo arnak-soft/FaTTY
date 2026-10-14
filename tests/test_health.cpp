@@ -164,6 +164,12 @@ FATTYCWD_abc:/root
   expect(slim.find("docker ps") == std::string::npos, "docker off in slim");
   expect(slim.find("reboot-required") != std::string::npos, "reboot always collected");
   expect(slim.find("oom_count=") != std::string::npos, "oom always collected");
+  expect(slim.find("/proc/net/dev") != std::string::npos, "net always collected");
+  expect(slim.find("ssh_fail_count=") != std::string::npos, "ssh fail always");
+  expect(slim.find("time_synced=") != std::string::npos || slim.find("timedatectl") != std::string::npos,
+         "time always");
+  expect(slim.find("top_mem=") != std::string::npos, "top procs always");
+  expect(slim.find("journalctl -k -b -g") != std::string::npos, "oom uses journalctl -g");
   expect(slim.find("os=other") != std::string::npos, "still detects non-linux");
 
   auto docker_snap = parse_health_output(
@@ -212,6 +218,41 @@ FATTYCWD_abc:/root
   expect(ram_s.size() == 3 && ram_s[0] == 40 && ram_s[2] == 70, "ram spark order");
   auto disk_s = health_spark_disk_pct(spark_e);
   expect(disk_s.size() == 3 && disk_s[0] == 40 && disk_s[2] == 70, "disk spark order");
+
+  auto extra = parse_health_output(
+      "FATTYHEALTH v1\nnproc=1\n"
+      "net_rx_bytes=1000\nnet_tx_bytes=2000\nnet_rx_errs=1\nnet_tx_errs=0\nnet_rx_drop=2\nnet_tx_drop=0\n"
+      "net_if=eth0\nssh_fail_count=25\ntime_synced=0\ntime_offset_sec=12.5\n"
+      "top_mem=10 204800 1.5 nginx\ntop_cpu=20 102400 40.0 php-fpm\n"
+      "FATTYHEALTH_END\n");
+  expect(extra.net_rx_bytes == 1000 && extra.net_if == "eth0", "parse net");
+  expect(health_net_errs(extra) == 3, "net errs+drops");
+  expect(extra.ssh_fail_count == 25 && extra.time_synced == 0 && extra.time_offset_known, "parse ssh/time");
+  expect(extra.top_mem.size() == 1 && extra.top_mem[0].name == "nginx", "parse top mem");
+  expect(extra.top_cpu.size() == 1 && extra.top_cpu[0].pid == 20, "parse top cpu");
+  extra.checked_at = 2;
+  apply_health_thresholds(extra, {});
+  expect(extra.level == HealthLevel::Warn, "ssh fail + unsynced is warn");
+  HealthSnapshot prev_net;
+  prev_net.net_rx_bytes = 500;
+  prev_net.net_tx_bytes = 1000;
+  prev_net.net_rx_errs = 0;
+  prev_net.net_tx_errs = 0;
+  prev_net.net_rx_drop = 0;
+  prev_net.net_tx_drop = 0;
+  prev_net.checked_at = 1;
+  HealthSnapshot cur_net = extra;
+  cur_net.level = HealthLevel::Ok;
+  cur_net.ssh_fail_count = 0;
+  cur_net.time_synced = 1;
+  cur_net.time_offset_known = false;
+  cur_net.oom_count = 0;
+  apply_health_thresholds(cur_net, {});
+  health_apply_net_delta(cur_net, prev_net);
+  expect(cur_net.net_err_delta == 3 && cur_net.level == HealthLevel::Warn, "net err growth warns");
+  auto trend_net = health_trend(cur_net, prev_net);
+  expect(trend_net.net && trend_net.net_rx_delta == 500, "net trend bytes");
+  expect(format_bytes(1536) == "1.5 КБ" || format_bytes(1536).find("КБ") != std::string::npos, "format bytes");
 
   expect(format_pct(-1) == "—", "missing pct");
   expect(format_kib(512) == "512 КБ", "bytes kb");

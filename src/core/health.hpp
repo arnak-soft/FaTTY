@@ -20,6 +20,17 @@ inline constexpr int kHealthHistoryMax = 48;
 inline constexpr int kHealthFailedUnitsMax = 8;
 /// Сколько имён контейнеров Docker (exited / unhealthy) сохранять.
 inline constexpr int kHealthDockerNamesMax = 6;
+/// Топ процессов по RAM / CPU в снимке.
+inline constexpr int kHealthTopProcsMax = 5;
+/// Сбойные SSH-логины за сутки: пороги статуса.
+inline constexpr int kHealthSshFailWarn = 20;
+inline constexpr int kHealthSshFailCrit = 100;
+/// Рост сетевых ошибок/дропов с прошлой проверки.
+inline constexpr int kHealthNetErrWarn = 1;
+inline constexpr int kHealthNetErrCrit = 50;
+/// |смещение часов|, секунды.
+inline constexpr double kHealthTimeOffsetWarnSec = 5.0;
+inline constexpr double kHealthTimeOffsetCritSec = 60.0;
 /// Точек на мини-графике карточки (включая текущий замер).
 inline constexpr int kHealthSparkMax = 12;
 
@@ -38,6 +49,13 @@ struct HealthDisk {
   long long used_kb = 0;
   long long total_kb = 0;
   double pct() const;
+};
+
+struct HealthProc {
+  int pid = 0;
+  long long rss_kb = 0;
+  double cpu_pct = -1;
+  std::string name;
 };
 
 struct HealthThresholds {
@@ -102,6 +120,25 @@ struct HealthSnapshot {
   /// Число OOM-убийств в логах (−1 = не собирали).
   int oom_count = -1;
   std::string oom_last;
+  /// Сумма по не-lo интерфейсам из /proc/net/dev (−1 = нет данных).
+  long long net_rx_bytes = -1;
+  long long net_tx_bytes = -1;
+  long long net_rx_errs = -1;
+  long long net_tx_errs = -1;
+  long long net_rx_drop = -1;
+  long long net_tx_drop = -1;
+  std::string net_if;
+  /// Рост errs+drop с прошлой проверки (−1 = нет базы для сравнения).
+  long long net_err_delta = -1;
+  /// Сбойные SSH-попытки за ~24 ч (−1 = не собирали).
+  int ssh_fail_count = -1;
+  /// NTP/chrony: −1 неизвестно, 0 нет, 1 да.
+  int time_synced = -1;
+  bool time_offset_known = false;
+  /// Смещение системных часов, сек (знак как у chrony).
+  double time_offset_sec = 0;
+  std::vector<HealthProc> top_mem;
+  std::vector<HealthProc> top_cpu;
   std::vector<HealthDisk> disks;
   double checked_at = 0;
 };
@@ -123,6 +160,12 @@ struct HealthTrend {
   std::string disk_mount;
   long long disk_used_delta_kb = 0;
   double disk_pct_delta = 0;
+  bool net = false;
+  long long net_rx_delta = 0;
+  long long net_tx_delta = 0;
+  long long net_err_delta = 0;
+  double net_rx_bps = -1;
+  double net_tx_bps = -1;
 };
 
 HealthLevel worse_health(HealthLevel a, HealthLevel b);
@@ -156,10 +199,15 @@ std::string format_interval_label(int seconds);
 
 long long health_mem_used_kb(const HealthSnapshot& snap);
 long long health_swap_used_kb(const HealthSnapshot& snap);
+long long health_net_errs(const HealthSnapshot& snap);
 HealthTrend health_trend(const HealthSnapshot& current, const HealthSnapshot& previous);
+/// Учесть рост сетевых ошибок относительно прошлого снимка (пишет net_err_delta и усиливает level).
+void health_apply_net_delta(HealthSnapshot& snap, const HealthSnapshot& previous);
 /// true, если аптайм не согласуется с прошлым замером (перезагрузка между проверками).
 bool health_rebooted_since(const HealthSnapshot& current, const HealthSnapshot& previous);
 void health_history_push(HealthCacheEntry& entry, HealthSnapshot previous, int max_keep = kHealthHistoryMax);
+std::string format_bytes(long long bytes);
+std::string format_bps(double bytes_per_sec);
 /// Серия pct от старых к новым (latest в конце), для мини-графика.
 std::vector<double> health_spark_mem_pct(const HealthCacheEntry& entry, int max_points = kHealthSparkMax);
 std::vector<double> health_spark_disk_pct(const HealthCacheEntry& entry, int max_points = kHealthSparkMax);

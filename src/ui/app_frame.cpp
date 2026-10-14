@@ -1947,10 +1947,29 @@ void AppFrame::init_health_monitor() {
       e.exit_code = 2;
     }
     if (!current.error.empty()) e.error = current.error;
+    std::string bits;
     if (current.oom_count > 0) {
-      e.output = "OOM: " + std::to_string(current.oom_count);
-      if (!current.oom_last.empty()) e.output += " (последний: " + current.oom_last + ")";
+      bits = "OOM: " + std::to_string(current.oom_count);
+      if (!current.oom_last.empty()) bits += " (последний: " + current.oom_last + ")";
     }
+    if (current.ssh_fail_count >= kHealthSshFailWarn) {
+      if (!bits.empty()) bits += "\n";
+      bits += "SSH fail: " + std::to_string(current.ssh_fail_count);
+    }
+    if (current.net_err_delta > 0) {
+      if (!bits.empty()) bits += "\n";
+      bits += "сеть +" + std::to_string(current.net_err_delta) + " ошибок/дропов";
+    }
+    if (current.time_synced == 0 ||
+        (current.time_offset_known && std::fabs(current.time_offset_sec) >= kHealthTimeOffsetWarnSec)) {
+      if (!bits.empty()) bits += "\n";
+      bits += "время";
+      if (current.time_synced == 0) bits += " не синхронизировано";
+      if (current.time_offset_known) {
+        bits += " смещение " + std::to_string(static_cast<int>(current.time_offset_sec)) + " с";
+      }
+    }
+    e.output = std::move(bits);
     journal_->append(std::move(e));
   };
   health_ = std::make_unique<HealthMonitor>(std::move(d));

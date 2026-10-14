@@ -72,7 +72,8 @@ bool health_has_readings(const HealthSnapshot& snap) {
   return snap.nproc > 0 || snap.cpu_pct >= 0 || snap.iowait_pct >= 0 || snap.steal_pct >= 0 || snap.mem_pct >= 0 ||
          snap.mem_total_kb > 0 || snap.swap_total_kb > 0 || snap.swap_pct >= 0 || !snap.disks.empty() ||
          snap.load1 >= 0 || snap.uptime_sec >= 0 || snap.reboot_required || !snap.failed_units.empty() ||
-         snap.docker_present || snap.docker_running >= 0 || snap.oom_count > 0;
+         snap.docker_present || snap.docker_running >= 0 || snap.oom_count > 0 || snap.net_rx_bytes >= 0 ||
+         snap.ssh_fail_count >= 0 || snap.time_synced >= 0 || !snap.top_mem.empty() || !snap.top_cpu.empty();
 }
 
 }  // namespace
@@ -160,6 +161,27 @@ void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thres
   }
   if (snap.oom_count > 0) {
     lvl = worse_health(lvl, snap.oom_count >= 3 ? HealthLevel::Crit : HealthLevel::Warn);
+  }
+  if (snap.ssh_fail_count >= kHealthSshFailCrit) {
+    lvl = worse_health(lvl, HealthLevel::Crit);
+  } else if (snap.ssh_fail_count >= kHealthSshFailWarn) {
+    lvl = worse_health(lvl, HealthLevel::Warn);
+  }
+  if (snap.time_synced == 0) {
+    lvl = worse_health(lvl, HealthLevel::Warn);
+  }
+  if (snap.time_offset_known) {
+    const double off = std::fabs(snap.time_offset_sec);
+    if (off >= kHealthTimeOffsetCritSec) {
+      lvl = worse_health(lvl, HealthLevel::Crit);
+    } else if (off >= kHealthTimeOffsetWarnSec) {
+      lvl = worse_health(lvl, HealthLevel::Warn);
+    }
+  }
+  if (snap.net_err_delta >= kHealthNetErrCrit) {
+    lvl = worse_health(lvl, HealthLevel::Crit);
+  } else if (snap.net_err_delta >= kHealthNetErrWarn) {
+    lvl = worse_health(lvl, HealthLevel::Warn);
   }
   if (lvl == HealthLevel::Unknown && snap.checked_at > 0 && snap.error.empty() && health_has_readings(snap)) {
     lvl = HealthLevel::Ok;
@@ -291,6 +313,53 @@ HealthSnapshot parse_health_output(std::string_view text) {
       if (parse_int(val, n) && n >= 0) snap.oom_count = n;
     } else if (key == "oom_last") {
       snap.oom_last = trim(val);
+    } else if (key == "net_rx_bytes") {
+      long long n = 0;
+      if (parse_ll(val, n) && n >= 0) snap.net_rx_bytes = n;
+    } else if (key == "net_tx_bytes") {
+      long long n = 0;
+      if (parse_ll(val, n) && n >= 0) snap.net_tx_bytes = n;
+    } else if (key == "net_rx_errs") {
+      long long n = 0;
+      if (parse_ll(val, n) && n >= 0) snap.net_rx_errs = n;
+    } else if (key == "net_tx_errs") {
+      long long n = 0;
+      if (parse_ll(val, n) && n >= 0) snap.net_tx_errs = n;
+    } else if (key == "net_rx_drop") {
+      long long n = 0;
+      if (parse_ll(val, n) && n >= 0) snap.net_rx_drop = n;
+    } else if (key == "net_tx_drop") {
+      long long n = 0;
+      if (parse_ll(val, n) && n >= 0) snap.net_tx_drop = n;
+    } else if (key == "net_if") {
+      snap.net_if = trim(val);
+    } else if (key == "ssh_fail_count") {
+      int n = 0;
+      if (parse_int(val, n) && n >= 0) snap.ssh_fail_count = n;
+    } else if (key == "time_synced") {
+      int n = 0;
+      if (parse_int(val, n) && (n == 0 || n == 1)) snap.time_synced = n;
+    } else if (key == "time_offset_sec") {
+      double off = 0;
+      if (parse_double(val, off)) {
+        snap.time_offset_known = true;
+        snap.time_offset_sec = off;
+      }
+    } else if (key == "top_mem" || key == "top_cpu") {
+      auto parts = split_ws(val);
+      if (parts.size() >= 4) {
+        HealthProc proc;
+        if (!parse_int(parts[0], proc.pid) || proc.pid <= 0) continue;
+        if (!parse_ll(parts[1], proc.rss_kb) || proc.rss_kb < 0) continue;
+        if (!parse_double(parts[2], proc.cpu_pct)) continue;
+        proc.name = parts[3];
+        for (std::size_t j = 4; j < parts.size(); ++j) {
+          proc.name += " ";
+          proc.name += parts[j];
+        }
+        auto& dest = key == "top_mem" ? snap.top_mem : snap.top_cpu;
+        if (static_cast<int>(dest.size()) < kHealthTopProcsMax) dest.push_back(std::move(proc));
+      }
     } else if (key == "disk") {
       auto parts = split_ws(val);
       if (parts.size() < 3) continue;
@@ -429,14 +498,52 @@ std::string health_remote_script(const HealthCollect& collect) {
     s += "printf 'docker=0\\n'\n";
     s += "fi\n";
   }
+  // Сеть: один проход /proc/net/dev, без внешних утилит.
+  s += "if [ -r /proc/net/dev ]; then\n";
+  s += "awk 'NR>2 {\n";
+  s += "  name=$1; sub(/:$/,\"\",name);\n";
+  s += "  if (name==\"\" || name==\"lo\") next;\n";
+  s += "  rx=$2+0; re=$4+0; rd=$5+0; tx=$10+0; te=$12+0; td=$13+0;\n";
+  s += "  RX+=rx; TX+=tx; RE+=re; TE+=te; RD+=rd; TD+=td;\n";
+  s += "  if (iface==\"\" && (rx+tx)>0) iface=name;\n";
+  s += "} END {\n";
+  s += "  printf \"net_rx_bytes=%d\\n\", RX+0;\n";
+  s += "  printf \"net_tx_bytes=%d\\n\", TX+0;\n";
+  s += "  printf \"net_rx_errs=%d\\n\", RE+0;\n";
+  s += "  printf \"net_tx_errs=%d\\n\", TE+0;\n";
+  s += "  printf \"net_rx_drop=%d\\n\", RD+0;\n";
+  s += "  printf \"net_tx_drop=%d\\n\", TD+0;\n";
+  s += "  if (iface!=\"\") printf \"net_if=%s\\n\", iface;\n";
+  s += "}' /proc/net/dev\n";
+  s += "fi\n";
+
+  // Топ процессов: два коротких ps (не чаще top -b).
+  s += "if command -v ps >/dev/null 2>&1; then\n";
+  s += "ps -eo pid=,rss=,pcpu=,comm= --sort=-rss 2>/dev/null | awk 'NF>=4 {\n";
+  s += "  name=$4; for (i=5;i<=NF;i++) name=name \" \" $i;\n";
+  s += "  printf \"top_mem=%s %s %s %s\\n\", $1, $2, $3, name;\n";
+  s += "  if (++c >= ";
+  s += std::to_string(kHealthTopProcsMax);
+  s += ") exit\n";
+  s += "}'\n";
+  s += "ps -eo pid=,rss=,pcpu=,comm= --sort=-pcpu 2>/dev/null | awk 'NF>=4 {\n";
+  s += "  name=$4; for (i=5;i<=NF;i++) name=name \" \" $i;\n";
+  s += "  printf \"top_cpu=%s %s %s %s\\n\", $1, $2, $3, name;\n";
+  s += "  if (++c >= ";
+  s += std::to_string(kHealthTopProcsMax);
+  s += ") exit\n";
+  s += "}'\n";
+  s += "fi\n";
+
+  // OOM: journalctl -g, без прогона всего kern.log.
   s += "oom_count=0\n";
   s += "oom_last=\n";
   s += "if command -v journalctl >/dev/null 2>&1; then\n";
-  s += "oom_lines=$(journalctl -k -b --no-pager -q 2>/dev/null | grep -E 'Out of memory|oom-kill|Killed process' || true)\n";
+  s += "oom_lines=$(journalctl -k -b -g 'Out of memory|oom-kill|Killed process' -q --no-pager 2>/dev/null || true)\n";
   s += "elif [ -r /var/log/kern.log ]; then\n";
-  s += "oom_lines=$(grep -E 'Out of memory|oom-kill|Killed process' /var/log/kern.log 2>/dev/null || true)\n";
+  s += "oom_lines=$(grep -E 'Out of memory|oom-kill|Killed process' /var/log/kern.log 2>/dev/null | tail -n 50 || true)\n";
   s += "else\n";
-  s += "oom_lines=$(dmesg 2>/dev/null | grep -E 'Out of memory|oom-kill|Killed process' || true)\n";
+  s += "oom_lines=$(dmesg 2>/dev/null | grep -E 'Out of memory|oom-kill|Killed process' | tail -n 50 || true)\n";
   s += "fi\n";
   s += "if [ -n \"$oom_lines\" ]; then\n";
   s += "oom_count=$(printf '%s\\n' \"$oom_lines\" | grep -c . || true)\n";
@@ -449,6 +556,36 @@ std::string health_remote_script(const HealthCollect& collect) {
   s += "fi\n";
   s += "printf 'oom_count=%s\\n' \"${oom_count:-0}\"\n";
   s += "if [ -n \"$oom_last\" ]; then printf 'oom_last=%s\\n' \"$oom_last\"; fi\n";
+
+  // SSH fail за сутки — узкий journalctl, без полного auth.log.
+  s += "ssh_fail_count=0\n";
+  s += "if command -v journalctl >/dev/null 2>&1; then\n";
+  s += "ssh_fail_count=$(journalctl -u ssh -u sshd --since '24 hours ago' "
+      "-g 'Failed password|Invalid user|authentication failure' -q --no-pager 2>/dev/null | "
+      "head -n 200 | grep -c . || true)\n";
+  s += "elif [ -r /var/log/auth.log ]; then\n";
+  s += "ssh_fail_count=$(grep -E 'Failed password|Invalid user|authentication failure' "
+      "/var/log/auth.log 2>/dev/null | tail -n 500 | grep -c . || true)\n";
+  s += "elif [ -r /var/log/secure ]; then\n";
+  s += "ssh_fail_count=$(grep -E 'Failed password|Invalid user|authentication failure' "
+      "/var/log/secure 2>/dev/null | tail -n 500 | grep -c . || true)\n";
+  s += "fi\n";
+  s += "printf 'ssh_fail_count=%s\\n' \"${ssh_fail_count:-0}\"\n";
+
+  // Время: timedatectl / chronyc, без долгого ожидания.
+  s += "if command -v timedatectl >/dev/null 2>&1; then\n";
+  s += "sync=$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)\n";
+  s += "if [ \"$sync\" = \"yes\" ]; then printf 'time_synced=1\\n'\n";
+  s += "elif [ \"$sync\" = \"no\" ]; then printf 'time_synced=0\\n'\n";
+  s += "fi\n";
+  s += "fi\n";
+  s += "if command -v chronyc >/dev/null 2>&1; then\n";
+  s += "off=$(chronyc tracking 2>/dev/null | awk -F: '/Last offset/ {\n";
+  s += "  gsub(/^[ \\t]+|[ \\t]+$/, \"\", $2); split($2, a, /[ \\t]+/); print a[1]; exit\n";
+  s += "}')\n";
+  s += "if [ -n \"$off\" ]; then printf 'time_offset_sec=%s\\n' \"$off\"; fi\n";
+  s += "fi\n";
+
   s += "printf '%s\\n' 'FATTYHEALTH_END'\n";
   return s;
 }
@@ -576,6 +713,33 @@ std::string format_kib(long long kb) {
   return ss.str();
 }
 
+std::string format_bytes(long long bytes) {
+  if (bytes < 0) bytes = 0;
+  if (bytes < 1024) return std::to_string(bytes) + " Б";
+  return format_kib(bytes / 1024);
+}
+
+std::string format_bps(double bytes_per_sec) {
+  if (bytes_per_sec < 0) return "—";
+  std::ostringstream ss;
+  ss.setf(std::ios::fixed);
+  if (bytes_per_sec < 1024.0) {
+    ss.precision(0);
+    ss << bytes_per_sec << " Б/с";
+    return ss.str();
+  }
+  const double kib = bytes_per_sec / 1024.0;
+  if (kib < 1024.0) {
+    ss.precision(kib >= 10 ? 0 : 1);
+    ss << kib << " КБ/с";
+    return ss.str();
+  }
+  const double mib = kib / 1024.0;
+  ss.precision(mib >= 10 ? 1 : 2);
+  ss << mib << " МБ/с";
+  return ss.str();
+}
+
 std::string format_pct(double pct) {
   if (pct < 0) return "—";
   std::ostringstream ss;
@@ -609,6 +773,36 @@ long long health_mem_used_kb(const HealthSnapshot& snap) {
 long long health_swap_used_kb(const HealthSnapshot& snap) {
   if (snap.swap_total_kb <= 0) return -1;
   return snap.swap_total_kb - std::min(snap.swap_free_kb, snap.swap_total_kb);
+}
+
+long long health_net_errs(const HealthSnapshot& snap) {
+  if (snap.net_rx_errs < 0 && snap.net_tx_errs < 0 && snap.net_rx_drop < 0 && snap.net_tx_drop < 0) {
+    return -1;
+  }
+  long long n = 0;
+  if (snap.net_rx_errs >= 0) n += snap.net_rx_errs;
+  if (snap.net_tx_errs >= 0) n += snap.net_tx_errs;
+  if (snap.net_rx_drop >= 0) n += snap.net_rx_drop;
+  if (snap.net_tx_drop >= 0) n += snap.net_tx_drop;
+  return n;
+}
+
+void health_apply_net_delta(HealthSnapshot& snap, const HealthSnapshot& previous) {
+  snap.net_err_delta = -1;
+  const auto cur = health_net_errs(snap);
+  const auto prev = health_net_errs(previous);
+  if (cur < 0 || prev < 0) return;
+  snap.net_err_delta = cur - prev;
+  if (snap.net_err_delta < 0) snap.net_err_delta = 0;
+  if (snap.level == HealthLevel::Offline || snap.level == HealthLevel::Unsupported ||
+      snap.level == HealthLevel::Checking) {
+    return;
+  }
+  if (snap.net_err_delta >= kHealthNetErrCrit) {
+    snap.level = worse_health(snap.level, HealthLevel::Crit);
+  } else if (snap.net_err_delta >= kHealthNetErrWarn) {
+    snap.level = worse_health(snap.level, HealthLevel::Warn);
+  }
 }
 
 bool health_rebooted_since(const HealthSnapshot& current, const HealthSnapshot& previous) {
@@ -655,6 +849,25 @@ HealthTrend health_trend(const HealthSnapshot& current, const HealthSnapshot& pr
       const double cur_pct = cur_disk->pct();
       const double prev_pct = prev_disk->pct();
       if (cur_pct >= 0 && prev_pct >= 0) t.disk_pct_delta = cur_pct - prev_pct;
+    }
+  }
+  if (current.net_rx_bytes >= 0 && previous.net_rx_bytes >= 0 && current.net_tx_bytes >= 0 &&
+      previous.net_tx_bytes >= 0) {
+    t.net = true;
+    t.net_rx_delta = current.net_rx_bytes - previous.net_rx_bytes;
+    t.net_tx_delta = current.net_tx_bytes - previous.net_tx_bytes;
+    if (t.net_rx_delta < 0) t.net_rx_delta = 0;
+    if (t.net_tx_delta < 0) t.net_tx_delta = 0;
+    const auto cur_err = health_net_errs(current);
+    const auto prev_err = health_net_errs(previous);
+    if (cur_err >= 0 && prev_err >= 0) {
+      t.net_err_delta = cur_err - prev_err;
+      if (t.net_err_delta < 0) t.net_err_delta = 0;
+    }
+    const double span = current.checked_at - previous.checked_at;
+    if (span >= 1.0) {
+      t.net_rx_bps = static_cast<double>(t.net_rx_delta) / span;
+      t.net_tx_bps = static_cast<double>(t.net_tx_delta) / span;
     }
   }
   return t;
@@ -849,6 +1062,34 @@ HealthSnapshot snapshot_from_json(const json& raw, const std::string& id) {
   load_names("docker_unhealthy_names", snap.docker_unhealthy_names);
   snap.oom_count = raw.value("oom_count", -1);
   snap.oom_last = raw.value("oom_last", "");
+  snap.net_rx_bytes = raw.value("net_rx_bytes", -1LL);
+  snap.net_tx_bytes = raw.value("net_tx_bytes", -1LL);
+  snap.net_rx_errs = raw.value("net_rx_errs", -1LL);
+  snap.net_tx_errs = raw.value("net_tx_errs", -1LL);
+  snap.net_rx_drop = raw.value("net_rx_drop", -1LL);
+  snap.net_tx_drop = raw.value("net_tx_drop", -1LL);
+  snap.net_if = raw.value("net_if", "");
+  snap.net_err_delta = raw.value("net_err_delta", -1LL);
+  snap.ssh_fail_count = raw.value("ssh_fail_count", -1);
+  snap.time_synced = raw.value("time_synced", -1);
+  snap.time_offset_known = raw.value("time_offset_known", false);
+  snap.time_offset_sec = raw.value("time_offset_sec", 0.0);
+  auto load_procs = [&](const char* key, std::vector<HealthProc>& out) {
+    if (!raw.contains(key) || !raw[key].is_array()) return;
+    for (const auto& p : raw[key]) {
+      if (!p.is_object()) continue;
+      HealthProc proc;
+      proc.pid = p.value("pid", 0);
+      proc.rss_kb = p.value("rss_kb", 0LL);
+      proc.cpu_pct = p.value("cpu", -1.0);
+      proc.name = p.value("name", "");
+      if (proc.pid <= 0 || proc.name.empty()) continue;
+      if (static_cast<int>(out.size()) >= kHealthTopProcsMax) break;
+      out.push_back(std::move(proc));
+    }
+  };
+  load_procs("top_mem", snap.top_mem);
+  load_procs("top_cpu", snap.top_cpu);
   if (snap.mem_pct < 0 && snap.mem_total_kb > 0) {
     const auto used = snap.mem_total_kb - std::min(snap.mem_avail_kb, snap.mem_total_kb);
     snap.mem_pct = 100.0 * static_cast<double>(used) / static_cast<double>(snap.mem_total_kb);
@@ -885,6 +1126,13 @@ json snapshot_to_json(const HealthSnapshot& snap) {
   for (const auto& u : snap.docker_exited_names) exited_names.push_back(u);
   json unhealthy_names = json::array();
   for (const auto& u : snap.docker_unhealthy_names) unhealthy_names.push_back(u);
+  auto procs_json = [](const std::vector<HealthProc>& procs) {
+    json arr = json::array();
+    for (const auto& p : procs) {
+      arr.push_back({{"pid", p.pid}, {"rss_kb", p.rss_kb}, {"cpu", p.cpu_pct}, {"name", p.name}});
+    }
+    return arr;
+  };
   return {
       {"name", snap.server_name},
       {"level", health_level_id(snap.level)},
@@ -914,6 +1162,20 @@ json snapshot_to_json(const HealthSnapshot& snap) {
       {"docker_unhealthy_names", std::move(unhealthy_names)},
       {"oom_count", snap.oom_count},
       {"oom_last", snap.oom_last},
+      {"net_rx_bytes", snap.net_rx_bytes},
+      {"net_tx_bytes", snap.net_tx_bytes},
+      {"net_rx_errs", snap.net_rx_errs},
+      {"net_tx_errs", snap.net_tx_errs},
+      {"net_rx_drop", snap.net_rx_drop},
+      {"net_tx_drop", snap.net_tx_drop},
+      {"net_if", snap.net_if},
+      {"net_err_delta", snap.net_err_delta},
+      {"ssh_fail_count", snap.ssh_fail_count},
+      {"time_synced", snap.time_synced},
+      {"time_offset_known", snap.time_offset_known},
+      {"time_offset_sec", snap.time_offset_sec},
+      {"top_mem", procs_json(snap.top_mem)},
+      {"top_cpu", procs_json(snap.top_cpu)},
       {"checked_at", snap.checked_at},
       {"disks", std::move(disks)},
   };

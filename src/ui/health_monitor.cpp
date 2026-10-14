@@ -263,8 +263,10 @@ void HealthMonitor::store_snapshot(HealthSnapshot snap, bool persist_now) {
     HealthSnapshot prior = entry.latest;
     prior.checking = false;
     snap.rebooted = false;
+    snap.net_err_delta = -1;
     if (prior.checked_at > 0 && snap.checked_at > 0) {
       snap.rebooted = health_rebooted_since(snap, prior);
+      health_apply_net_delta(snap, prior);
       if (prior.level != snap.level &&
           (health_level_is_alert(prior.level) || health_level_is_alert(snap.level))) {
         prior_for_journal = prior;
