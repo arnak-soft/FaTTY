@@ -310,7 +310,8 @@ class HostCard : public wxPanel {
     });
   }
 
-  void set(const Server& server, const HealthSnapshot& snap, bool selected, const AppSettings& st) {
+  void set(const Server& server, const HealthSnapshot& snap, bool selected, const AppSettings& st,
+           const HealthTrend& trend, std::vector<double> ram_spark, std::vector<double> disk_spark) {
     id_ = server.id;
     name_ = wxString::FromUTF8(server.name.empty() ? server.host : server.name);
     host_ = wxString::FromUTF8(server.username + "@" + server.host);
@@ -329,6 +330,9 @@ class HostCard : public wxPanel {
     cpu_warn_ = st.health_cpu_warn;
     cpu_crit_ = st.health_cpu_crit;
     enabled_ = server.health_enabled;
+    trend_ = trend;
+    ram_spark_ = std::move(ram_spark);
+    disk_spark_ = std::move(disk_spark);
     SetToolTip(host_);
     Refresh();
   }
@@ -338,7 +342,10 @@ class HostCard : public wxPanel {
  protected:
   wxSize DoGetBestSize() const override {
     int bars = (show_cpu_ ? 1 : 0) + (show_ram_ ? 1 : 0) + (show_swap_ ? 1 : 0) + (show_disk_ ? 1 : 0);
-    return FromDIP(wxSize(260, 86 + bars * 16));
+    int extra = 0;
+    if (trend_.has_prev && ((show_ram_ && trend_.mem) || (show_disk_ && trend_.disk))) extra += 16;
+    if ((show_ram_ && ram_spark_.size() >= 2) || (show_disk_ && disk_spark_.size() >= 2)) extra += 18;
+    return FromDIP(wxSize(260, 86 + bars * 16 + extra));
   }
 
  private:
@@ -349,6 +356,29 @@ class HostCard : public wxPanel {
     gc.DrawText(label, x, y - FromDIP(2));
     if (gfx) draw_h_bar(gfx, wxRect(x + FromDIP(40), y + FromDIP(2), w - FromDIP(40), FromDIP(9)), pct,
                         health_colour(level), Theme::btn());
+  }
+
+  void sparkline(wxGraphicsContext* gfx, int x, int y, int w, int h, const std::vector<double>& pts,
+                 const wxColour& colour) {
+    if (!gfx || pts.size() < 2 || w < 4 || h < 4) return;
+    double lo = pts[0], hi = pts[0];
+    for (double v : pts) {
+      lo = std::min(lo, v);
+      hi = std::max(hi, v);
+    }
+    if (hi - lo < 1.0) {
+      lo = std::max(0.0, lo - 1.0);
+      hi = lo + 2.0;
+    }
+    gfx->SetPen(wxPen(colour, std::max(1, FromDIP(1))));
+    const double step = static_cast<double>(w) / static_cast<double>(pts.size() - 1);
+    for (std::size_t i = 1; i < pts.size(); ++i) {
+      const double x0 = x + step * static_cast<double>(i - 1);
+      const double x1 = x + step * static_cast<double>(i);
+      const double y0 = y + h - (pts[i - 1] - lo) / (hi - lo) * h;
+      const double y1 = y + h - (pts[i] - lo) / (hi - lo) * h;
+      gfx->StrokeLine(x0, y0, x1, y1);
+    }
   }
 
   void on_paint(wxPaintEvent&) {
@@ -399,6 +429,31 @@ class HostCard : public wxPanel {
       double dp = -1;
       if (auto* d = health_root_or_worst(snap_)) dp = d->pct();
       mini_bar(gfx, gc, x, y, w, L"Диск", dp, bar_level(dp, disk_warn_, disk_crit_));
+      y += FromDIP(16);
+    }
+    if (trend_.has_prev && ((show_ram_ && trend_.mem) || (show_disk_ && trend_.disk))) {
+      std::string delta;
+      if (show_ram_ && trend_.mem) delta += "RAM " + format_signed_kib(trend_.mem_used_delta_kb);
+      if (show_disk_ && trend_.disk) {
+        if (!delta.empty()) delta += "  ·  ";
+        delta += "диск " + format_signed_kib(trend_.disk_used_delta_kb);
+      }
+      gc.SetFont(Theme::ui_small());
+      gc.SetTextForeground(Theme::muted());
+      gc.DrawText(wxString::FromUTF8(delta), x, y - FromDIP(2));
+      y += FromDIP(16);
+    }
+    const int spark_h = FromDIP(12);
+    const int spark_gap = FromDIP(6);
+    int spark_x = x;
+    if (show_ram_ && ram_spark_.size() >= 2) {
+      const int sw = (show_disk_ && disk_spark_.size() >= 2) ? (w - spark_gap) / 2 : w;
+      sparkline(gfx, spark_x, y, sw, spark_h, ram_spark_, Theme::accent());
+      spark_x += sw + spark_gap;
+    }
+    if (show_disk_ && disk_spark_.size() >= 2) {
+      const int sw = sz.x - FromDIP(24) - (spark_x - x);
+      sparkline(gfx, spark_x, y, std::max(FromDIP(40), sw), spark_h, disk_spark_, Theme::ok());
     }
   }
 
@@ -407,6 +462,9 @@ class HostCard : public wxPanel {
   wxString name_;
   wxString host_;
   HealthSnapshot snap_;
+  HealthTrend trend_;
+  std::vector<double> ram_spark_;
+  std::vector<double> disk_spark_;
   bool selected_ = false;
   bool enabled_ = true;
   bool show_cpu_ = true;
@@ -544,7 +602,13 @@ void HealthWindow::rebuild_cards() {
       snap.checking = true;
       snap.level = HealthLevel::Checking;
     }
-    card->set(server, snap, server.id == selected_id_, st);
+    auto prev = view_snap(monitor_->previous(server.id), st);
+    const auto trend = health_trend(snap, prev);
+    auto cache = monitor_->entry(server.id);
+    health_apply_virtual_disks(cache.latest, st.health_show_docker_disks, thresholds_of(st));
+    for (auto& h : cache.history) health_apply_virtual_disks(h, st.health_show_docker_disks, thresholds_of(st));
+    card->set(server, snap, server.id == selected_id_, st, trend, health_spark_mem_pct(cache),
+              health_spark_disk_pct(cache));
     list_sz_->Add(card, 0, wxEXPAND | wxBOTTOM, FromDIP(8));
   }
   list_->FitInside();
@@ -690,6 +754,14 @@ void HealthWindow::show_detail() {
     did->SetForegroundColour(Theme::muted());
     did->Wrap(FromDIP(420));
     root->Add(did, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  }
+  if (snap.oom_count > 0) {
+    std::string oom = "OOM: " + std::to_string(snap.oom_count) + " в логах ядра";
+    if (!snap.oom_last.empty()) oom += " (последний: " + snap.oom_last + ")";
+    auto* oom_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(oom));
+    oom_line->SetForegroundColour(snap.oom_count >= 3 ? Theme::err() : Theme::warn());
+    oom_line->Wrap(FromDIP(420));
+    root->Add(oom_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
   if (!snap.failed_units.empty()) {
     std::string failed = "Упавшие службы (" + std::to_string(snap.failed_units.size()) + "): ";

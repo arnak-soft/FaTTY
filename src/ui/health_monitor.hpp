@@ -26,6 +26,8 @@ class HealthMonitor : public wxEvtHandler {
     std::function<std::string()> busy_server_id;
     std::shared_ptr<std::atomic<bool>> alive;
     std::function<void()> on_change;
+    /// Смена заметного статуса (средне / высокое / нет связи / восстановление).
+    std::function<void(const HealthSnapshot& previous, const HealthSnapshot& current)> on_level_change;
   };
 
   explicit HealthMonitor(Deps deps);
@@ -40,6 +42,7 @@ class HealthMonitor : public wxEvtHandler {
   HealthSnapshot snapshot(const std::string& server_id) const;
   /// Ближайший прошлый замер (если есть).
   HealthSnapshot previous(const std::string& server_id) const;
+  HealthCacheEntry entry(const std::string& server_id) const;
   std::map<std::string, HealthSnapshot> snapshots() const;
   bool worker_busy() const { return running_->load(); }
   std::string checking_id() const;

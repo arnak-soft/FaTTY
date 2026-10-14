@@ -134,6 +134,7 @@ wxColour Theme::sorted_column(const wxColour& row_bg) {
 wxColour Theme::run_status(const std::string& status) {
   if (status == "ok") return ok();
   if (status == "failed" || status == "error") return err();
+  if (status == "warn") return warn();
   return warn();
 }
 wxFont Theme::ui() { return wxFont(10, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }

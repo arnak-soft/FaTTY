@@ -20,6 +20,8 @@ inline constexpr int kHealthHistoryMax = 48;
 inline constexpr int kHealthFailedUnitsMax = 8;
 /// Сколько имён контейнеров Docker (exited / unhealthy) сохранять.
 inline constexpr int kHealthDockerNamesMax = 6;
+/// Точек на мини-графике карточки (включая текущий замер).
+inline constexpr int kHealthSparkMax = 12;
 
 enum class HealthLevel {
   Unknown = 0,
@@ -97,6 +99,9 @@ struct HealthSnapshot {
   int docker_unhealthy = -1;
   std::vector<std::string> docker_exited_names;
   std::vector<std::string> docker_unhealthy_names;
+  /// Число OOM-убийств в логах (−1 = не собирали).
+  int oom_count = -1;
+  std::string oom_last;
   std::vector<HealthDisk> disks;
   double checked_at = 0;
 };
@@ -155,6 +160,10 @@ HealthTrend health_trend(const HealthSnapshot& current, const HealthSnapshot& pr
 /// true, если аптайм не согласуется с прошлым замером (перезагрузка между проверками).
 bool health_rebooted_since(const HealthSnapshot& current, const HealthSnapshot& previous);
 void health_history_push(HealthCacheEntry& entry, HealthSnapshot previous, int max_keep = kHealthHistoryMax);
+/// Серия pct от старых к новым (latest в конце), для мини-графика.
+std::vector<double> health_spark_mem_pct(const HealthCacheEntry& entry, int max_points = kHealthSparkMax);
+std::vector<double> health_spark_disk_pct(const HealthCacheEntry& entry, int max_points = kHealthSparkMax);
+bool health_level_is_alert(HealthLevel level);
 
 struct HealthFleetAlert {
   int crit = 0;

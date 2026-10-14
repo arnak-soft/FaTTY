@@ -72,7 +72,7 @@ bool health_has_readings(const HealthSnapshot& snap) {
   return snap.nproc > 0 || snap.cpu_pct >= 0 || snap.iowait_pct >= 0 || snap.steal_pct >= 0 || snap.mem_pct >= 0 ||
          snap.mem_total_kb > 0 || snap.swap_total_kb > 0 || snap.swap_pct >= 0 || !snap.disks.empty() ||
          snap.load1 >= 0 || snap.uptime_sec >= 0 || snap.reboot_required || !snap.failed_units.empty() ||
-         snap.docker_present || snap.docker_running >= 0;
+         snap.docker_present || snap.docker_running >= 0 || snap.oom_count > 0;
 }
 
 }  // namespace
@@ -157,6 +157,9 @@ void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thres
   }
   if (snap.docker_unhealthy > 0) {
     lvl = worse_health(lvl, snap.docker_unhealthy >= 3 ? HealthLevel::Crit : HealthLevel::Warn);
+  }
+  if (snap.oom_count > 0) {
+    lvl = worse_health(lvl, snap.oom_count >= 3 ? HealthLevel::Crit : HealthLevel::Warn);
   }
   if (lvl == HealthLevel::Unknown && snap.checked_at > 0 && snap.error.empty() && health_has_readings(snap)) {
     lvl = HealthLevel::Ok;
@@ -283,6 +286,11 @@ HealthSnapshot parse_health_output(std::string_view text) {
       if (!name.empty() && static_cast<int>(snap.docker_unhealthy_names.size()) < kHealthDockerNamesMax) {
         snap.docker_unhealthy_names.push_back(std::move(name));
       }
+    } else if (key == "oom_count") {
+      int n = 0;
+      if (parse_int(val, n) && n >= 0) snap.oom_count = n;
+    } else if (key == "oom_last") {
+      snap.oom_last = trim(val);
     } else if (key == "disk") {
       auto parts = split_ws(val);
       if (parts.size() < 3) continue;
@@ -421,6 +429,26 @@ std::string health_remote_script(const HealthCollect& collect) {
     s += "printf 'docker=0\\n'\n";
     s += "fi\n";
   }
+  s += "oom_count=0\n";
+  s += "oom_last=\n";
+  s += "if command -v journalctl >/dev/null 2>&1; then\n";
+  s += "oom_lines=$(journalctl -k -b --no-pager -q 2>/dev/null | grep -E 'Out of memory|oom-kill|Killed process' || true)\n";
+  s += "elif [ -r /var/log/kern.log ]; then\n";
+  s += "oom_lines=$(grep -E 'Out of memory|oom-kill|Killed process' /var/log/kern.log 2>/dev/null || true)\n";
+  s += "else\n";
+  s += "oom_lines=$(dmesg 2>/dev/null | grep -E 'Out of memory|oom-kill|Killed process' || true)\n";
+  s += "fi\n";
+  s += "if [ -n \"$oom_lines\" ]; then\n";
+  s += "oom_count=$(printf '%s\\n' \"$oom_lines\" | grep -c . || true)\n";
+  s += "oom_last=$(printf '%s\\n' \"$oom_lines\" | tail -n 1 | sed -n "
+      "'s/.*Killed process [0-9][0-9]* (\\([^)]*\\)).*/\\1/p')\n";
+  s += "if [ -z \"$oom_last\" ]; then\n";
+  s += "oom_last=$(printf '%s\\n' \"$oom_lines\" | tail -n 1 | sed -n "
+      "'s/.*task=\\([^, ]*\\).*/\\1/p')\n";
+  s += "fi\n";
+  s += "fi\n";
+  s += "printf 'oom_count=%s\\n' \"${oom_count:-0}\"\n";
+  s += "if [ -n \"$oom_last\" ]; then printf 'oom_last=%s\\n' \"$oom_last\"; fi\n";
   s += "printf '%s\\n' 'FATTYHEALTH_END'\n";
   return s;
 }
@@ -667,6 +695,46 @@ void health_history_push(HealthCacheEntry& entry, HealthSnapshot previous, int m
   }
 }
 
+bool health_level_is_alert(HealthLevel level) {
+  return level == HealthLevel::Warn || level == HealthLevel::Crit || level == HealthLevel::Offline;
+}
+
+namespace {
+
+std::vector<HealthSnapshot> spark_points(const HealthCacheEntry& entry, int max_points) {
+  if (max_points < 2) max_points = kHealthSparkMax;
+  std::vector<HealthSnapshot> points;
+  // history: newest first → walk reverse for older-first
+  const int hist_n = static_cast<int>(entry.history.size());
+  const int take_hist = std::min(hist_n, max_points - 1);
+  for (int i = take_hist - 1; i >= 0; --i) {
+    points.push_back(entry.history[static_cast<std::size_t>(i)]);
+  }
+  if (entry.latest.checked_at > 0) points.push_back(entry.latest);
+  return points;
+}
+
+}  // namespace
+
+std::vector<double> health_spark_mem_pct(const HealthCacheEntry& entry, int max_points) {
+  std::vector<double> out;
+  for (const auto& s : spark_points(entry, max_points)) {
+    if (s.mem_pct >= 0) out.push_back(s.mem_pct);
+  }
+  return out;
+}
+
+std::vector<double> health_spark_disk_pct(const HealthCacheEntry& entry, int max_points) {
+  std::vector<double> out;
+  for (const auto& s : spark_points(entry, max_points)) {
+    if (auto* d = health_root_or_worst(s)) {
+      const double p = d->pct();
+      if (p >= 0) out.push_back(p);
+    }
+  }
+  return out;
+}
+
 std::string format_health_span(double older_ts, double newer_ts) {
   if (older_ts <= 0 || newer_ts <= 0 || newer_ts < older_ts) return {};
   const double span = newer_ts - older_ts;
@@ -779,6 +847,8 @@ HealthSnapshot snapshot_from_json(const json& raw, const std::string& id) {
   };
   load_names("docker_exited_names", snap.docker_exited_names);
   load_names("docker_unhealthy_names", snap.docker_unhealthy_names);
+  snap.oom_count = raw.value("oom_count", -1);
+  snap.oom_last = raw.value("oom_last", "");
   if (snap.mem_pct < 0 && snap.mem_total_kb > 0) {
     const auto used = snap.mem_total_kb - std::min(snap.mem_avail_kb, snap.mem_total_kb);
     snap.mem_pct = 100.0 * static_cast<double>(used) / static_cast<double>(snap.mem_total_kb);
@@ -842,6 +912,8 @@ json snapshot_to_json(const HealthSnapshot& snap) {
       {"docker_unhealthy", snap.docker_unhealthy},
       {"docker_exited_names", std::move(exited_names)},
       {"docker_unhealthy_names", std::move(unhealthy_names)},
+      {"oom_count", snap.oom_count},
+      {"oom_last", snap.oom_last},
       {"checked_at", snap.checked_at},
       {"disks", std::move(disks)},
   };

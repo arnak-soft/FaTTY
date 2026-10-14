@@ -163,6 +163,7 @@ FATTYCWD_abc:/root
   expect(slim.find("SwapTotal") == std::string::npos, "swap off");
   expect(slim.find("docker ps") == std::string::npos, "docker off in slim");
   expect(slim.find("reboot-required") != std::string::npos, "reboot always collected");
+  expect(slim.find("oom_count=") != std::string::npos, "oom always collected");
   expect(slim.find("os=other") != std::string::npos, "still detects non-linux");
 
   auto docker_snap = parse_health_output(
@@ -181,6 +182,36 @@ FATTYCWD_abc:/root
   expect(docker_snap.level == HealthLevel::Crit, "3 unhealthy is crit");
   auto no_docker = parse_health_output("FATTYHEALTH v1\nnproc=1\ndocker=0\nFATTYHEALTH_END\n");
   expect(!no_docker.docker_present && no_docker.docker_running < 0, "docker absent");
+
+  auto oom_snap = parse_health_output(
+      "FATTYHEALTH v1\nnproc=1\noom_count=2\noom_last=mysqld\nFATTYHEALTH_END\n");
+  expect(oom_snap.oom_count == 2 && oom_snap.oom_last == "mysqld", "parse oom");
+  oom_snap.checked_at = 1;
+  apply_health_thresholds(oom_snap, {});
+  expect(oom_snap.level == HealthLevel::Warn, "2 oom is warn");
+  oom_snap.oom_count = 3;
+  apply_health_thresholds(oom_snap, {});
+  expect(oom_snap.level == HealthLevel::Crit, "3 oom is crit");
+  expect(health_level_is_alert(HealthLevel::Warn) && health_level_is_alert(HealthLevel::Offline), "alert levels");
+  expect(!health_level_is_alert(HealthLevel::Ok), "ok not alert");
+
+  HealthCacheEntry spark_e;
+  spark_e.latest.checked_at = 3;
+  spark_e.latest.mem_pct = 70;
+  spark_e.latest.disks.push_back({"/", 700, 1000});
+  HealthSnapshot h1;
+  h1.checked_at = 1;
+  h1.mem_pct = 40;
+  h1.disks.push_back({"/", 400, 1000});
+  HealthSnapshot h2;
+  h2.checked_at = 2;
+  h2.mem_pct = 55;
+  h2.disks.push_back({"/", 550, 1000});
+  spark_e.history = {h2, h1};  // newest first
+  auto ram_s = health_spark_mem_pct(spark_e);
+  expect(ram_s.size() == 3 && ram_s[0] == 40 && ram_s[2] == 70, "ram spark order");
+  auto disk_s = health_spark_disk_pct(spark_e);
+  expect(disk_s.size() == 3 && disk_s[0] == 40 && disk_s[2] == 70, "disk spark order");
 
   expect(format_pct(-1) == "—", "missing pct");
   expect(format_kib(512) == "512 КБ", "bytes kb");

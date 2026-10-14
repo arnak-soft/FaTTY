@@ -895,6 +895,10 @@ void AppFrame::build_ui() {
 void AppFrame::show_journal() {
   if (!journal_window_) {
     journal_window_ = new JournalWindow(this, journal_, [this](const JournalEntry& e) {
+      if (e.kind == "health") {
+        show_health(e.server_id);
+        return;
+      }
       auto* s = config_.server_by_id(e.server_id);
       if (!s) {
         wxMessageBox(L"VPS из этой записи больше нет в списке.", L"Журнал", wxOK | wxICON_ERROR, this);
@@ -1914,6 +1918,40 @@ void AppFrame::init_health_monitor() {
     if (!alive->load()) return;
     if (health_window_) health_window_->reload();
     update_health_button();
+  };
+  d.on_level_change = [this, alive = alive_](const HealthSnapshot& previous, const HealthSnapshot& current) {
+    if (!alive->load() || !journal_) return;
+    JournalEntry e;
+    e.id = new_uuid();
+    e.started_at = now_iso();
+    e.finished_at = e.started_at;
+    e.server_id = current.server_id;
+    e.server_name = current.server_name;
+    if (auto* s = config_.server_by_id(current.server_id)) {
+      e.host = s->host;
+      e.port = s->port;
+      e.username = s->username;
+      if (e.server_name.empty()) e.server_name = s->name;
+    }
+    e.title = "Состояние: " + health_level_label(previous.level) + " → " + health_level_label(current.level);
+    e.command = e.title;
+    e.kind = "health";
+    if (current.level == HealthLevel::Ok) {
+      e.status = "ok";
+      e.exit_code = 0;
+    } else if (current.level == HealthLevel::Warn) {
+      e.status = "warn";
+      e.exit_code = 1;
+    } else {
+      e.status = "failed";
+      e.exit_code = 2;
+    }
+    if (!current.error.empty()) e.error = current.error;
+    if (current.oom_count > 0) {
+      e.output = "OOM: " + std::to_string(current.oom_count);
+      if (!current.oom_last.empty()) e.output += " (последний: " + current.oom_last + ")";
+    }
+    journal_->append(std::move(e));
   };
   health_ = std::make_unique<HealthMonitor>(std::move(d));
   update_health_button();

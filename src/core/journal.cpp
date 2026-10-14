@@ -130,6 +130,7 @@ std::string status_label(const std::string& status) {
   if (status == "timeout") return "таймаут";
   if (status == "cancelled") return "прервано";
   if (status == "error") return "сбой";
+  if (status == "warn") return "средне";
   return status;
 }
 
@@ -138,6 +139,7 @@ std::string kind_label(const std::string& kind) {
   if (kind == "quick") return "разовая";
   if (kind == "test") return "проверка связи";
   if (kind == "bundle") return "связка";
+  if (kind == "health") return "состояние";
   return kind;
 }
 

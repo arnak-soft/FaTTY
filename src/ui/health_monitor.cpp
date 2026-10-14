@@ -68,6 +68,13 @@ HealthSnapshot HealthMonitor::previous(const std::string& server_id) const {
   return it->second.history.front();
 }
 
+HealthCacheEntry HealthMonitor::entry(const std::string& server_id) const {
+  std::lock_guard lock(mutex_);
+  auto it = entries_.find(server_id);
+  if (it == entries_.end()) return {};
+  return it->second;
+}
+
 std::map<std::string, HealthSnapshot> HealthMonitor::snapshots() const {
   std::lock_guard lock(mutex_);
   std::map<std::string, HealthSnapshot> out;
@@ -248,6 +255,8 @@ void HealthMonitor::start_check(Server server) {
 
 void HealthMonitor::store_snapshot(HealthSnapshot snap, bool persist_now) {
   std::map<std::string, HealthCacheEntry> copy;
+  HealthSnapshot prior_for_journal;
+  bool level_changed = false;
   {
     std::lock_guard lock(mutex_);
     auto& entry = entries_[snap.server_id];
@@ -256,6 +265,12 @@ void HealthMonitor::store_snapshot(HealthSnapshot snap, bool persist_now) {
     snap.rebooted = false;
     if (prior.checked_at > 0 && snap.checked_at > 0) {
       snap.rebooted = health_rebooted_since(snap, prior);
+      if (prior.level != snap.level &&
+          (health_level_is_alert(prior.level) || health_level_is_alert(snap.level))) {
+        prior_for_journal = prior;
+        if (prior_for_journal.server_id.empty()) prior_for_journal.server_id = snap.server_id;
+        level_changed = true;
+      }
       if (std::fabs(prior.checked_at - snap.checked_at) >= 0.5) {
         health_history_push(entry, std::move(prior));
       }
@@ -263,6 +278,12 @@ void HealthMonitor::store_snapshot(HealthSnapshot snap, bool persist_now) {
     snap.checking = false;
     entry.latest = std::move(snap);
     copy = entries_;
+  }
+  if (level_changed && deps_.on_level_change) {
+    auto cur_it = copy.find(prior_for_journal.server_id);
+    if (cur_it != copy.end()) {
+      deps_.on_level_change(prior_for_journal, cur_it->second.latest);
+    }
   }
   if (!persist_now) return;
   if (deps_.servers) {
