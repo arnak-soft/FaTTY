@@ -75,6 +75,29 @@ FATTYCWD_abc:/root
   auto no_swap = parse_health_output("FATTYHEALTH v1\nnproc=1\nswap_total_kb=0\nswap_free_kb=0\nFATTYHEALTH_END\n");
   expect(no_swap.swap_pct < 0, "zero swap is N/A");
 
+  auto cpu_parts = parse_health_output(
+      "FATTYHEALTH v1\nnproc=2\ncpu=10.0\niowait=30.0\nsteal=20.0\nFATTYHEALTH_END\n");
+  expect(cpu_parts.iowait_pct > 29.9 && cpu_parts.iowait_pct < 30.1, "parse iowait");
+  expect(cpu_parts.steal_pct > 19.9 && cpu_parts.steal_pct < 20.1, "parse steal");
+  cpu_parts.checked_at = 1;
+  HealthThresholds io_t;
+  io_t.iowait_warn = 25;
+  io_t.iowait_crit = 50;
+  io_t.steal_warn = 15;
+  io_t.steal_crit = 30;
+  apply_health_thresholds(cpu_parts, io_t);
+  expect(cpu_parts.level == HealthLevel::Warn, "iowait/steal warn");
+
+  HealthSnapshot fleet_a;
+  fleet_a.level = HealthLevel::Crit;
+  HealthSnapshot fleet_b;
+  fleet_b.level = HealthLevel::Offline;
+  HealthSnapshot fleet_c;
+  fleet_c.level = HealthLevel::Ok;
+  auto fleet = health_fleet_alert({{"a", fleet_a}, {"b", fleet_b}, {"c", fleet_c}}, {"a", "b", "c"});
+  expect(fleet.crit == 1 && fleet.offline == 1 && fleet.total() == 2, "fleet alert counts");
+  expect(health_fleet_alert({{"a", fleet_a}}, {"c"}).total() == 0, "disabled not counted");
+
   auto signals = parse_health_output(
       "FATTYHEALTH v1\nnproc=1\nuptime=100\nreboot_required=1\n"
       "failed_unit=nginx.service\nfailed_unit=cron.service\nFATTYHEALTH_END\n");
@@ -121,6 +144,8 @@ FATTYCWD_abc:/root
   auto script = health_remote_script({true, true, true, true});
   expect(script.find("FATTYHEALTH v1") != std::string::npos, "script marker");
   expect(script.find("/proc/stat") != std::string::npos, "script cpu");
+  expect(script.find("iowait=") != std::string::npos, "script iowait");
+  expect(script.find("steal=") != std::string::npos, "script steal");
   expect(script.find("df -Pk") != std::string::npos, "script df");
   expect(script.find("SwapTotal") != std::string::npos, "script swap");
   expect(script.find("reboot-required") != std::string::npos, "script reboot flag");

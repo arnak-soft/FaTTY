@@ -120,6 +120,10 @@ struct AppSettings {
   int health_swap_crit = 80;
   int health_cpu_warn = 80;
   int health_cpu_crit = 95;
+  int health_iowait_warn = 25;
+  int health_iowait_crit = 50;
+  int health_steal_warn = 15;
+  int health_steal_crit = 30;
   int health_load_warn = 100;
   int health_load_crit = 150;
   bool health_show_cpu = true;

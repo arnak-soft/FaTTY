@@ -69,9 +69,9 @@ std::tm local_from_unix(double unix_ts) {
 }
 
 bool health_has_readings(const HealthSnapshot& snap) {
-  return snap.nproc > 0 || snap.cpu_pct >= 0 || snap.mem_pct >= 0 || snap.mem_total_kb > 0 || snap.swap_total_kb > 0 ||
-         snap.swap_pct >= 0 || !snap.disks.empty() || snap.load1 >= 0 || snap.uptime_sec >= 0 || snap.reboot_required ||
-         !snap.failed_units.empty();
+  return snap.nproc > 0 || snap.cpu_pct >= 0 || snap.iowait_pct >= 0 || snap.steal_pct >= 0 || snap.mem_pct >= 0 ||
+         snap.mem_total_kb > 0 || snap.swap_total_kb > 0 || snap.swap_pct >= 0 || !snap.disks.empty() ||
+         snap.load1 >= 0 || snap.uptime_sec >= 0 || snap.reboot_required || !snap.failed_units.empty();
 }
 
 }  // namespace
@@ -127,6 +127,12 @@ void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thres
   HealthLevel lvl = HealthLevel::Unknown;
   if (snap.cpu_pct >= 0) {
     lvl = worse_health(lvl, level_from_pct(snap.cpu_pct, thresholds.cpu_warn, thresholds.cpu_crit));
+  }
+  if (snap.iowait_pct >= 0) {
+    lvl = worse_health(lvl, level_from_pct(snap.iowait_pct, thresholds.iowait_warn, thresholds.iowait_crit));
+  }
+  if (snap.steal_pct >= 0) {
+    lvl = worse_health(lvl, level_from_pct(snap.steal_pct, thresholds.steal_warn, thresholds.steal_crit));
   }
   if (snap.mem_pct >= 0) {
     lvl = worse_health(lvl, level_from_pct(snap.mem_pct, thresholds.ram_warn, thresholds.ram_crit));
@@ -222,6 +228,10 @@ HealthSnapshot parse_health_output(std::string_view text) {
       parse_double(val, snap.load15);
     } else if (key == "cpu") {
       parse_double(val, snap.cpu_pct);
+    } else if (key == "iowait") {
+      parse_double(val, snap.iowait_pct);
+    } else if (key == "steal") {
+      parse_double(val, snap.steal_pct);
     } else if (key == "mem_total_kb") {
       parse_ll(val, snap.mem_total_kb);
     } else if (key == "mem_avail_kb") {
@@ -320,9 +330,15 @@ std::string health_remote_script(const HealthCollect& collect) {
     s += "idle2=$((i2+w2))\n";
     s += "d=$((tot2-tot1))\n";
     s += "di=$((idle2-idle1))\n";
+    s += "dw=$((w2-w1))\n";
+    s += "dst=$((st2-st1))\n";
     s += "if [ \"$d\" -gt 0 ]; then\n";
     s += "cpu=$(awk -v d=\"$d\" -v di=\"$di\" 'BEGIN { printf \"%.1f\", (1-di/d)*100 }')\n";
+    s += "iowait=$(awk -v d=\"$d\" -v dw=\"$dw\" 'BEGIN { printf \"%.1f\", (dw/d)*100 }')\n";
+    s += "steal=$(awk -v d=\"$d\" -v dst=\"$dst\" 'BEGIN { printf \"%.1f\", (dst/d)*100 }')\n";
     s += "printf 'cpu=%s\\n' \"$cpu\"\n";
+    s += "printf 'iowait=%s\\n' \"$iowait\"\n";
+    s += "printf 'steal=%s\\n' \"$steal\"\n";
     s += "fi\n";
     s += "fi\n";
   }
@@ -562,6 +578,26 @@ HealthTrend health_trend(const HealthSnapshot& current, const HealthSnapshot& pr
   return t;
 }
 
+HealthFleetAlert health_fleet_alert(const std::map<std::string, HealthSnapshot>& snaps,
+                                    const std::vector<std::string>& enabled_ids) {
+  HealthFleetAlert out;
+  for (const auto& id : enabled_ids) {
+    auto it = snaps.find(id);
+    if (it == snaps.end()) continue;
+    switch (it->second.level) {
+      case HealthLevel::Crit:
+        ++out.crit;
+        break;
+      case HealthLevel::Offline:
+        ++out.offline;
+        break;
+      default:
+        break;
+    }
+  }
+  return out;
+}
+
 void health_history_push(HealthCacheEntry& entry, HealthSnapshot previous, int max_keep) {
   if (max_keep < 1) max_keep = kHealthHistoryMax;
   if (previous.checked_at <= 0) return;
@@ -647,6 +683,8 @@ HealthSnapshot snapshot_from_json(const json& raw, const std::string& id) {
   snap.load5 = raw.value("load5", -1.0);
   snap.load15 = raw.value("load15", -1.0);
   snap.cpu_pct = raw.value("cpu", -1.0);
+  snap.iowait_pct = raw.value("iowait", -1.0);
+  snap.steal_pct = raw.value("steal", -1.0);
   snap.mem_total_kb = raw.value("mem_total_kb", 0LL);
   snap.mem_avail_kb = raw.value("mem_avail_kb", 0LL);
   snap.mem_pct = raw.value("mem_pct", -1.0);
@@ -707,6 +745,8 @@ json snapshot_to_json(const HealthSnapshot& snap) {
       {"load5", snap.load5},
       {"load15", snap.load15},
       {"cpu", snap.cpu_pct},
+      {"iowait", snap.iowait_pct},
+      {"steal", snap.steal_pct},
       {"mem_total_kb", snap.mem_total_kb},
       {"mem_avail_kb", snap.mem_avail_kb},
       {"mem_pct", snap.mem_pct},

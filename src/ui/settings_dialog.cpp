@@ -312,6 +312,10 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* ram_row = thresh_row(L"RAM", st.health_ram_warn, st.health_ram_crit, &health_ram_warn_, &health_ram_crit_);
   auto* swap_row = thresh_row(L"Swap", st.health_swap_warn, st.health_swap_crit, &health_swap_warn_, &health_swap_crit_);
   auto* cpu_row = thresh_row(L"CPU", st.health_cpu_warn, st.health_cpu_crit, &health_cpu_warn_, &health_cpu_crit_);
+  auto* iowait_row =
+      thresh_row(L"iowait", st.health_iowait_warn, st.health_iowait_crit, &health_iowait_warn_, &health_iowait_crit_);
+  auto* steal_row =
+      thresh_row(L"steal", st.health_steal_warn, st.health_steal_crit, &health_steal_warn_, &health_steal_crit_);
   auto* load_row =
       thresh_row(L"Нагрузка", st.health_load_warn, st.health_load_crit, &health_load_warn_, &health_load_crit_);
   hsz->Add(health_auto_, 0, wxALL, 8);
@@ -327,6 +331,8 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   hsz->Add(ram_row, 0, wxALL, 8);
   hsz->Add(swap_row, 0, wxALL, 8);
   hsz->Add(cpu_row, 0, wxALL, 8);
+  hsz->Add(iowait_row, 0, wxALL, 8);
+  hsz->Add(steal_row, 0, wxALL, 8);
   hsz->Add(load_row, 0, wxALL, 8);
   health_page->SetSizer(hsz);
   nb->AddPage(health_page, L"Состояние");
@@ -588,6 +594,10 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   int swap_crit = config_.settings.health_swap_crit;
   int cpu_warn = config_.settings.health_cpu_warn;
   int cpu_crit = config_.settings.health_cpu_crit;
+  int iowait_warn = config_.settings.health_iowait_warn;
+  int iowait_crit = config_.settings.health_iowait_crit;
+  int steal_warn = config_.settings.health_steal_warn;
+  int steal_crit = config_.settings.health_steal_crit;
   int load_warn = config_.settings.health_load_warn;
   int load_crit = config_.settings.health_load_crit;
   parse_int(std::string(health_interval_sec_->GetValue().utf8_string()), health_interval);
@@ -600,6 +610,10 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   parse_int(std::string(health_swap_crit_->GetValue().utf8_string()), swap_crit);
   parse_int(std::string(health_cpu_warn_->GetValue().utf8_string()), cpu_warn);
   parse_int(std::string(health_cpu_crit_->GetValue().utf8_string()), cpu_crit);
+  parse_int(std::string(health_iowait_warn_->GetValue().utf8_string()), iowait_warn);
+  parse_int(std::string(health_iowait_crit_->GetValue().utf8_string()), iowait_crit);
+  parse_int(std::string(health_steal_warn_->GetValue().utf8_string()), steal_warn);
+  parse_int(std::string(health_steal_crit_->GetValue().utf8_string()), steal_crit);
   parse_int(std::string(health_load_warn_->GetValue().utf8_string()), load_warn);
   parse_int(std::string(health_load_crit_->GetValue().utf8_string()), load_crit);
   config_.settings.health_interval_sec = clamp_int(health_interval, 300, 30 * 24 * 3600);
@@ -612,6 +626,10 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.health_swap_crit = clamp_int(std::max(swap_crit, config_.settings.health_swap_warn), 1, 100);
   config_.settings.health_cpu_warn = clamp_int(cpu_warn, 1, 100);
   config_.settings.health_cpu_crit = clamp_int(std::max(cpu_crit, config_.settings.health_cpu_warn), 1, 100);
+  config_.settings.health_iowait_warn = clamp_int(iowait_warn, 1, 100);
+  config_.settings.health_iowait_crit = clamp_int(std::max(iowait_crit, config_.settings.health_iowait_warn), 1, 100);
+  config_.settings.health_steal_warn = clamp_int(steal_warn, 1, 100);
+  config_.settings.health_steal_crit = clamp_int(std::max(steal_crit, config_.settings.health_steal_warn), 1, 100);
   config_.settings.health_load_warn = clamp_int(load_warn, 1, 500);
   config_.settings.health_load_crit = clamp_int(std::max(load_crit, config_.settings.health_load_warn), 1, 500);
   config_.settings.health_show_cpu = health_cpu_->GetValue();

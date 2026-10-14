@@ -45,6 +45,10 @@ struct HealthThresholds {
   int swap_crit = 80;
   int cpu_warn = 80;
   int cpu_crit = 95;
+  int iowait_warn = 25;
+  int iowait_crit = 50;
+  int steal_warn = 15;
+  int steal_crit = 30;
   // Нагрузка как % от числа ядер (load / nproc * 100). Может быть > 100.
   int load_warn = 100;
   int load_crit = 150;
@@ -70,6 +74,8 @@ struct HealthSnapshot {
   double load5 = -1;
   double load15 = -1;
   double cpu_pct = -1;
+  double iowait_pct = -1;
+  double steal_pct = -1;
   long long mem_total_kb = 0;
   long long mem_avail_kb = 0;
   double mem_pct = -1;
@@ -139,6 +145,19 @@ HealthTrend health_trend(const HealthSnapshot& current, const HealthSnapshot& pr
 /// true, если аптайм не согласуется с прошлым замером (перезагрузка между проверками).
 bool health_rebooted_since(const HealthSnapshot& current, const HealthSnapshot& previous);
 void health_history_push(HealthCacheEntry& entry, HealthSnapshot previous, int max_keep = kHealthHistoryMax);
+
+struct HealthFleetAlert {
+  int crit = 0;
+  int offline = 0;
+  int total() const { return crit + offline; }
+  HealthLevel worst() const {
+    if (offline > 0 || crit > 0) return offline > 0 ? HealthLevel::Offline : HealthLevel::Crit;
+    return HealthLevel::Unknown;
+  }
+};
+/// Сколько включённых в проверку VPS в «высокое» / «нет связи».
+HealthFleetAlert health_fleet_alert(const std::map<std::string, HealthSnapshot>& snaps,
+                                    const std::vector<std::string>& enabled_ids);
 
 std::map<std::string, HealthCacheEntry> load_health_cache(const std::filesystem::path& path);
 void save_health_cache(const std::filesystem::path& path, const std::map<std::string, HealthCacheEntry>& entries);

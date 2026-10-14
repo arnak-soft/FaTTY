@@ -65,6 +65,10 @@ class SettingsDialog : public PositionedDialog {
   wxTextCtrl* health_swap_crit_{};
   wxTextCtrl* health_cpu_warn_{};
   wxTextCtrl* health_cpu_crit_{};
+  wxTextCtrl* health_iowait_warn_{};
+  wxTextCtrl* health_iowait_crit_{};
+  wxTextCtrl* health_steal_warn_{};
+  wxTextCtrl* health_steal_crit_{};
   wxTextCtrl* health_load_warn_{};
   wxTextCtrl* health_load_crit_{};
   ThemedCheckBox* health_cpu_{};

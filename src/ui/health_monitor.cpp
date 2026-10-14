@@ -92,6 +92,10 @@ HealthThresholds HealthMonitor::thresholds_from(const AppSettings& st) const {
   t.swap_crit = st.health_swap_crit;
   t.cpu_warn = st.health_cpu_warn;
   t.cpu_crit = st.health_cpu_crit;
+  t.iowait_warn = st.health_iowait_warn;
+  t.iowait_crit = st.health_iowait_crit;
+  t.steal_warn = st.health_steal_warn;
+  t.steal_crit = st.health_steal_crit;
   t.load_warn = st.health_load_warn;
   t.load_crit = st.health_load_crit;
   return t;

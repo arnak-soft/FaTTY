@@ -74,6 +74,10 @@ json portable_settings(const AppSettings& settings) {
       {"health_swap_crit", settings.health_swap_crit},
       {"health_cpu_warn", settings.health_cpu_warn},
       {"health_cpu_crit", settings.health_cpu_crit},
+      {"health_iowait_warn", settings.health_iowait_warn},
+      {"health_iowait_crit", settings.health_iowait_crit},
+      {"health_steal_warn", settings.health_steal_warn},
+      {"health_steal_crit", settings.health_steal_crit},
       {"health_load_warn", settings.health_load_warn},
       {"health_load_crit", settings.health_load_crit},
       {"health_show_cpu", settings.health_show_cpu},
@@ -125,6 +129,10 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   settings.health_swap_crit = clamp_int(raw.value("health_swap_crit", settings.health_swap_crit), 1, 100);
   settings.health_cpu_warn = clamp_int(raw.value("health_cpu_warn", settings.health_cpu_warn), 1, 100);
   settings.health_cpu_crit = clamp_int(raw.value("health_cpu_crit", settings.health_cpu_crit), 1, 100);
+  settings.health_iowait_warn = clamp_int(raw.value("health_iowait_warn", settings.health_iowait_warn), 1, 100);
+  settings.health_iowait_crit = clamp_int(raw.value("health_iowait_crit", settings.health_iowait_crit), 1, 100);
+  settings.health_steal_warn = clamp_int(raw.value("health_steal_warn", settings.health_steal_warn), 1, 100);
+  settings.health_steal_crit = clamp_int(raw.value("health_steal_crit", settings.health_steal_crit), 1, 100);
   settings.health_load_warn = clamp_int(raw.value("health_load_warn", settings.health_load_warn), 1, 500);
   settings.health_load_crit = clamp_int(raw.value("health_load_crit", settings.health_load_crit), 1, 500);
   settings.health_show_cpu = raw.value("health_show_cpu", settings.health_show_cpu);

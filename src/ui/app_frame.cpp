@@ -354,14 +354,14 @@ void AppFrame::build_ui() {
   auto* putty = make_button(left, L"PuTTY", BtnIcon::Putty);
   auto* winscp = make_button(left, L"WinSCP", BtnIcon::WinSCP);
   auto* test = make_button(left, L"Проверить связь", BtnIcon::Network);
-  auto* health_btn = make_button(left, L"Состояние", BtnIcon::Pulse);
+  health_btn_ = make_button(left, L"Состояние", BtnIcon::Pulse);
   add_btn(sbtns, sadd);
   add_btn(sbtns, files);
   add_btn(sbtns, cons);
   add_btn(sbtns, putty);
   add_btn(sbtns, winscp);
   add_btn(sbtns, test);
-  add_btn(sbtns, health_btn);
+  add_btn(sbtns, health_btn_);
   extra_tools_parent_ = left;
   extra_tools_sizer_ = new wxWrapSizer(wxHORIZONTAL);
   auto* ls = new wxBoxSizer(wxVERTICAL);
@@ -725,7 +725,7 @@ void AppFrame::build_ui() {
     auto* s = selected_server();
     if (s) run_command(*s, "echo OK && hostname && whoami && pwd", 30, true, "Проверка " + s->name, "", "test");
   });
-  health_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+  health_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* s = selected_server();
     show_health(s ? s->id : std::string{});
   });
@@ -1262,6 +1262,7 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
   rebuild_group_tabs();
   refresh_commands();
   if (health_window_) health_window_->reload();
+  update_health_button();
 }
 
 void AppFrame::restore_columns() {
@@ -1912,9 +1913,44 @@ void AppFrame::init_health_monitor() {
   d.on_change = [this, alive = alive_] {
     if (!alive->load()) return;
     if (health_window_) health_window_->reload();
+    update_health_button();
   };
   health_ = std::make_unique<HealthMonitor>(std::move(d));
+  update_health_button();
   health_->start();
+}
+
+void AppFrame::update_health_button() {
+  if (!health_btn_ || !health_) return;
+  std::vector<std::string> enabled;
+  enabled.reserve(config_.servers.size());
+  for (const auto& s : config_.servers) {
+    if (s.health_enabled) enabled.push_back(s.id);
+  }
+  const auto alert = health_fleet_alert(health_->snapshots(), enabled);
+  if (alert.total() > 0) {
+    health_btn_->SetName(L"danger");
+    if (alert.total() == 1) {
+      health_btn_->SetLabel(alert.offline > 0 ? L"Состояние · нет связи" : L"Состояние · высокое");
+    } else {
+      health_btn_->SetLabel(wxString::Format(L"Состояние · %d", alert.total()));
+    }
+    wxString tip = L"Есть VPS с проблемой — откройте окно состояния.";
+    if (alert.crit > 0 && alert.offline > 0) {
+      tip = wxString::Format(L"Высокое: %d, нет связи: %d", alert.crit, alert.offline);
+    } else if (alert.crit > 0) {
+      tip = wxString::Format(L"Высокое заполнение или сбой: %d", alert.crit);
+    } else {
+      tip = wxString::Format(L"Нет связи: %d", alert.offline);
+    }
+    health_btn_->SetToolTip(tip);
+  } else {
+    health_btn_->SetName(L"");
+    health_btn_->SetLabel(L"Состояние");
+    health_btn_->UnsetToolTip();
+  }
+  health_btn_->Refresh();
+  if (auto* parent = health_btn_->GetParent()) parent->Layout();
 }
 
 void AppFrame::update_busy_indicator() {

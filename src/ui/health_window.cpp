@@ -45,6 +45,10 @@ HealthThresholds thresholds_of(const AppSettings& st) {
   t.swap_crit = st.health_swap_crit;
   t.cpu_warn = st.health_cpu_warn;
   t.cpu_crit = st.health_cpu_crit;
+  t.iowait_warn = st.health_iowait_warn;
+  t.iowait_crit = st.health_iowait_crit;
+  t.steal_warn = st.health_steal_warn;
+  t.steal_crit = st.health_steal_crit;
   t.load_warn = st.health_load_warn;
   t.load_crit = st.health_load_crit;
   return t;
@@ -583,6 +587,14 @@ void HealthWindow::show_detail() {
     root->Add(title, 0, wxLEFT | wxRIGHT | wxTOP, 12);
     root->Add(sub, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
     root->Add(cpu, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    auto* iowait = new MetricBar(detail_, L"iowait", 52);
+    iowait->set(snap.iowait_pct, wxString::FromUTF8(format_pct(snap.iowait_pct)),
+                bar_level(snap.iowait_pct, st.health_iowait_warn, st.health_iowait_crit));
+    root->Add(iowait, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    auto* steal = new MetricBar(detail_, L"steal", 52);
+    steal->set(snap.steal_pct, wxString::FromUTF8(format_pct(snap.steal_pct)),
+               bar_level(snap.steal_pct, st.health_steal_warn, st.health_steal_crit));
+    root->Add(steal, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
   } else {
     root->Add(title, 0, wxLEFT | wxRIGHT | wxTOP, 12);
     root->Add(sub, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);

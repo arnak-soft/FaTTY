@@ -46,6 +46,7 @@ class AppFrame : public wxFrame {
   void build_ui();
   void init_run_controllers();
   void init_health_monitor();
+  void update_health_button();
   void persist();
   void maybe_run_backup();
   void apply_ui_theme();
@@ -177,6 +178,7 @@ class AppFrame : public wxFrame {
   HealthWindow* health_window_ = nullptr;
   HelpWindow* help_window_ = nullptr;
   BundleStepsWindow* bundle_steps_window_ = nullptr;
+  RoundButton* health_btn_ = nullptr;
 };
 
 }  // namespace fatty

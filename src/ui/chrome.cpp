@@ -533,15 +533,16 @@ void RoundButton::on_paint(wxPaintEvent&) {
   const wxColour parent_bg = GetParent() ? GetParent()->GetBackgroundColour() : Theme::bg();
   SetBackgroundColour(parent_bg);
   const bool accent = GetName() == L"accent";
-  wxColour fill = accent ? Theme::accent() : Theme::btn();
-  wxColour fg = accent ? *wxWHITE : Theme::text_bright();
+  const bool danger = GetName() == L"danger";
+  wxColour fill = accent ? Theme::accent() : danger ? Theme::err() : Theme::btn();
+  wxColour fg = (accent || danger) ? *wxWHITE : Theme::text_bright();
   if (!IsEnabled()) {
     fill = Theme::chrome();
     fg = Theme::muted();
   } else if (pressed_ && hovered_) {
     fill = shift(fill, theme_is_dark() ? -18 : -22);
   } else if (hovered_) {
-    fill = accent ? shift(fill, 16) : Theme::hover();
+    fill = (accent || danger) ? shift(fill, 16) : Theme::hover();
   }
   wxGCDC gc(dc);
   gc.SetBackground(wxBrush(parent_bg));
@@ -557,7 +558,7 @@ void RoundButton::on_paint(wxPaintEvent&) {
   gc.SetBrush(wxBrush(fill));
   gc.DrawRoundedRectangle(0.5, 0.5, sz.x - 1.0, sz.y - 1.0, radius);
   if (IsEnabled() && HasFocus()) {
-    const wxColour ring = accent ? *wxWHITE : Theme::accent();
+    const wxColour ring = (accent || danger) ? *wxWHITE : Theme::accent();
     gc.SetBrush(*wxTRANSPARENT_BRUSH);
     gc.SetPen(wxPen(ring, std::max(1, FromDIP(2))));
     const double inset = FromDIP(2);

@@ -631,6 +631,10 @@ Config load_config_from(const std::filesystem::path& path) {
   st.health_swap_crit = json_int(settings_raw, "health_swap_crit", 80, 1, 100);
   st.health_cpu_warn = json_int(settings_raw, "health_cpu_warn", 80, 1, 100);
   st.health_cpu_crit = json_int(settings_raw, "health_cpu_crit", 95, 1, 100);
+  st.health_iowait_warn = json_int(settings_raw, "health_iowait_warn", 25, 1, 100);
+  st.health_iowait_crit = json_int(settings_raw, "health_iowait_crit", 50, 1, 100);
+  st.health_steal_warn = json_int(settings_raw, "health_steal_warn", 15, 1, 100);
+  st.health_steal_crit = json_int(settings_raw, "health_steal_crit", 30, 1, 100);
   st.health_load_warn = json_int(settings_raw, "health_load_warn", 100, 1, 500);
   st.health_load_crit = json_int(settings_raw, "health_load_crit", 150, 1, 500);
   st.health_show_cpu = settings_raw.value("health_show_cpu", true);
@@ -768,6 +772,10 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"health_swap_crit", config.settings.health_swap_crit},
       {"health_cpu_warn", config.settings.health_cpu_warn},
       {"health_cpu_crit", config.settings.health_cpu_crit},
+      {"health_iowait_warn", config.settings.health_iowait_warn},
+      {"health_iowait_crit", config.settings.health_iowait_crit},
+      {"health_steal_warn", config.settings.health_steal_warn},
+      {"health_steal_crit", config.settings.health_steal_crit},
       {"health_load_warn", config.settings.health_load_warn},
       {"health_load_crit", config.settings.health_load_crit},
       {"health_show_cpu", config.settings.health_show_cpu},
