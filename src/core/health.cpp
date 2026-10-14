@@ -70,7 +70,8 @@ std::tm local_from_unix(double unix_ts) {
 
 bool health_has_readings(const HealthSnapshot& snap) {
   return snap.nproc > 0 || snap.cpu_pct >= 0 || snap.mem_pct >= 0 || snap.mem_total_kb > 0 || snap.swap_total_kb > 0 ||
-         snap.swap_pct >= 0 || !snap.disks.empty() || snap.load1 >= 0 || snap.uptime_sec >= 0;
+         snap.swap_pct >= 0 || !snap.disks.empty() || snap.load1 >= 0 || snap.uptime_sec >= 0 || snap.reboot_required ||
+         !snap.failed_units.empty();
 }
 
 }  // namespace
@@ -139,6 +140,13 @@ void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thres
   const double load_pct = health_load_pct(snap);
   if (load_pct >= 0) {
     lvl = worse_health(lvl, level_from_pct(load_pct, thresholds.load_warn, thresholds.load_crit));
+  }
+  if (snap.reboot_required) {
+    lvl = worse_health(lvl, HealthLevel::Warn);
+  }
+  if (!snap.failed_units.empty()) {
+    const auto n = static_cast<int>(snap.failed_units.size());
+    lvl = worse_health(lvl, n >= 3 ? HealthLevel::Crit : HealthLevel::Warn);
   }
   if (lvl == HealthLevel::Unknown && snap.checked_at > 0 && snap.error.empty() && health_has_readings(snap)) {
     lvl = HealthLevel::Ok;
@@ -224,6 +232,14 @@ HealthSnapshot parse_health_output(std::string_view text) {
       parse_ll(val, snap.swap_free_kb);
     } else if (key == "uptime") {
       parse_double(val, snap.uptime_sec);
+    } else if (key == "reboot_required") {
+      int flag = 0;
+      if (parse_int(val, flag)) snap.reboot_required = flag != 0;
+    } else if (key == "failed_unit") {
+      auto name = trim(val);
+      if (!name.empty() && static_cast<int>(snap.failed_units.size()) < kHealthFailedUnitsMax) {
+        snap.failed_units.push_back(std::move(name));
+      }
     } else if (key == "disk") {
       auto parts = split_ws(val);
       if (parts.size() < 3) continue;
@@ -324,6 +340,17 @@ std::string health_remote_script(const HealthCollect& collect) {
     s += "  printf \"disk=%s %s %s\\n\", mp, used, total;\n";
     s += "}'\n";
   }
+  s += "if [ -f /var/run/reboot-required ] || [ -f /run/reboot-required ]; then\n";
+  s += "printf 'reboot_required=1\\n'\n";
+  s += "else\n";
+  s += "printf 'reboot_required=0\\n'\n";
+  s += "fi\n";
+  s += "if command -v systemctl >/dev/null 2>&1; then\n";
+  s += "systemctl list-units --state=failed --no-legend --no-pager 2>/dev/null | ";
+  s += "awk 'NF { gsub(/^[ \\t]+|[ \\t]+$/, \"\", $1); if ($1 != \"\") { print \"failed_unit=\" $1; if (++c >= ";
+  s += std::to_string(kHealthFailedUnitsMax);
+  s += ") exit } }'\n";
+  s += "fi\n";
   s += "printf '%s\\n' 'FATTYHEALTH_END'\n";
   return s;
 }
@@ -486,6 +513,16 @@ long long health_swap_used_kb(const HealthSnapshot& snap) {
   return snap.swap_total_kb - std::min(snap.swap_free_kb, snap.swap_total_kb);
 }
 
+bool health_rebooted_since(const HealthSnapshot& current, const HealthSnapshot& previous) {
+  if (current.uptime_sec < 0 || previous.uptime_sec < 0) return false;
+  if (current.checked_at <= 0 || previous.checked_at <= 0) return false;
+  const double elapsed = current.checked_at - previous.checked_at;
+  if (elapsed < 120) return false;
+  const double expected = previous.uptime_sec + elapsed;
+  // Допуск на рассинхрон часов и длительность самой проверки.
+  return current.uptime_sec + 180.0 < expected;
+}
+
 HealthTrend health_trend(const HealthSnapshot& current, const HealthSnapshot& previous) {
   HealthTrend t;
   if (previous.checked_at <= 0 || current.checked_at <= 0) return t;
@@ -617,7 +654,18 @@ HealthSnapshot snapshot_from_json(const json& raw, const std::string& id) {
   snap.swap_free_kb = raw.value("swap_free_kb", 0LL);
   snap.swap_pct = raw.value("swap_pct", -1.0);
   snap.uptime_sec = raw.value("uptime", -1.0);
+  snap.reboot_required = raw.value("reboot_required", false);
+  snap.rebooted = raw.value("rebooted", false);
   snap.checked_at = raw.value("checked_at", 0.0);
+  if (raw.contains("failed_units") && raw["failed_units"].is_array()) {
+    for (const auto& u : raw["failed_units"]) {
+      if (!u.is_string()) continue;
+      auto name = trim(u.get<std::string>());
+      if (name.empty()) continue;
+      if (static_cast<int>(snap.failed_units.size()) >= kHealthFailedUnitsMax) break;
+      snap.failed_units.push_back(std::move(name));
+    }
+  }
   if (snap.mem_pct < 0 && snap.mem_total_kb > 0) {
     const auto used = snap.mem_total_kb - std::min(snap.mem_avail_kb, snap.mem_total_kb);
     snap.mem_pct = 100.0 * static_cast<double>(used) / static_cast<double>(snap.mem_total_kb);
@@ -648,6 +696,8 @@ json snapshot_to_json(const HealthSnapshot& snap) {
   for (const auto& d : snap.disks) {
     disks.push_back({{"mp", d.mount}, {"used", d.used_kb}, {"total", d.total_kb}});
   }
+  json failed = json::array();
+  for (const auto& u : snap.failed_units) failed.push_back(u);
   return {
       {"name", snap.server_name},
       {"level", health_level_id(snap.level)},
@@ -664,6 +714,9 @@ json snapshot_to_json(const HealthSnapshot& snap) {
       {"swap_free_kb", snap.swap_free_kb},
       {"swap_pct", snap.swap_pct},
       {"uptime", snap.uptime_sec},
+      {"reboot_required", snap.reboot_required},
+      {"rebooted", snap.rebooted},
+      {"failed_units", std::move(failed)},
       {"checked_at", snap.checked_at},
       {"disks", std::move(disks)},
   };

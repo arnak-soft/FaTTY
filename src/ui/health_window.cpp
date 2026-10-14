@@ -667,6 +667,29 @@ void HealthWindow::show_detail() {
                                 wxString::FromUTF8("Аптайм: " + format_uptime_sec(snap.uptime_sec)));
   meta->SetForegroundColour(Theme::muted());
   root->Add(meta, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  if (snap.reboot_required) {
+    auto* reboot = new wxStaticText(detail_, wxID_ANY, L"Нужна перезагрузка — установлены обновления ядра или системы.");
+    reboot->SetForegroundColour(Theme::warn());
+    reboot->Wrap(FromDIP(420));
+    root->Add(reboot, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  }
+  if (snap.rebooted) {
+    auto* did = new wxStaticText(detail_, wxID_ANY, L"С прошлой проверки машина перезагружалась.");
+    did->SetForegroundColour(Theme::muted());
+    did->Wrap(FromDIP(420));
+    root->Add(did, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  }
+  if (!snap.failed_units.empty()) {
+    std::string failed = "Упавшие службы (" + std::to_string(snap.failed_units.size()) + "): ";
+    for (std::size_t i = 0; i < snap.failed_units.size(); ++i) {
+      if (i) failed += ", ";
+      failed += snap.failed_units[i];
+    }
+    auto* units = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(failed));
+    units->SetForegroundColour(snap.failed_units.size() >= 3 ? Theme::err() : Theme::warn());
+    units->Wrap(FromDIP(420));
+    root->Add(units, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  }
   if (!snap.error.empty() && snap.level != HealthLevel::Ok) {
     auto* err = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(snap.error));
     err->SetForegroundColour(Theme::err());

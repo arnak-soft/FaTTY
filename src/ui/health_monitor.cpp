@@ -249,9 +249,12 @@ void HealthMonitor::store_snapshot(HealthSnapshot snap, bool persist_now) {
     auto& entry = entries_[snap.server_id];
     HealthSnapshot prior = entry.latest;
     prior.checking = false;
-    if (prior.checked_at > 0 && snap.checked_at > 0 &&
-        std::fabs(prior.checked_at - snap.checked_at) >= 0.5) {
-      health_history_push(entry, std::move(prior));
+    snap.rebooted = false;
+    if (prior.checked_at > 0 && snap.checked_at > 0) {
+      snap.rebooted = health_rebooted_since(snap, prior);
+      if (std::fabs(prior.checked_at - snap.checked_at) >= 0.5) {
+        health_history_push(entry, std::move(prior));
+      }
     }
     snap.checking = false;
     entry.latest = std::move(snap);

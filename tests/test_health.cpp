@@ -75,6 +75,30 @@ FATTYCWD_abc:/root
   auto no_swap = parse_health_output("FATTYHEALTH v1\nnproc=1\nswap_total_kb=0\nswap_free_kb=0\nFATTYHEALTH_END\n");
   expect(no_swap.swap_pct < 0, "zero swap is N/A");
 
+  auto signals = parse_health_output(
+      "FATTYHEALTH v1\nnproc=1\nuptime=100\nreboot_required=1\n"
+      "failed_unit=nginx.service\nfailed_unit=cron.service\nFATTYHEALTH_END\n");
+  expect(signals.reboot_required, "parse reboot_required");
+  expect(signals.failed_units.size() == 2, "parse failed units");
+  expect(signals.failed_units[0] == "nginx.service", "first failed unit");
+  signals.checked_at = 1;
+  apply_health_thresholds(signals, {});
+  expect(signals.level == HealthLevel::Warn, "reboot + 2 failed is warn");
+  signals.failed_units.push_back("a.service");
+  apply_health_thresholds(signals, {});
+  expect(signals.level == HealthLevel::Crit, "3 failed is crit");
+
+  HealthSnapshot before_reboot;
+  before_reboot.uptime_sec = 86400;
+  before_reboot.checked_at = 1000;
+  HealthSnapshot after_reboot;
+  after_reboot.uptime_sec = 300;
+  after_reboot.checked_at = 1000 + 3600;
+  expect(health_rebooted_since(after_reboot, before_reboot), "uptime drop is reboot");
+  HealthSnapshot still_up = after_reboot;
+  still_up.uptime_sec = 86400 + 3600;
+  expect(!health_rebooted_since(still_up, before_reboot), "continuous uptime not reboot");
+
   auto spaced = parse_health_output("FATTYHEALTH v1\ndisk=/home/user data 10 20\nFATTYHEALTH_END\n");
   expect(spaced.disks.size() == 1, "disk with spaces");
   expect(spaced.disks[0].mount == "/home/user data", "mount keeps spaces");
@@ -99,6 +123,8 @@ FATTYCWD_abc:/root
   expect(script.find("/proc/stat") != std::string::npos, "script cpu");
   expect(script.find("df -Pk") != std::string::npos, "script df");
   expect(script.find("SwapTotal") != std::string::npos, "script swap");
+  expect(script.find("reboot-required") != std::string::npos, "script reboot flag");
+  expect(script.find("systemctl list-units") != std::string::npos, "script failed units");
   expect(script.find("overlay2") != std::string::npos, "skip overlay by default");
   auto with_docker = health_remote_script({true, true, true, true, true});
   expect(with_docker.find("overlay2") == std::string::npos, "keep overlay when enabled");
@@ -106,6 +132,7 @@ FATTYCWD_abc:/root
   expect(slim.find("/proc/stat") == std::string::npos, "cpu off");
   expect(slim.find("df -Pk") == std::string::npos, "disk off");
   expect(slim.find("SwapTotal") == std::string::npos, "swap off");
+  expect(slim.find("reboot-required") != std::string::npos, "reboot always collected");
   expect(slim.find("os=other") != std::string::npos, "still detects non-linux");
 
   expect(format_pct(-1) == "—", "missing pct");

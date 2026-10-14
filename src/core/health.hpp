@@ -16,6 +16,8 @@ inline constexpr int kHealthTimeoutMax = 120;
 inline constexpr int kHealthTimeoutDefault = 20;
 /// Сколько прошлых замеров хранить на VPS (без текущего).
 inline constexpr int kHealthHistoryMax = 48;
+/// Сколько имён упавших юнитов systemd сохранять в снимке.
+inline constexpr int kHealthFailedUnitsMax = 8;
 
 enum class HealthLevel {
   Unknown = 0,
@@ -75,6 +77,10 @@ struct HealthSnapshot {
   long long swap_free_kb = 0;
   double swap_pct = -1;
   double uptime_sec = -1;
+  bool reboot_required = false;
+  /// Аптайм короче, чем ожидалось после прошлого замера — машина перезагружалась.
+  bool rebooted = false;
+  std::vector<std::string> failed_units;
   std::vector<HealthDisk> disks;
   double checked_at = 0;
 };
@@ -130,6 +136,8 @@ std::string format_interval_label(int seconds);
 long long health_mem_used_kb(const HealthSnapshot& snap);
 long long health_swap_used_kb(const HealthSnapshot& snap);
 HealthTrend health_trend(const HealthSnapshot& current, const HealthSnapshot& previous);
+/// true, если аптайм не согласуется с прошлым замером (перезагрузка между проверками).
+bool health_rebooted_since(const HealthSnapshot& current, const HealthSnapshot& previous);
 void health_history_push(HealthCacheEntry& entry, HealthSnapshot previous, int max_keep = kHealthHistoryMax);
 
 std::map<std::string, HealthCacheEntry> load_health_cache(const std::filesystem::path& path);
