@@ -55,6 +55,7 @@ json portable_settings(const AppSettings& settings) {
       {"default_command_timeout", settings.default_command_timeout},
       {"journal_max_entries", settings.journal_max_entries},
       {"clear_output_before_run", settings.clear_output_before_run},
+      {"quick_history_per_group", settings.quick_history_per_group},
       {"advance_command_after_run", settings.advance_command_after_run},
       {"allow_short_master_password", settings.allow_short_master_password},
       {"master_password_max_attempts", settings.master_password_max_attempts},
@@ -101,6 +102,7 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
     settings.extra_programs = parse_extra_programs(raw["extra_programs"]);
   }
   settings.clear_output_before_run = raw.value("clear_output_before_run", settings.clear_output_before_run);
+  settings.quick_history_per_group = raw.value("quick_history_per_group", settings.quick_history_per_group);
   settings.advance_command_after_run = raw.value("advance_command_after_run", settings.advance_command_after_run);
   settings.allow_short_master_password =
       raw.value("allow_short_master_password", settings.allow_short_master_password);

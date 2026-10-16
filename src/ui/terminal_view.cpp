@@ -109,6 +109,7 @@ TerminalView::TerminalView(wxWindow* parent)
   Bind(wxEVT_LEFT_DOWN, &TerminalView::on_mouse_down, this);
   Bind(wxEVT_MOTION, &TerminalView::on_mouse_move, this);
   Bind(wxEVT_LEFT_UP, &TerminalView::on_mouse_up, this);
+  Bind(wxEVT_RIGHT_UP, &TerminalView::on_mouse_right, this);
   Bind(wxEVT_MOUSEWHEEL, &TerminalView::on_mouse_wheel, this);
   Bind(wxEVT_SCROLLWIN_TOP, &TerminalView::on_scroll, this);
   Bind(wxEVT_SCROLLWIN_BOTTOM, &TerminalView::on_scroll, this);
@@ -845,6 +846,25 @@ void TerminalView::on_mouse_up(wxMouseEvent& e) {
   Refresh();
 }
 
+void TerminalView::paste_clipboard() {
+  snap_to_bottom();
+  if (!write_cb_) return;
+  if (!wxTheClipboard->Open()) return;
+  if (wxTheClipboard->IsSupported(wxDF_UNICODETEXT)) {
+    wxTextDataObject data;
+    wxTheClipboard->GetData(data);
+    const wxString t = data.GetText();
+    if (!t.empty()) write_cb_(std::string(t.utf8_string()));
+  }
+  wxTheClipboard->Close();
+}
+
+void TerminalView::on_mouse_right(wxMouseEvent& e) {
+  SetFocus();
+  paste_clipboard();
+  (void)e;
+}
+
 std::string TerminalView::key_to_seq(int key, int modifiers) const {
   const bool ctrl = (modifiers & wxMOD_CONTROL) != 0;
   const bool alt = (modifiers & wxMOD_ALT) != 0;
@@ -928,16 +948,7 @@ void TerminalView::on_key_down(wxKeyEvent& e) {
     // Ctrl+C → ETX to shell (not copy). Copy via select not implemented yet.
   }
   if (key == 'V' && e.ControlDown()) {
-    snap_to_bottom();
-    if (wxTheClipboard->Open()) {
-      if (wxTheClipboard->IsSupported(wxDF_UNICODETEXT)) {
-        wxTextDataObject data;
-        wxTheClipboard->GetData(data);
-        const wxString t = data.GetText();
-        if (write_cb_ && !t.empty()) write_cb_(std::string(t.utf8_string()));
-      }
-      wxTheClipboard->Close();
-    }
+    paste_clipboard();
     return;
   }
   const std::string seq = key_to_seq(key, e.GetModifiers());

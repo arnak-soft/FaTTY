@@ -90,6 +90,39 @@ void fill_row(StripedListCtrl* list, long row, const std::vector<std::string>& i
   }
 }
 
+wxColour health_badge_colour(HealthLevel level) {
+  switch (level) {
+    case HealthLevel::Ok:
+      return Theme::ok();
+    case HealthLevel::Warn:
+      return Theme::warn();
+    case HealthLevel::Crit:
+    case HealthLevel::Offline:
+      return Theme::err();
+    default:
+      return Theme::muted();
+  }
+}
+
+HealthThresholds health_thresholds_of(const AppSettings& st) {
+  HealthThresholds t;
+  t.disk_warn = st.health_disk_warn;
+  t.disk_crit = st.health_disk_crit;
+  t.ram_warn = st.health_ram_warn;
+  t.ram_crit = st.health_ram_crit;
+  t.swap_warn = st.health_swap_warn;
+  t.swap_crit = st.health_swap_crit;
+  t.cpu_warn = st.health_cpu_warn;
+  t.cpu_crit = st.health_cpu_crit;
+  t.iowait_warn = st.health_iowait_warn;
+  t.iowait_crit = st.health_iowait_crit;
+  t.steal_warn = st.health_steal_warn;
+  t.steal_crit = st.health_steal_crit;
+  t.load_warn = st.health_load_warn;
+  t.load_crit = st.health_load_crit;
+  return t;
+}
+
 }  // namespace
 
 AppFrame::AppFrame(Config config, SessionVault vault)
@@ -603,6 +636,7 @@ void AppFrame::build_ui() {
     refresh_servers();
   });
   servers_->Bind(wxEVT_LIST_ITEM_SELECTED, [this](wxListEvent&) {
+    reset_quick_history_nav();
     rebuild_group_tabs();
     refresh_commands();
   });
@@ -733,6 +767,7 @@ void AppFrame::build_ui() {
   gadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { add_group(); });
   groups_nb_->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
     if (updating_groups_) return;
+    if (config_.settings.quick_history_per_group) reset_quick_history_nav();
     attach_commands_page(e.GetSelection());
     if (auto* s = selected_server()) {
       config_.settings.last_group_by_server[s->id] = current_group_id();
@@ -816,12 +851,28 @@ void AppFrame::build_ui() {
     if (config_.settings.confirm_before_run &&
         !ask_confirm(this, L"Запуск", L"Выполнить разовую команду?", L"Запустить", true, BtnIcon::Play))
       return;
+    push_quick_history(cmd);
     run_command(*s, cmd, config_.settings.default_command_timeout, true, "разовая команда", "", "quick");
   });
   quick_->Bind(wxEVT_TEXT_ENTER, [this, qrun](wxCommandEvent&) {
     wxCommandEvent ev(wxEVT_BUTTON);
     qrun->GetEventHandler()->ProcessEvent(ev);
   });
+  quick_->Bind(wxEVT_KEY_DOWN, [this](wxKeyEvent& e) {
+    const int key = e.GetKeyCode();
+    if (key == WXK_UP) {
+      if (navigate_quick_history(-1)) return;
+    } else if (key == WXK_DOWN) {
+      if (navigate_quick_history(+1)) return;
+    } else if (quick_hist_pos_ >= 0 && key != WXK_LEFT && key != WXK_RIGHT && key != WXK_HOME && key != WXK_END &&
+               key != WXK_SHIFT && key != WXK_CONTROL && key != WXK_ALT) {
+      // Начали править выбранную из истории строку — дальше это уже черновик.
+      quick_hist_pos_ = -1;
+      quick_draft_.clear();
+    }
+    e.Skip();
+  });
+  quick_->SetToolTip(L"↑/↓ — история разовых команд этого VPS");
   cwd_reset_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) return;
@@ -1169,6 +1220,64 @@ void AppFrame::persist() {
   }
 }
 
+std::string AppFrame::quick_history_key() {
+  auto* s = selected_server();
+  if (!s) return {};
+  if (!config_.settings.quick_history_per_group) return s->id;
+  return s->id + '\x1f' + current_group_id();
+}
+
+void AppFrame::reset_quick_history_nav() {
+  quick_hist_pos_ = -1;
+  quick_draft_.clear();
+}
+
+void AppFrame::push_quick_history(const std::string& cmd) {
+  const auto key = quick_history_key();
+  if (key.empty() || cmd.empty()) return;
+  auto& hist = config_.settings.quick_history[key];
+  if (!hist.empty() && hist.back() == cmd) {
+    reset_quick_history_nav();
+    return;
+  }
+  hist.push_back(cmd);
+  constexpr std::size_t kMaxQuickHistory = 50;
+  if (hist.size() > kMaxQuickHistory) {
+    hist.erase(hist.begin(), hist.begin() + static_cast<std::ptrdiff_t>(hist.size() - kMaxQuickHistory));
+  }
+  reset_quick_history_nav();
+  persist();
+}
+
+bool AppFrame::navigate_quick_history(int delta) {
+  if (!quick_ || delta == 0) return false;
+  const auto key = quick_history_key();
+  if (key.empty()) return false;
+  auto it = config_.settings.quick_history.find(key);
+  if (it == config_.settings.quick_history.end() || it->second.empty()) return false;
+  const auto& hist = it->second;
+  const int n = static_cast<int>(hist.size());
+
+  if (quick_hist_pos_ < 0) {
+    if (delta > 0) return false;
+    quick_draft_ = std::string(quick_->GetValue().utf8_string());
+    quick_hist_pos_ = n - 1;
+  } else {
+    int next = quick_hist_pos_ + delta;
+    if (next < 0) next = 0;
+    if (next >= n) {
+      quick_hist_pos_ = -1;
+      quick_->ChangeValue(wxString::FromUTF8(quick_draft_));
+      quick_->SetInsertionPointEnd();
+      return true;
+    }
+    quick_hist_pos_ = next;
+  }
+  quick_->ChangeValue(wxString::FromUTF8(hist[static_cast<std::size_t>(quick_hist_pos_)]));
+  quick_->SetInsertionPointEnd();
+  return true;
+}
+
 void AppFrame::rebuild_extra_tools() {
   if (!extra_tools_sizer_ || !extra_tools_parent_) return;
   const int gap = extra_tools_parent_->FromDIP(8);
@@ -1249,9 +1358,33 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
     servers_->InsertItem(row, L"");
     fill_row(servers_, row, server_column_ids(),
              {{"name", wxString::FromUTF8(s.name)},
-              {"host", wxString::FromUTF8(s.username + "@" + s.host + ":" + std::to_string(s.port))}});
+              {"host", wxString::FromUTF8(s.username + "@" + s.host + ":" + std::to_string(s.port))},
+              {"health", L""}});
     servers_->SetItemPtrData(row, static_cast<wxUIntPtr>(i));
-    style_list_row(servers_, row, Theme::text());
+    wxColour row_colour = Theme::text();
+    if (health_) {
+      const auto snap = health_->snapshot(s.id);
+      const auto th = health_thresholds_of(config_.settings);
+      const auto badges = health_list_badges(snap, th, s.health_enabled);
+      std::vector<ListCellBadge> cells;
+      cells.reserve(badges.size());
+      for (const auto& b : badges) {
+        cells.push_back({health_badge_colour(b.level), wxString::FromUTF8(b.tip)});
+      }
+      const auto ids = server_column_ids();
+      for (int col = 0; col < static_cast<int>(ids.size()); ++col) {
+        if (ids[static_cast<std::size_t>(col)] == "health") {
+          servers_->SetItemBadges(row, col, std::move(cells));
+          break;
+        }
+      }
+      if (s.health_enabled && (snap.level == HealthLevel::Crit || snap.level == HealthLevel::Offline)) {
+        row_colour = Theme::err();
+      } else if (s.health_enabled && snap.level == HealthLevel::Warn) {
+        row_colour = Theme::warn();
+      }
+    }
+    style_list_row(servers_, row, row_colour);
     if (s.id == keep) sel = row;
     ++row;
   }
@@ -1460,7 +1593,7 @@ std::vector<std::string> AppFrame::command_column_ids() const {
 }
 
 std::vector<std::string> AppFrame::server_column_ids() const {
-  std::vector<std::string> available{"name", "host"};
+  std::vector<std::string> available{"name", "health", "host"};
   auto it = config_.settings.column_order.find("servers");
   if (it == config_.settings.column_order.end()) return available;
   return prefer_order(available, it->second);
@@ -1475,14 +1608,50 @@ void AppFrame::setup_server_columns() {
   const auto ids = server_column_ids();
   for (const auto& id : ids) {
     if (id == "host") {
-      servers_->AppendColumn(L"Адрес", wxLIST_FORMAT_LEFT, FromDIP(220));
+      servers_->AppendColumn(L"Адрес", wxLIST_FORMAT_LEFT, FromDIP(200));
+    } else if (id == "health") {
+      servers_->AppendColumn(L"Состояние", wxLIST_FORMAT_LEFT, FromDIP(78));
     } else {
-      servers_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(160));
+      servers_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(140));
     }
   }
   auto it = config_.settings.column_widths.find("servers");
   if (it != config_.settings.column_widths.end()) {
     apply_list_columns(servers_, it->second, ids);
+  }
+}
+
+void AppFrame::refresh_server_health() {
+  if (!servers_ || !health_) return;
+  const auto ids = server_column_ids();
+  int health_col = -1;
+  for (int col = 0; col < static_cast<int>(ids.size()); ++col) {
+    if (ids[static_cast<std::size_t>(col)] == "health") {
+      health_col = col;
+      break;
+    }
+  }
+  if (health_col < 0) return;
+  const auto th = health_thresholds_of(config_.settings);
+  for (long row = 0; row < servers_->GetItemCount(); ++row) {
+    const auto idx = static_cast<std::size_t>(servers_->GetItemData(row));
+    if (idx >= config_.servers.size()) continue;
+    const auto& s = config_.servers[idx];
+    const auto snap = health_->snapshot(s.id);
+    const auto badges = health_list_badges(snap, th, s.health_enabled);
+    std::vector<ListCellBadge> cells;
+    cells.reserve(badges.size());
+    for (const auto& b : badges) {
+      cells.push_back({health_badge_colour(b.level), wxString::FromUTF8(b.tip)});
+    }
+    servers_->SetItemBadges(row, health_col, std::move(cells));
+    wxColour row_colour = Theme::text();
+    if (s.health_enabled && (snap.level == HealthLevel::Crit || snap.level == HealthLevel::Offline)) {
+      row_colour = Theme::err();
+    } else if (s.health_enabled && snap.level == HealthLevel::Warn) {
+      row_colour = Theme::warn();
+    }
+    style_list_row(servers_, row, row_colour);
   }
 }
 
@@ -1921,6 +2090,7 @@ void AppFrame::init_health_monitor() {
   d.on_change = [this, alive = alive_] {
     if (!alive->load()) return;
     if (health_window_) health_window_->reload();
+    refresh_server_health();
     update_health_button();
   };
   d.on_level_change = [this, alive = alive_](const HealthSnapshot& previous, const HealthSnapshot& current) {

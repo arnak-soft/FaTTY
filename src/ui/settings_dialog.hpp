@@ -31,6 +31,7 @@ class SettingsDialog : public PositionedDialog {
   std::function<void()> on_check_updates_;
   std::function<void()> on_import_done_;
   ThemedCheckBox* confirm_{};
+  ThemedCheckBox* quick_history_per_group_{};
   ThemedCheckBox* updates_{};
   ThemedCheckBox* clear_output_{};
   ThemedCheckBox* automation_to_shell_{};

@@ -51,6 +51,7 @@ class AppFrame : public wxFrame {
   void maybe_run_backup();
   void apply_ui_theme();
   void refresh_servers(const std::string& keep_id = {});
+  void refresh_server_health();
   void refresh_commands();
   void update_server_heading();
   void refresh_bundles();
@@ -97,6 +98,10 @@ class AppFrame : public wxFrame {
   void open_settings();
   void restore_columns();
   void track_window_state();
+  std::string quick_history_key();
+  void push_quick_history(const std::string& cmd);
+  void reset_quick_history_nav();
+  bool navigate_quick_history(int delta);
   void rebuild_extra_tools();
   void show_servers_context_menu(long row);
   void show_commands_context_menu(long row);
@@ -161,6 +166,9 @@ class AppFrame : public wxFrame {
   // Сессионный флаг: при каждом запуске FaTTY снова включается.
   bool session_automation_to_shell_ = true;
   wxTextCtrl* quick_{};
+  /// −1 — черновик в поле; иначе индекс в векторе истории (0 = самая старая).
+  int quick_hist_pos_ = -1;
+  std::string quick_draft_;
   wxStaticText* cwd_label_{};
   RoundButton* cwd_reset_{};
   RoundButton* run_btn_{};

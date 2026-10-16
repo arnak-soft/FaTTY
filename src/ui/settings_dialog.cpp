@@ -143,6 +143,12 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto* gsz = new wxBoxSizer(wxVERTICAL);
   confirm_ = new ThemedCheckBox(general, wxID_ANY, L"Спрашивать подтверждение перед разовой командой");
   confirm_->SetValue(st.confirm_before_run);
+  quick_history_per_group_ =
+      new ThemedCheckBox(general, wxID_ANY, L"История разовой команды отдельно для каждой вкладки групп");
+  quick_history_per_group_->SetValue(st.quick_history_per_group);
+  quick_history_per_group_->SetToolTip(
+      L"Стрелки ↑/↓ в поле «Разовая команда» листают историю. По умолчанию история своя у каждого VPS; "
+      L"включите, чтобы ещё и у каждой вкладки групп была своя.");
   clear_output_ = new ThemedCheckBox(general, wxID_ANY, L"Очищать панель вывода перед новым запуском");
   clear_output_->SetValue(st.clear_output_before_run);
   automation_to_shell_ =
@@ -204,6 +210,7 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   auto add_check = [&](ThemedCheckBox* box) { gsz->Add(box, 0, wxLEFT | wxRIGHT | wxTOP, pad); };
   add_section(L"Запуск");
   add_check(confirm_);
+  add_check(quick_history_per_group_);
   add_check(clear_output_);
   add_check(advance_command_);
   add_row(trow);
@@ -563,6 +570,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   parse_int(std::string(lockout_attempts_->GetValue().utf8_string()), attempts);
   parse_int(std::string(lockout_minutes_->GetValue().utf8_string()), minutes);
   config_.settings.confirm_before_run = confirm_->GetValue();
+  config_.settings.quick_history_per_group = quick_history_per_group_->GetValue();
   config_.settings.check_updates_on_start = updates_->GetValue();
   config_.settings.clear_output_before_run = clear_output_->GetValue();
   config_.settings.automation_to_shell_when_connected = automation_to_shell_->GetValue();

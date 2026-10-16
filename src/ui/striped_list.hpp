@@ -9,6 +9,11 @@
 
 namespace fatty {
 
+struct ListCellBadge {
+  wxColour colour;
+  wxString tip;
+};
+
 // Список с полосами и цветом строк. Нативный wxListCtrl на Windows в тёмной
 // теме игнорирует SetItemTextColour / фон — поэтому рисуем сами.
 class StripedListCtrl : public wxPanel {
@@ -20,6 +25,7 @@ class StripedListCtrl : public wxPanel {
 
   long InsertItem(long index, const wxString& label);
   void SetItem(long row, int col, const wxString& text);
+  void SetItemBadges(long row, int col, std::vector<ListCellBadge> badges);
   void SetItemPtrData(long row, wxUIntPtr data);
   wxUIntPtr GetItemData(long row) const;
   void DeleteAllItems();
@@ -49,6 +55,7 @@ class StripedListCtrl : public wxPanel {
   };
   struct Row {
     std::vector<wxString> cells;
+    std::vector<std::vector<ListCellBadge>> badges;
     wxColour text;
     wxUIntPtr data = 0;
     bool selected = false;
@@ -86,12 +93,18 @@ class StripedListCtrl : public wxPanel {
    private:
     void on_paint(wxPaintEvent&);
     void on_mouse(wxMouseEvent&);
+    void on_motion(wxMouseEvent&);
+    void on_leave(wxMouseEvent&);
     void on_dclick(wxMouseEvent&);
     void on_key(wxKeyEvent&);
     void on_size(wxSizeEvent&);
     int hit_row(int y) const;
+    int hit_column(int x) const;
+    int hit_badge(int row, int col, int x) const;
+    void set_hover_tip(const wxString& tip);
 
     StripedListCtrl* owner_;
+    wxString tip_;
   };
 
   void emit_selected(long row);
@@ -107,6 +120,8 @@ class StripedListCtrl : public wxPanel {
   int row_height() const;
   int header_height() const;
   void refresh_body();
+  int badge_size() const;
+  int badge_gap() const;
 
   std::vector<Column> columns_;
   std::vector<Row> rows_;

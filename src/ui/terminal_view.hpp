@@ -63,7 +63,9 @@ class TerminalView : public wxPanel {
   void on_mouse_down(wxMouseEvent&);
   void on_mouse_move(wxMouseEvent&);
   void on_mouse_up(wxMouseEvent&);
+  void on_mouse_right(wxMouseEvent&);
   void on_mouse_wheel(wxMouseEvent&);
+  void paste_clipboard();
   void on_scroll(wxScrollWinEvent&);
   void on_blink(wxTimerEvent&);
 

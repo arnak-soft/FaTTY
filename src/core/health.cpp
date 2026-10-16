@@ -694,6 +694,93 @@ std::string health_level_label(HealthLevel level) {
   }
 }
 
+std::vector<HealthListBadge> health_list_badges(const HealthSnapshot& snap, const HealthThresholds& thresholds,
+                                                bool enabled) {
+  auto same = [](HealthLevel level, const std::string& tip) {
+    return std::vector<HealthListBadge>{
+        {tip, level},
+        {tip, level},
+        {tip, level},
+        {tip, level},
+    };
+  };
+  if (!enabled) return same(HealthLevel::Unknown, "Проверка состояния выключена");
+  if (snap.checking || snap.level == HealthLevel::Checking) {
+    return same(HealthLevel::Checking, "Проверка…");
+  }
+  if (snap.level == HealthLevel::Offline) {
+    std::string tip = "Нет связи";
+    if (!snap.error.empty()) tip += ": " + snap.error;
+    return same(HealthLevel::Offline, tip);
+  }
+  if (snap.level == HealthLevel::Unsupported) {
+    return same(HealthLevel::Unsupported, "Не Linux / не поддерживается");
+  }
+  if (snap.checked_at <= 0 && !health_has_readings(snap)) {
+    return same(HealthLevel::Unknown, "Ещё не проверяли");
+  }
+
+  std::vector<HealthListBadge> out;
+  out.reserve(4);
+
+  {
+    HealthListBadge b;
+    if (snap.cpu_pct >= 0) {
+      b.level = level_from_pct(snap.cpu_pct, thresholds.cpu_warn, thresholds.cpu_crit);
+      b.tip = "CPU " + format_pct(snap.cpu_pct);
+    } else {
+      b.tip = "CPU: нет данных";
+    }
+    out.push_back(std::move(b));
+  }
+  {
+    HealthListBadge b;
+    if (snap.mem_pct >= 0) {
+      b.level = level_from_pct(snap.mem_pct, thresholds.ram_warn, thresholds.ram_crit);
+      b.tip = "RAM " + format_pct(snap.mem_pct);
+      if (snap.mem_total_kb > 0) {
+        b.tip += " · " + format_kib(health_mem_used_kb(snap)) + " / " + format_kib(snap.mem_total_kb);
+      }
+    } else {
+      b.tip = "RAM: нет данных";
+    }
+    out.push_back(std::move(b));
+  }
+  {
+    HealthListBadge b;
+    if (const auto* disk = health_root_or_worst(snap)) {
+      const double pct = disk->pct();
+      b.level = level_from_pct(pct, thresholds.disk_warn, thresholds.disk_crit);
+      b.tip = "Диск " + disk->mount + " " + format_pct(pct);
+      b.tip += " · " + format_kib(disk->used_kb) + " / " + format_kib(disk->total_kb);
+    } else {
+      b.tip = "Диск: нет данных";
+    }
+    out.push_back(std::move(b));
+  }
+  {
+    HealthListBadge b;
+    const double load_pct = health_load_pct(snap);
+    if (load_pct >= 0) {
+      b.level = level_from_pct(load_pct, thresholds.load_warn, thresholds.load_crit);
+      std::ostringstream tip;
+      tip.setf(std::ios::fixed);
+      tip.precision(load_pct >= 10 ? 0 : 1);
+      tip << "Нагрузка " << load_pct << "% (load/ядра)";
+      const double load = snap.load15 >= 0 ? snap.load15 : (snap.load5 >= 0 ? snap.load5 : snap.load1);
+      if (load >= 0 && snap.nproc > 0) {
+        tip.precision(2);
+        tip << " · " << load << " / " << snap.nproc;
+      }
+      b.tip = tip.str();
+    } else {
+      b.tip = "Нагрузка: нет данных";
+    }
+    out.push_back(std::move(b));
+  }
+  return out;
+}
+
 std::string format_kib(long long kb) {
   if (kb < 0) kb = 0;
   std::ostringstream ss;

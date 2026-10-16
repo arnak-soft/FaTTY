@@ -274,6 +274,8 @@ StripedListCtrl::Body::Body(StripedListCtrl* owner)
   Bind(wxEVT_PAINT, &Body::on_paint, this);
   Bind(wxEVT_LEFT_DOWN, &Body::on_mouse, this);
   Bind(wxEVT_RIGHT_UP, &Body::on_mouse, this);
+  Bind(wxEVT_MOTION, &Body::on_motion, this);
+  Bind(wxEVT_LEAVE_WINDOW, &Body::on_leave, this);
   Bind(wxEVT_LEFT_DCLICK, &Body::on_dclick, this);
   Bind(wxEVT_KEY_DOWN, &Body::on_key, this);
   Bind(wxEVT_SIZE, &Body::on_size, this);
@@ -294,6 +296,46 @@ int StripedListCtrl::Body::hit_row(int y) const {
   return -1;
 }
 
+int StripedListCtrl::Body::hit_column(int x) const {
+  int acc = 0;
+  for (int i = 0; i < static_cast<int>(owner_->columns_.size()); ++i) {
+    const int w = owner_->columns_[static_cast<std::size_t>(i)].width;
+    if (x >= acc && x < acc + w) return i;
+    acc += w;
+  }
+  return -1;
+}
+
+int StripedListCtrl::Body::hit_badge(int row, int col, int x) const {
+  if (row < 0 || row >= owner_->GetItemCount() || col < 0 || col >= owner_->GetColumnCount()) return -1;
+  const auto& item = owner_->rows_[static_cast<std::size_t>(row)];
+  if (col >= static_cast<int>(item.badges.size()) || item.badges[static_cast<std::size_t>(col)].empty()) {
+    return -1;
+  }
+  int col_x = 0;
+  for (int i = 0; i < col; ++i) col_x += owner_->columns_[static_cast<std::size_t>(i)].width;
+  const int pad = FromDIP(6);
+  const int size = owner_->badge_size();
+  const int gap = owner_->badge_gap();
+  int bx = col_x + pad;
+  const auto& badges = item.badges[static_cast<std::size_t>(col)];
+  for (int i = 0; i < static_cast<int>(badges.size()); ++i) {
+    if (x >= bx && x < bx + size) return i;
+    bx += size + gap;
+  }
+  return -1;
+}
+
+void StripedListCtrl::Body::set_hover_tip(const wxString& tip) {
+  if (tip_ == tip) return;
+  tip_ = tip;
+  if (tip.empty()) {
+    UnsetToolTip();
+  } else {
+    SetToolTip(tip);
+  }
+}
+
 void StripedListCtrl::Body::on_paint(wxPaintEvent&) {
   wxAutoBufferedPaintDC dc(this);
   dc.SetBackground(wxBrush(Theme::elevated()));
@@ -305,6 +347,8 @@ void StripedListCtrl::Body::on_paint(wxPaintEvent&) {
   dc.SetFont(Theme::ui());
   const int h = owner_->row_height();
   const int pad = FromDIP(6);
+  const int badge = owner_->badge_size();
+  const int gap = owner_->badge_gap();
   const int first = static_cast<int>(GetVisibleBegin());
   const int last = static_cast<int>(GetVisibleEnd());
   for (int row = first; row < last && row < static_cast<int>(owner_->rows_.size()); ++row) {
@@ -325,15 +369,48 @@ void StripedListCtrl::Body::on_paint(wxPaintEvent&) {
         dc.DrawRectangle(wxRect(x, y, w, h));
       }
       wxRect cell(x + pad, y, std::max(0, w - pad * 2), h);
-      wxString text;
-      if (col < static_cast<int>(item.cells.size())) text = item.cells[static_cast<std::size_t>(col)];
+      const bool has_badges =
+          col < static_cast<int>(item.badges.size()) && !item.badges[static_cast<std::size_t>(col)].empty();
       dc.SetClippingRegion(cell);
-      dc.DrawLabel(text, cell, wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL);
+      if (has_badges) {
+        const auto& badges = item.badges[static_cast<std::size_t>(col)];
+        int bx = cell.x;
+        const int by = y + (h - badge) / 2;
+        const int radius = FromDIP(2);
+        for (const auto& b : badges) {
+          dc.SetPen(*wxTRANSPARENT_PEN);
+          dc.SetBrush(wxBrush(b.colour.IsOk() ? b.colour : Theme::muted()));
+          dc.DrawRoundedRectangle(bx, by, badge, badge, radius);
+          bx += badge + gap;
+        }
+      } else {
+        wxString text;
+        if (col < static_cast<int>(item.cells.size())) text = item.cells[static_cast<std::size_t>(col)];
+        dc.DrawLabel(text, cell, wxALIGN_LEFT | wxALIGN_CENTER_VERTICAL);
+      }
       dc.DestroyClippingRegion();
       x += w;
     }
   }
 }
+
+void StripedListCtrl::Body::on_motion(wxMouseEvent& e) {
+  const int row = hit_row(e.GetY());
+  const int col = hit_column(e.GetX());
+  if (row < 0 || col < 0) {
+    set_hover_tip(L"");
+    return;
+  }
+  const int bi = hit_badge(row, col, e.GetX());
+  if (bi < 0) {
+    set_hover_tip(L"");
+    return;
+  }
+  const auto& badges = owner_->rows_[static_cast<std::size_t>(row)].badges[static_cast<std::size_t>(col)];
+  set_hover_tip(badges[static_cast<std::size_t>(bi)].tip);
+}
+
+void StripedListCtrl::Body::on_leave(wxMouseEvent&) { set_hover_tip(L""); }
 
 void StripedListCtrl::Body::on_mouse(wxMouseEvent& e) {
   SetFocus();
@@ -415,6 +492,7 @@ void StripedListCtrl::set_row_text(long row, const wxColour& text) {
 
 void StripedListCtrl::ensure_cells(Row& row) const {
   if (row.cells.size() < columns_.size()) row.cells.resize(columns_.size());
+  if (row.badges.size() < columns_.size()) row.badges.resize(columns_.size());
 }
 
 long StripedListCtrl::InsertItem(long index, const wxString& label) {
@@ -437,6 +515,16 @@ void StripedListCtrl::SetItem(long row, int col, const wxString& text) {
     rows_[static_cast<std::size_t>(row)].cells.resize(static_cast<std::size_t>(col) + 1);
   }
   rows_[static_cast<std::size_t>(row)].cells[static_cast<std::size_t>(col)] = text;
+  refresh_body();
+}
+
+void StripedListCtrl::SetItemBadges(long row, int col, std::vector<ListCellBadge> badges) {
+  if (row < 0 || row >= GetItemCount() || col < 0) return;
+  ensure_cells(rows_[static_cast<std::size_t>(row)]);
+  if (col >= static_cast<int>(rows_[static_cast<std::size_t>(row)].badges.size())) {
+    rows_[static_cast<std::size_t>(row)].badges.resize(static_cast<std::size_t>(col) + 1);
+  }
+  rows_[static_cast<std::size_t>(row)].badges[static_cast<std::size_t>(col)] = std::move(badges);
   refresh_body();
 }
 
@@ -470,6 +558,9 @@ bool StripedListCtrl::DeleteColumn(int col) {
   for (auto& row : rows_) {
     if (col < static_cast<int>(row.cells.size())) {
       row.cells.erase(row.cells.begin() + col);
+    }
+    if (col < static_cast<int>(row.badges.size())) {
+      row.badges.erase(row.badges.begin() + col);
     }
   }
   if (sort_col_ == col) sort_col_ = -1;
@@ -586,13 +677,22 @@ void StripedListCtrl::MoveColumn(int from, int to_before) {
   }
   for (auto& row : rows_) {
     ensure_cells(row);
-    if (from >= static_cast<int>(row.cells.size())) continue;
-    wxString cell = std::move(row.cells[static_cast<std::size_t>(from)]);
-    row.cells.erase(row.cells.begin() + from);
-    if (insert > static_cast<int>(row.cells.size())) {
-      row.cells.resize(static_cast<std::size_t>(insert));
+    if (from < static_cast<int>(row.cells.size())) {
+      wxString cell = std::move(row.cells[static_cast<std::size_t>(from)]);
+      row.cells.erase(row.cells.begin() + from);
+      if (insert > static_cast<int>(row.cells.size())) {
+        row.cells.resize(static_cast<std::size_t>(insert));
+      }
+      row.cells.insert(row.cells.begin() + insert, std::move(cell));
     }
-    row.cells.insert(row.cells.begin() + insert, std::move(cell));
+    if (from < static_cast<int>(row.badges.size())) {
+      auto badges = std::move(row.badges[static_cast<std::size_t>(from)]);
+      row.badges.erase(row.badges.begin() + from);
+      if (insert > static_cast<int>(row.badges.size())) {
+        row.badges.resize(static_cast<std::size_t>(insert));
+      }
+      row.badges.insert(row.badges.begin() + insert, std::move(badges));
+    }
     ensure_cells(row);
   }
   refresh_body();
@@ -629,6 +729,8 @@ void StripedListCtrl::select_range(long from, long to) {
 
 int StripedListCtrl::row_height() const { return FromDIP(28); }
 int StripedListCtrl::header_height() const { return FromDIP(28); }
+int StripedListCtrl::badge_size() const { return FromDIP(10); }
+int StripedListCtrl::badge_gap() const { return FromDIP(4); }
 
 void StripedListCtrl::refresh_body() {
   if (header_) header_->Refresh();

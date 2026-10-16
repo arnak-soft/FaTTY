@@ -188,6 +188,15 @@ std::string health_level_id(HealthLevel level);
 HealthLevel health_level_from_id(std::string_view id);
 std::string health_level_label(HealthLevel level);
 
+/// Краткий индикатор для списка VPS: цветной кубик + текст подсказки.
+struct HealthListBadge {
+  std::string tip;
+  HealthLevel level = HealthLevel::Unknown;
+};
+/// CPU, RAM, диск, нагрузка — четыре кубика; при офлайне/нет данных все одного тона.
+std::vector<HealthListBadge> health_list_badges(const HealthSnapshot& snap, const HealthThresholds& thresholds,
+                                                bool enabled);
+
 std::string format_kib(long long kb);
 std::string format_pct(double pct);
 std::string format_signed_kib(long long delta_kb);

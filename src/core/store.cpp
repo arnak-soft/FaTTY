@@ -590,6 +590,23 @@ Config load_config_from(const std::filesystem::path& path) {
   st.default_command_timeout = json_int(settings_raw, "default_command_timeout", 180, 1, 86400);
   st.journal_max_entries = json_int(settings_raw, "journal_max_entries", 5000, 100, 50000);
   st.clear_output_before_run = settings_raw.value("clear_output_before_run", false);
+  st.quick_history_per_group = settings_raw.value("quick_history_per_group", false);
+  {
+    json qh = settings_raw.value("quick_history", json::object());
+    if (qh.is_object()) {
+      for (auto it = qh.begin(); it != qh.end(); ++it) {
+        if (!it.value().is_array()) continue;
+        std::vector<std::string> cmds;
+        for (const auto& item : it.value()) {
+          if (!item.is_string()) continue;
+          auto cmd = trim(item.get<std::string>());
+          if (cmd.empty()) continue;
+          cmds.push_back(std::move(cmd));
+        }
+        if (!cmds.empty()) st.quick_history[it.key()] = std::move(cmds);
+      }
+    }
+  }
   st.automation_to_shell_when_connected = settings_raw.value("automation_to_shell_when_connected", true);
   st.shell_follow_command_cwd = settings_raw.value("shell_follow_command_cwd", true);
   st.advance_command_after_run = settings_raw.value("advance_command_after_run", true);
@@ -750,6 +767,8 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"default_command_timeout", config.settings.default_command_timeout},
       {"journal_max_entries", config.settings.journal_max_entries},
       {"clear_output_before_run", config.settings.clear_output_before_run},
+      {"quick_history_per_group", config.settings.quick_history_per_group},
+      {"quick_history", config.settings.quick_history},
       {"automation_to_shell_when_connected", config.settings.automation_to_shell_when_connected},
       {"shell_follow_command_cwd", config.settings.shell_follow_command_cwd},
       {"advance_command_after_run", config.settings.advance_command_after_run},

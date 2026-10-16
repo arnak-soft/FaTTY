@@ -75,6 +75,10 @@ struct Bundle {
 
 struct AppSettings {
   bool confirm_before_run = true;
+  /// История разовой команды: отдельно на каждую вкладку групп (иначе только на VPS).
+  bool quick_history_per_group = false;
+  /// Ключ: id VPS или `idVPS\\x1fidГруппы`; значения — от старых к новым.
+  std::map<std::string, std::vector<std::string>> quick_history;
   bool check_updates_on_start = true;
   double last_update_check = 0.0;
   std::string skipped_update_version;

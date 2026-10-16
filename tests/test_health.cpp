@@ -48,6 +48,20 @@ FATTYCWD_abc:/root
   apply_health_thresholds(snap, t);
   expect(snap.level == HealthLevel::Warn, "/var 80% is warn at 70");
 
+  {
+    auto badges = health_list_badges(snap, t, true);
+    expect(badges.size() == 4, "list badges: cpu ram disk load");
+    expect(badges[0].tip.find("CPU") == 0, "cpu tip");
+    expect(badges[1].tip.find("RAM") == 0, "ram tip");
+    expect(badges[2].tip.find("Диск") == 0, "disk tip");
+    expect(badges[3].tip.find("Нагрузка") == 0, "load tip");
+    auto off = health_list_badges({}, t, true);
+    expect(off.size() == 4, "unknown still four cubes");
+    expect(off[0].tip.find("Ещё не") != std::string::npos, "not checked tip");
+    auto disabled = health_list_badges(snap, t, false);
+    expect(disabled[0].tip.find("выключена") != std::string::npos, "disabled tip");
+  }
+
   HealthSnapshot load_only;
   load_only.nproc = 2;
   load_only.load15 = 2.5;
