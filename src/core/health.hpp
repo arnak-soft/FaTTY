@@ -187,6 +187,10 @@ void health_apply_virtual_disks(HealthSnapshot& snap, bool show_virtual, const H
 std::string health_level_id(HealthLevel level);
 HealthLevel health_level_from_id(std::string_view id);
 std::string health_level_label(HealthLevel level);
+/// Короткие причины статуса «средне» / «высокое» (CPU 92%, OOM ×3, …).
+std::vector<std::string> health_alert_reasons(const HealthSnapshot& snap, const HealthThresholds& thresholds);
+/// До max_items причин через « · », остаток как «+N».
+std::string health_alert_summary(const HealthSnapshot& snap, const HealthThresholds& thresholds, int max_items = 3);
 
 /// Краткий индикатор для списка VPS: цветной кубик + текст подсказки.
 struct HealthListBadge {

@@ -60,6 +60,11 @@ FATTYCWD_abc:/root
     expect(off[0].tip.find("Ещё не") != std::string::npos, "not checked tip");
     auto disabled = health_list_badges(snap, t, false);
     expect(disabled[0].tip.find("выключена") != std::string::npos, "disabled tip");
+    auto reasons = health_alert_reasons(snap, t);
+    expect(!reasons.empty(), "warn has reasons");
+    expect(health_alert_summary(snap, t, 2).find("диск") != std::string::npos ||
+               health_alert_summary(snap, t, 8).find("диск") != std::string::npos,
+           "disk in summary");
   }
 
   HealthSnapshot load_only;

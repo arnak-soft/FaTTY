@@ -322,6 +322,7 @@ class HostCard : public wxPanel {
     show_ram_ = st.health_show_ram;
     show_swap_ = st.health_show_swap;
     show_disk_ = st.health_show_disk;
+    thresholds_ = thresholds_of(st);
     disk_warn_ = st.health_disk_warn;
     disk_crit_ = st.health_disk_crit;
     ram_warn_ = st.health_ram_warn;
@@ -334,7 +335,8 @@ class HostCard : public wxPanel {
     trend_ = trend;
     ram_spark_ = std::move(ram_spark);
     disk_spark_ = std::move(disk_spark);
-    SetToolTip(host_);
+    const auto why = health_alert_summary(snap_, thresholds_, 4);
+    SetToolTip(why.empty() ? host_ : host_ + L"\n" + wxString::FromUTF8(why));
     Refresh();
   }
 
@@ -404,7 +406,20 @@ class HostCard : public wxPanel {
     gc.DrawText(name_, FromDIP(14), FromDIP(8));
     gc.SetFont(Theme::ui_small());
     gc.SetTextForeground(health_colour(snap_.level));
-    gc.DrawText(wxString::FromUTF8(health_level_label(snap_.level)), FromDIP(14), FromDIP(28));
+    const auto why = health_alert_summary(snap_, thresholds_, 2);
+    wxString status = wxString::FromUTF8(health_level_label(snap_.level));
+    if (!why.empty()) status += L" · " + wxString::FromUTF8(why);
+    {
+      wxString draw = status;
+      while (draw.length() > 8 && gc.GetTextExtent(draw).GetWidth() > sz.x - FromDIP(28)) {
+        draw.RemoveLast();
+      }
+      if (draw != status && draw.length() > 1) {
+        draw.RemoveLast();
+        draw += L"…";
+      }
+      gc.DrawText(draw, FromDIP(14), FromDIP(28));
+    }
     gc.SetFont(Theme::ui_small());
     gc.SetTextForeground(Theme::muted());
     gc.DrawText(wxString::FromUTF8(format_health_when(snap_.checked_at)), FromDIP(14), sz.y - FromDIP(20));
@@ -472,6 +487,7 @@ class HostCard : public wxPanel {
   bool show_ram_ = true;
   bool show_swap_ = true;
   bool show_disk_ = true;
+  HealthThresholds thresholds_{};
   int disk_warn_ = 80;
   int disk_crit_ = 90;
   int ram_warn_ = 80;
@@ -644,13 +660,22 @@ void HealthWindow::show_detail() {
       wxString::FromUTF8(s->username + "@" + s->host + ":" + std::to_string(s->port) + "  •  " +
                          health_level_label(snap.level) + "  •  " + format_health_when(snap.checked_at)));
   sub->SetForegroundColour(health_colour(snap.level));
+  const auto th = thresholds_of(st);
+  const auto why = health_alert_summary(snap, th, 6);
+  wxStaticText* why_line = nullptr;
+  if (!why.empty()) {
+    why_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8("Почему: " + why));
+    why_line->SetForegroundColour(health_colour(snap.level));
+    why_line->Wrap(FromDIP(420));
+  }
 
   if (st.health_show_cpu) {
     auto* cpu = new MetricBar(detail_, L"CPU", 52);
     wxString cap = wxString::FromUTF8(format_pct(snap.cpu_pct));
     cpu->set(snap.cpu_pct, cap, bar_level(snap.cpu_pct, st.health_cpu_warn, st.health_cpu_crit));
     root->Add(title, 0, wxLEFT | wxRIGHT | wxTOP, 12);
-    root->Add(sub, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    root->Add(sub, 0, wxLEFT | wxRIGHT | (why_line ? wxTOP : wxBOTTOM), why_line ? 4 : 12);
+    if (why_line) root->Add(why_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
     root->Add(cpu, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
     auto* iowait = new MetricBar(detail_, L"iowait", 52);
     iowait->set(snap.iowait_pct, wxString::FromUTF8(format_pct(snap.iowait_pct)),
@@ -662,7 +687,8 @@ void HealthWindow::show_detail() {
     root->Add(steal, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
   } else {
     root->Add(title, 0, wxLEFT | wxRIGHT | wxTOP, 12);
-    root->Add(sub, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    root->Add(sub, 0, wxLEFT | wxRIGHT | (why_line ? wxTOP : wxBOTTOM), why_line ? 4 : 12);
+    if (why_line) root->Add(why_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
   if (st.health_show_ram) {
     auto* ram = new MetricBar(detail_, L"RAM", 52);

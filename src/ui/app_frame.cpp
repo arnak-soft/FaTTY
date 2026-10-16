@@ -1525,7 +1525,7 @@ void AppFrame::refresh_commands() {
     long row = commands_->InsertItem(static_cast<long>(i), L"");
     wxString last = L"—";
     wxString avg = L"—";
-    wxString result = L"—";
+    wxString result;
     wxColour colour = Theme::text();
     auto it = command_stats_.find(c.id);
     if (it != command_stats_.end()) {

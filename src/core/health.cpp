@@ -694,6 +694,82 @@ std::string health_level_label(HealthLevel level) {
   }
 }
 
+std::vector<std::string> health_alert_reasons(const HealthSnapshot& snap, const HealthThresholds& thresholds) {
+  std::vector<std::string> out;
+  if (snap.level == HealthLevel::Offline) {
+    out.push_back(snap.error.empty() ? "нет связи" : snap.error);
+    return out;
+  }
+  if (snap.level == HealthLevel::Unsupported) {
+    out.push_back("не Linux");
+    return out;
+  }
+  if (snap.checking || snap.level == HealthLevel::Checking) return out;
+  if (snap.level != HealthLevel::Warn && snap.level != HealthLevel::Crit) return out;
+
+  auto add_pct = [&](const char* name, double pct, int warn, int crit) {
+    if (pct < 0) return;
+    const auto lvl = level_from_pct(pct, warn, crit);
+    if (lvl == HealthLevel::Warn || lvl == HealthLevel::Crit) {
+      out.push_back(std::string(name) + " " + format_pct(pct));
+    }
+  };
+  add_pct("CPU", snap.cpu_pct, thresholds.cpu_warn, thresholds.cpu_crit);
+  add_pct("iowait", snap.iowait_pct, thresholds.iowait_warn, thresholds.iowait_crit);
+  add_pct("steal", snap.steal_pct, thresholds.steal_warn, thresholds.steal_crit);
+  add_pct("RAM", snap.mem_pct, thresholds.ram_warn, thresholds.ram_crit);
+  add_pct("Swap", snap.swap_pct, thresholds.swap_warn, thresholds.swap_crit);
+  for (const auto& disk : snap.disks) {
+    const double pct = disk.pct();
+    const auto lvl = level_from_pct(pct, thresholds.disk_warn, thresholds.disk_crit);
+    if (lvl == HealthLevel::Warn || lvl == HealthLevel::Crit) {
+      out.push_back("диск " + disk.mount + " " + format_pct(pct));
+    }
+  }
+  {
+    const double load_pct = health_load_pct(snap);
+    add_pct("нагрузка", load_pct, thresholds.load_warn, thresholds.load_crit);
+  }
+  if (snap.reboot_required) out.push_back("нужна перезагрузка");
+  if (!snap.failed_units.empty()) {
+    out.push_back("службы ×" + std::to_string(snap.failed_units.size()));
+  }
+  if (snap.docker_unhealthy > 0) {
+    out.push_back("Docker unhealthy ×" + std::to_string(snap.docker_unhealthy));
+  }
+  if (snap.oom_count > 0) out.push_back("OOM ×" + std::to_string(snap.oom_count));
+  if (snap.ssh_fail_count >= kHealthSshFailWarn) {
+    out.push_back("SSH fail ×" + std::to_string(snap.ssh_fail_count));
+  }
+  if (snap.time_synced == 0) out.push_back("время не синхронизировано");
+  if (snap.time_offset_known) {
+    const double off = std::fabs(snap.time_offset_sec);
+    if (off >= kHealthTimeOffsetWarnSec) {
+      out.push_back("смещение часов " + std::to_string(static_cast<int>(off)) + " с");
+    }
+  }
+  if (snap.net_err_delta >= kHealthNetErrWarn) {
+    out.push_back("сеть +" + std::to_string(snap.net_err_delta) + " ошибок");
+  }
+  if (!snap.error.empty() && out.empty()) out.push_back(snap.error);
+  return out;
+}
+
+std::string health_alert_summary(const HealthSnapshot& snap, const HealthThresholds& thresholds, int max_items) {
+  auto reasons = health_alert_reasons(snap, thresholds);
+  if (reasons.empty()) return {};
+  if (max_items < 1) max_items = 1;
+  std::string out;
+  const int n = static_cast<int>(reasons.size());
+  const int take = std::min(n, max_items);
+  for (int i = 0; i < take; ++i) {
+    if (i) out += " · ";
+    out += reasons[static_cast<std::size_t>(i)];
+  }
+  if (n > take) out += " · +" + std::to_string(n - take);
+  return out;
+}
+
 std::vector<HealthListBadge> health_list_badges(const HealthSnapshot& snap, const HealthThresholds& thresholds,
                                                 bool enabled) {
   auto same = [](HealthLevel level, const std::string& tip) {

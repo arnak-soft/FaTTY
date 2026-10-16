@@ -87,7 +87,7 @@ std::string command_run_working_dir(const Config& config, const Command& command
 }
 
 std::string command_display_folder(const Config& config, const Command& command) {
-  if (!command.cd_before_run) return "—";
+  if (!command.cd_before_run) return {};
   auto dir = trim(command.working_dir);
   if (!dir.empty()) return dir;
   if (!command.group_id.empty()) {
@@ -96,7 +96,7 @@ std::string command_display_folder(const Config& config, const Command& command)
       if (!dir.empty()) return dir;
     }
   }
-  return "—";
+  return {};
 }
 
 std::string normalize_remote_shell(std::string_view shell) {

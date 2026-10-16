@@ -293,11 +293,16 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   script_head->Add(new wxStaticText(body, wxID_ANY, L"Пресет"), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
   script_head->Add(preset_, 0, wxALIGN_CENTER_VERTICAL);
 
+  // wxTE_RICH2 обязателен на Windows: без него SetForegroundColour у multiline
+  // не действует — на тёмном фоне текст не видно при наборе.
   text_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(command.command), wxDefaultPosition, wxDefaultSize,
-                         wxTE_MULTILINE | wxHSCROLL);
-  style_text(text_, true);
-  text_->SetMinSize(FromDIP(wxSize(480, 200)));
-  text_->SetHint(L"Текст, который уйдёт на VPS");
+                         wxTE_MULTILINE | wxTE_RICH2 | wxHSCROLL);
+  style_text(text_, false);
+  text_->SetFont(Theme::mono());
+  text_->SetMinSize(FromDIP(wxSize(480, 140)));
+  auto* script_hint = new wxStaticText(body, wxID_ANY, L"Текст, который уйдёт на VPS");
+  script_hint->SetName(L"muted");
+  script_hint->SetForegroundColour(Theme::muted());
 
   auto* who = new wxFlexGridSizer(4, 2, gap, gap);
   who->AddGrowableCol(1);
@@ -355,6 +360,7 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(script_head, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 12);
   root->Add(text_, 1, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 12);
+  root->Add(script_hint, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 4);
   root->Add(who, 0, wxEXPAND | wxALL, 12);
   root->Add(section_label(body, L"Запуск"), 0, wxLEFT | wxRIGHT, 12);
   root->Add(run, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP | wxBOTTOM, 12);
