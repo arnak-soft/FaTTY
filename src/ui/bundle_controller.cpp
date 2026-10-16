@@ -176,8 +176,11 @@ void BundleController::finish(const std::string& reason) {
   active_ = false;
   cancel_ = false;
   cmds_.clear();
+  const auto finished_id = bundle_id_;
+  const auto finished_name = name_;
   const wxColour meta = Theme::meta();
   if (host_.append_output) host_.append_output("Связка «" + name_ + "»: " + reason + "\n", &meta);
+  if (host_.on_finished) host_.on_finished(finished_id, finished_name, reason);
   if (host_.runs && host_.runs->has_queue() && reason != "прервано") {
     if (host_.set_status) host_.set_status("Связка «" + name_ + "»: " + reason + host_.runs->queue_suffix());
     host_.runs->pump_run_queue();

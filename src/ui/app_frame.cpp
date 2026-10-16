@@ -117,6 +117,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       command_stats_ = std::move(snap.commands);
       bundle_stats_ = std::move(snap.bundles);
       refresh_commands();
+      if (bundle_steps_window_) bundle_steps_window_->refresh();
     });
   });
   build_menu();
@@ -1904,6 +1905,9 @@ void AppFrame::init_run_controllers() {
     run_command(srv, cmd.command, cmd.timeout_sec, cmd.login_shell, cmd.name, cmd.id, "command", std::move(on_done),
                 command_run_working_dir(config_, cmd), cmd.cd_before_run, effective_remote_shell(srv, cmd));
   };
+  bh.on_finished = [this](const std::string& bundle_id, const std::string& name, const std::string& reason) {
+    if (bundle_steps_window_) bundle_steps_window_->notify_bundle_finished(bundle_id, name, reason);
+  };
   bh.journal = journal_;
   bundle_run_ = std::make_unique<BundleController>(std::move(bh));
 }
@@ -2104,20 +2108,24 @@ void AppFrame::open_bundle_steps() {
     return;
   }
   if (!bundle_steps_window_) {
-    bundle_steps_window_ = new BundleStepsWindow(this, config_, [this](const Command& cmd) {
-      auto* live = config_.command_by_id(cmd.id);
-      const Command* c = live ? live : &cmd;
-      auto* srv = config_.server_by_id(c->server_id);
-      if (!srv) {
-        wxMessageBox(L"VPS этой команды больше нет в списке.", L"Связка", wxOK | wxICON_ERROR,
-                     bundle_steps_window_ ? static_cast<wxWindow*>(bundle_steps_window_) : this);
-        return;
-      }
-      wxWindow* parent = bundle_steps_window_ ? static_cast<wxWindow*>(bundle_steps_window_) : this;
-      if (!confirm_saved_run(parent, *c, srv->name)) return;
-      run_command(*srv, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command", {},
-                  command_run_working_dir(config_, *c), c->cd_before_run);
-    }, [this](const std::string& bundle_id) { start_bundle(bundle_id); }, &config_.settings, [this] { persist(); });
+    bundle_steps_window_ = new BundleStepsWindow(
+        this, config_, &command_stats_,
+        [this](const Command& cmd) {
+          auto* live = config_.command_by_id(cmd.id);
+          const Command* c = live ? live : &cmd;
+          auto* srv = config_.server_by_id(c->server_id);
+          if (!srv) {
+            wxMessageBox(L"VPS этой команды больше нет в списке.", L"Связка", wxOK | wxICON_ERROR,
+                         bundle_steps_window_ ? static_cast<wxWindow*>(bundle_steps_window_) : this);
+            return;
+          }
+          wxWindow* parent = bundle_steps_window_ ? static_cast<wxWindow*>(bundle_steps_window_) : this;
+          if (!confirm_saved_run(parent, *c, srv->name)) return;
+          if (bundle_steps_window_) bundle_steps_window_->await_step(c->id, c->name);
+          run_command(*srv, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command", {},
+                      command_run_working_dir(config_, *c), c->cd_before_run);
+        },
+        [this](const std::string& bundle_id) { start_bundle(bundle_id); }, &config_.settings, [this] { persist(); });
     bundle_steps_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
       bundle_steps_window_ = nullptr;
       ev.Skip();

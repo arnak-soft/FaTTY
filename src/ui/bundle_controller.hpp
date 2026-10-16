@@ -25,6 +25,7 @@ class BundleController {
     std::function<void(bool)> set_busy;
     std::function<void(const std::string&)> set_status;
     std::function<void(const Server&, const Command&, std::function<void(int, std::string)> on_done)> run_step;
+    std::function<void(const std::string& bundle_id, const std::string& name, const std::string& reason)> on_finished;
     std::shared_ptr<Journal> journal;
   };
 
