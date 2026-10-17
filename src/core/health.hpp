@@ -74,6 +74,19 @@ struct HealthThresholds {
   // Нагрузка как % от числа ядер (load / nproc * 100). Может быть > 100.
   int load_warn = 100;
   int load_crit = 150;
+  int ssh_warn = kHealthSshFailWarn;
+  int ssh_crit = kHealthSshFailCrit;
+};
+
+/// Какие тревоги не влияют на статус (цифры в деталях всё равно видны).
+struct HealthAlertIgnore {
+  bool ssh = false;
+  bool oom = false;
+  bool failed_units = false;
+  bool reboot = false;
+  bool docker = false;
+  bool time = false;
+  bool net = false;
 };
 
 struct HealthCollect {
@@ -172,7 +185,8 @@ HealthLevel worse_health(HealthLevel a, HealthLevel b);
 HealthLevel level_from_pct(double pct, int warn, int crit);
 /// load15 (иначе load5 / load1) / nproc * 100; −1 если нет данных.
 double health_load_pct(const HealthSnapshot& snap);
-void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thresholds);
+void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thresholds,
+                             const HealthAlertIgnore& ignore = {});
 
 HealthSnapshot parse_health_output(std::string_view text);
 std::string health_remote_script(const HealthCollect& collect);
@@ -182,15 +196,18 @@ double unix_now();
 
 const HealthDisk* health_root_or_worst(const HealthSnapshot& snap);
 bool health_mount_is_virtual(std::string_view mount);
-void health_apply_virtual_disks(HealthSnapshot& snap, bool show_virtual, const HealthThresholds& thresholds);
+void health_apply_virtual_disks(HealthSnapshot& snap, bool show_virtual, const HealthThresholds& thresholds,
+                                const HealthAlertIgnore& ignore = {});
 
 std::string health_level_id(HealthLevel level);
 HealthLevel health_level_from_id(std::string_view id);
 std::string health_level_label(HealthLevel level);
 /// Короткие причины статуса «средне» / «высокое» (CPU 92%, OOM ×3, …).
-std::vector<std::string> health_alert_reasons(const HealthSnapshot& snap, const HealthThresholds& thresholds);
+std::vector<std::string> health_alert_reasons(const HealthSnapshot& snap, const HealthThresholds& thresholds,
+                                              const HealthAlertIgnore& ignore = {});
 /// До max_items причин через « · », остаток как «+N».
-std::string health_alert_summary(const HealthSnapshot& snap, const HealthThresholds& thresholds, int max_items = 3);
+std::string health_alert_summary(const HealthSnapshot& snap, const HealthThresholds& thresholds, int max_items = 3,
+                                 const HealthAlertIgnore& ignore = {});
 
 /// Краткий индикатор для списка VPS: цветной кубик + текст подсказки.
 struct HealthListBadge {
@@ -215,7 +232,8 @@ long long health_swap_used_kb(const HealthSnapshot& snap);
 long long health_net_errs(const HealthSnapshot& snap);
 HealthTrend health_trend(const HealthSnapshot& current, const HealthSnapshot& previous);
 /// Учесть рост сетевых ошибок относительно прошлого снимка (пишет net_err_delta и усиливает level).
-void health_apply_net_delta(HealthSnapshot& snap, const HealthSnapshot& previous);
+void health_apply_net_delta(HealthSnapshot& snap, const HealthSnapshot& previous,
+                            const HealthAlertIgnore& ignore = {});
 /// true, если аптайм не согласуется с прошлым замером (перезагрузка между проверками).
 bool health_rebooted_since(const HealthSnapshot& current, const HealthSnapshot& previous);
 void health_history_push(HealthCacheEntry& entry, HealthSnapshot previous, int max_keep = kHealthHistoryMax);

@@ -36,6 +36,8 @@ class HealthMonitor : public wxEvtHandler {
   void start();
   void stop();
   void wake();
+  /// Пересчитать level у кэша по текущим порогам и health_ignore (без нового SSH).
+  void reevaluate_cached();
   void refresh(const std::string& server_id);
   void refresh_all();
 

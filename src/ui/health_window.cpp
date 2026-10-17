@@ -52,11 +52,15 @@ HealthThresholds thresholds_of(const AppSettings& st) {
   t.steal_crit = st.health_steal_crit;
   t.load_warn = st.health_load_warn;
   t.load_crit = st.health_load_crit;
+  t.ssh_warn = st.health_ssh_warn;
+  t.ssh_crit = st.health_ssh_crit;
   return t;
 }
 
-HealthSnapshot view_snap(HealthSnapshot snap, const AppSettings& st) {
-  health_apply_virtual_disks(snap, st.health_show_docker_disks, thresholds_of(st));
+HealthSnapshot view_snap(HealthSnapshot snap, const AppSettings& st, const HealthAlertIgnore& ignore = {}) {
+  const auto th = thresholds_of(st);
+  health_apply_virtual_disks(snap, st.health_show_docker_disks, th, ignore);
+  apply_health_thresholds(snap, th, ignore);
   return snap;
 }
 
@@ -332,10 +336,11 @@ class HostCard : public wxPanel {
     cpu_warn_ = st.health_cpu_warn;
     cpu_crit_ = st.health_cpu_crit;
     enabled_ = server.health_enabled;
+    ignore_ = server.health_ignore;
     trend_ = trend;
     ram_spark_ = std::move(ram_spark);
     disk_spark_ = std::move(disk_spark);
-    const auto why = health_alert_summary(snap_, thresholds_, 4);
+    const auto why = health_alert_summary(snap_, thresholds_, 4, ignore_);
     SetToolTip(why.empty() ? host_ : host_ + L"\n" + wxString::FromUTF8(why));
     Refresh();
   }
@@ -406,7 +411,7 @@ class HostCard : public wxPanel {
     gc.DrawText(name_, FromDIP(14), FromDIP(8));
     gc.SetFont(Theme::ui_small());
     gc.SetTextForeground(health_colour(snap_.level));
-    const auto why = health_alert_summary(snap_, thresholds_, 2);
+    const auto why = health_alert_summary(snap_, thresholds_, 2, ignore_);
     wxString status = wxString::FromUTF8(health_level_label(snap_.level));
     if (!why.empty()) status += L" · " + wxString::FromUTF8(why);
     {
@@ -483,6 +488,7 @@ class HostCard : public wxPanel {
   std::vector<double> disk_spark_;
   bool selected_ = false;
   bool enabled_ = true;
+  HealthAlertIgnore ignore_{};
   bool show_cpu_ = true;
   bool show_ram_ = true;
   bool show_swap_ = true;
@@ -612,18 +618,20 @@ void HealthWindow::rebuild_cards() {
   const auto st = settings_ ? *settings_ : AppSettings{};
   for (const auto& server : config_->servers) {
     auto* card = new HostCard(list_, this);
-    auto snap = view_snap(monitor_->snapshot(server.id), st);
+    auto snap = view_snap(monitor_->snapshot(server.id), st, server.health_ignore);
     snap.server_id = server.id;
     snap.server_name = server.name;
     if (monitor_->checking_id() == server.id) {
       snap.checking = true;
       snap.level = HealthLevel::Checking;
     }
-    auto prev = view_snap(monitor_->previous(server.id), st);
+    auto prev = view_snap(monitor_->previous(server.id), st, server.health_ignore);
     const auto trend = health_trend(snap, prev);
     auto cache = monitor_->entry(server.id);
-    health_apply_virtual_disks(cache.latest, st.health_show_docker_disks, thresholds_of(st));
-    for (auto& h : cache.history) health_apply_virtual_disks(h, st.health_show_docker_disks, thresholds_of(st));
+    health_apply_virtual_disks(cache.latest, st.health_show_docker_disks, thresholds_of(st),
+                               server.health_ignore);
+    for (auto& h : cache.history)
+      health_apply_virtual_disks(h, st.health_show_docker_disks, thresholds_of(st), server.health_ignore);
     card->set(server, snap, server.id == selected_id_, st, trend, health_spark_mem_pct(cache),
               health_spark_disk_pct(cache));
     list_sz_->Add(card, 0, wxEXPAND | wxBOTTOM, FromDIP(8));
@@ -646,7 +654,7 @@ void HealthWindow::show_detail() {
     return;
   }
   const auto st = settings_ ? *settings_ : AppSettings{};
-  auto snap = view_snap(monitor_->snapshot(s->id), st);
+  auto snap = view_snap(monitor_->snapshot(s->id), st, s->health_ignore);
   if (monitor_->checking_id() == s->id) {
     snap.checking = true;
     snap.level = HealthLevel::Checking;
@@ -661,7 +669,7 @@ void HealthWindow::show_detail() {
                          health_level_label(snap.level) + "  •  " + format_health_when(snap.checked_at)));
   sub->SetForegroundColour(health_colour(snap.level));
   const auto th = thresholds_of(st);
-  const auto why = health_alert_summary(snap, th, 6);
+  const auto why = health_alert_summary(snap, th, 6, s->health_ignore);
   wxStaticText* why_line = nullptr;
   if (!why.empty()) {
     why_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8("Почему: " + why));
@@ -733,7 +741,7 @@ void HealthWindow::show_detail() {
     root->Add(load, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
 
-  auto prev = view_snap(monitor_->previous(s->id), st);
+  auto prev = view_snap(monitor_->previous(s->id), st, s->health_ignore);
   const auto trend = health_trend(snap, prev);
   if (trend.has_prev && (trend.mem || trend.swap || trend.disk || trend.net)) {
     std::string head = "С прошлой проверки";

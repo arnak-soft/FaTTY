@@ -35,6 +35,13 @@ class ServerDialog : public PositionedDialog {
   ThemedCheckBox* clear_pw_{};
   ThemedChoice* shell_{};
   ThemedCheckBox* health_{};
+  ThemedCheckBox* ignore_ssh_{};
+  ThemedCheckBox* ignore_oom_{};
+  ThemedCheckBox* ignore_failed_{};
+  ThemedCheckBox* ignore_reboot_{};
+  ThemedCheckBox* ignore_docker_{};
+  ThemedCheckBox* ignore_time_{};
+  ThemedCheckBox* ignore_net_{};
   wxStaticText* error_{};
   std::string stored_password_;
 };

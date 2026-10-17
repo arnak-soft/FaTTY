@@ -120,6 +120,8 @@ HealthThresholds health_thresholds_of(const AppSettings& st) {
   t.steal_crit = st.health_steal_crit;
   t.load_warn = st.health_load_warn;
   t.load_crit = st.health_load_crit;
+  t.ssh_warn = st.health_ssh_warn;
+  t.ssh_crit = st.health_ssh_crit;
   return t;
 }
 
@@ -648,7 +650,9 @@ void AppFrame::build_ui() {
     if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
       *s = dlg.result;
       persist();
+      if (health_) health_->reevaluate_cached();
       refresh_servers(s->id);
+      if (health_window_) health_window_->reload();
     }
   });
   commands_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { request_saved_runs(); });
@@ -1154,7 +1158,10 @@ void AppFrame::open_settings() {
                        apply_ui_theme();
                        rebuild_extra_tools();
                        persist();
-                       if (health_) health_->wake();
+                       if (health_) {
+                         health_->reevaluate_cached();
+                         health_->wake();
+                       }
                        if (health_window_) health_window_->reload();
                        if (config_.settings.automation_to_shell_when_connected && shell_ && shell_->running()) {
                          session_automation_to_shell_ = true;
@@ -1363,8 +1370,9 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
     servers_->SetItemPtrData(row, static_cast<wxUIntPtr>(i));
     wxColour row_colour = Theme::text();
     if (health_) {
-      const auto snap = health_->snapshot(s.id);
+      auto snap = health_->snapshot(s.id);
       const auto th = health_thresholds_of(config_.settings);
+      apply_health_thresholds(snap, th, s.health_ignore);
       const auto badges = health_list_badges(snap, th, s.health_enabled);
       std::vector<ListCellBadge> cells;
       cells.reserve(badges.size());
@@ -1637,7 +1645,8 @@ void AppFrame::refresh_server_health() {
     const auto idx = static_cast<std::size_t>(servers_->GetItemData(row));
     if (idx >= config_.servers.size()) continue;
     const auto& s = config_.servers[idx];
-    const auto snap = health_->snapshot(s.id);
+    auto snap = health_->snapshot(s.id);
+    apply_health_thresholds(snap, th, s.health_ignore);
     const auto badges = health_list_badges(snap, th, s.health_enabled);
     std::vector<ListCellBadge> cells;
     cells.reserve(badges.size());
@@ -2431,7 +2440,9 @@ void AppFrame::show_servers_context_menu(long row) {
     if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
       *s = dlg.result;
       persist();
+      if (health_) health_->reevaluate_cached();
       refresh_servers(s->id);
+      if (health_window_) health_window_->reload();
     }
   }, 2001);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {

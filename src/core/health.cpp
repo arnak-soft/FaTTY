@@ -121,7 +121,8 @@ double health_load_pct(const HealthSnapshot& snap) {
   return 100.0 * load / static_cast<double>(snap.nproc);
 }
 
-void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thresholds) {
+void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thresholds,
+                             const HealthAlertIgnore& ignore) {
   if (snap.level == HealthLevel::Offline || snap.level == HealthLevel::Unsupported ||
       snap.level == HealthLevel::Checking) {
     return;
@@ -149,39 +150,45 @@ void apply_health_thresholds(HealthSnapshot& snap, const HealthThresholds& thres
   if (load_pct >= 0) {
     lvl = worse_health(lvl, level_from_pct(load_pct, thresholds.load_warn, thresholds.load_crit));
   }
-  if (snap.reboot_required) {
+  if (!ignore.reboot && snap.reboot_required) {
     lvl = worse_health(lvl, HealthLevel::Warn);
   }
-  if (!snap.failed_units.empty()) {
+  if (!ignore.failed_units && !snap.failed_units.empty()) {
     const auto n = static_cast<int>(snap.failed_units.size());
     lvl = worse_health(lvl, n >= 3 ? HealthLevel::Crit : HealthLevel::Warn);
   }
-  if (snap.docker_unhealthy > 0) {
+  if (!ignore.docker && snap.docker_unhealthy > 0) {
     lvl = worse_health(lvl, snap.docker_unhealthy >= 3 ? HealthLevel::Crit : HealthLevel::Warn);
   }
-  if (snap.oom_count > 0) {
+  if (!ignore.oom && snap.oom_count > 0) {
     lvl = worse_health(lvl, snap.oom_count >= 3 ? HealthLevel::Crit : HealthLevel::Warn);
   }
-  if (snap.ssh_fail_count >= kHealthSshFailCrit) {
-    lvl = worse_health(lvl, HealthLevel::Crit);
-  } else if (snap.ssh_fail_count >= kHealthSshFailWarn) {
-    lvl = worse_health(lvl, HealthLevel::Warn);
-  }
-  if (snap.time_synced == 0) {
-    lvl = worse_health(lvl, HealthLevel::Warn);
-  }
-  if (snap.time_offset_known) {
-    const double off = std::fabs(snap.time_offset_sec);
-    if (off >= kHealthTimeOffsetCritSec) {
+  if (!ignore.ssh && snap.ssh_fail_count >= 0) {
+    if (snap.ssh_fail_count >= thresholds.ssh_crit) {
       lvl = worse_health(lvl, HealthLevel::Crit);
-    } else if (off >= kHealthTimeOffsetWarnSec) {
+    } else if (snap.ssh_fail_count >= thresholds.ssh_warn) {
       lvl = worse_health(lvl, HealthLevel::Warn);
     }
   }
-  if (snap.net_err_delta >= kHealthNetErrCrit) {
-    lvl = worse_health(lvl, HealthLevel::Crit);
-  } else if (snap.net_err_delta >= kHealthNetErrWarn) {
-    lvl = worse_health(lvl, HealthLevel::Warn);
+  if (!ignore.time) {
+    if (snap.time_synced == 0) {
+      lvl = worse_health(lvl, HealthLevel::Warn);
+    }
+    if (snap.time_offset_known) {
+      const double off = std::fabs(snap.time_offset_sec);
+      if (off >= kHealthTimeOffsetCritSec) {
+        lvl = worse_health(lvl, HealthLevel::Crit);
+      } else if (off >= kHealthTimeOffsetWarnSec) {
+        lvl = worse_health(lvl, HealthLevel::Warn);
+      }
+    }
+  }
+  if (!ignore.net) {
+    if (snap.net_err_delta >= kHealthNetErrCrit) {
+      lvl = worse_health(lvl, HealthLevel::Crit);
+    } else if (snap.net_err_delta >= kHealthNetErrWarn) {
+      lvl = worse_health(lvl, HealthLevel::Warn);
+    }
   }
   if (lvl == HealthLevel::Unknown && snap.checked_at > 0 && snap.error.empty() && health_has_readings(snap)) {
     lvl = HealthLevel::Ok;
@@ -634,14 +641,15 @@ bool health_mount_is_virtual(std::string_view mount) {
   return false;
 }
 
-void health_apply_virtual_disks(HealthSnapshot& snap, bool show_virtual, const HealthThresholds& thresholds) {
+void health_apply_virtual_disks(HealthSnapshot& snap, bool show_virtual, const HealthThresholds& thresholds,
+                                const HealthAlertIgnore& ignore) {
   if (show_virtual) return;
   const auto before = snap.disks.size();
   snap.disks.erase(std::remove_if(snap.disks.begin(), snap.disks.end(),
                                   [](const HealthDisk& d) { return health_mount_is_virtual(d.mount); }),
                    snap.disks.end());
   if (snap.disks.size() == before) return;
-  apply_health_thresholds(snap, thresholds);
+  apply_health_thresholds(snap, thresholds, ignore);
 }
 
 std::string health_level_id(HealthLevel level) {
@@ -694,7 +702,8 @@ std::string health_level_label(HealthLevel level) {
   }
 }
 
-std::vector<std::string> health_alert_reasons(const HealthSnapshot& snap, const HealthThresholds& thresholds) {
+std::vector<std::string> health_alert_reasons(const HealthSnapshot& snap, const HealthThresholds& thresholds,
+                                              const HealthAlertIgnore& ignore) {
   std::vector<std::string> out;
   if (snap.level == HealthLevel::Offline) {
     out.push_back(snap.error.empty() ? "нет связи" : snap.error);
@@ -730,33 +739,36 @@ std::vector<std::string> health_alert_reasons(const HealthSnapshot& snap, const 
     const double load_pct = health_load_pct(snap);
     add_pct("нагрузка", load_pct, thresholds.load_warn, thresholds.load_crit);
   }
-  if (snap.reboot_required) out.push_back("нужна перезагрузка");
-  if (!snap.failed_units.empty()) {
+  if (!ignore.reboot && snap.reboot_required) out.push_back("нужна перезагрузка");
+  if (!ignore.failed_units && !snap.failed_units.empty()) {
     out.push_back("службы ×" + std::to_string(snap.failed_units.size()));
   }
-  if (snap.docker_unhealthy > 0) {
+  if (!ignore.docker && snap.docker_unhealthy > 0) {
     out.push_back("Docker unhealthy ×" + std::to_string(snap.docker_unhealthy));
   }
-  if (snap.oom_count > 0) out.push_back("OOM ×" + std::to_string(snap.oom_count));
-  if (snap.ssh_fail_count >= kHealthSshFailWarn) {
+  if (!ignore.oom && snap.oom_count > 0) out.push_back("OOM ×" + std::to_string(snap.oom_count));
+  if (!ignore.ssh && snap.ssh_fail_count >= thresholds.ssh_warn) {
     out.push_back("SSH fail ×" + std::to_string(snap.ssh_fail_count));
   }
-  if (snap.time_synced == 0) out.push_back("время не синхронизировано");
-  if (snap.time_offset_known) {
-    const double off = std::fabs(snap.time_offset_sec);
-    if (off >= kHealthTimeOffsetWarnSec) {
-      out.push_back("смещение часов " + std::to_string(static_cast<int>(off)) + " с");
+  if (!ignore.time) {
+    if (snap.time_synced == 0) out.push_back("время не синхронизировано");
+    if (snap.time_offset_known) {
+      const double off = std::fabs(snap.time_offset_sec);
+      if (off >= kHealthTimeOffsetWarnSec) {
+        out.push_back("смещение часов " + std::to_string(static_cast<int>(off)) + " с");
+      }
     }
   }
-  if (snap.net_err_delta >= kHealthNetErrWarn) {
+  if (!ignore.net && snap.net_err_delta >= kHealthNetErrWarn) {
     out.push_back("сеть +" + std::to_string(snap.net_err_delta) + " ошибок");
   }
   if (!snap.error.empty() && out.empty()) out.push_back(snap.error);
   return out;
 }
 
-std::string health_alert_summary(const HealthSnapshot& snap, const HealthThresholds& thresholds, int max_items) {
-  auto reasons = health_alert_reasons(snap, thresholds);
+std::string health_alert_summary(const HealthSnapshot& snap, const HealthThresholds& thresholds, int max_items,
+                                 const HealthAlertIgnore& ignore) {
+  auto reasons = health_alert_reasons(snap, thresholds, ignore);
   if (reasons.empty()) return {};
   if (max_items < 1) max_items = 1;
   std::string out;
@@ -950,13 +962,15 @@ long long health_net_errs(const HealthSnapshot& snap) {
   return n;
 }
 
-void health_apply_net_delta(HealthSnapshot& snap, const HealthSnapshot& previous) {
+void health_apply_net_delta(HealthSnapshot& snap, const HealthSnapshot& previous,
+                            const HealthAlertIgnore& ignore) {
   snap.net_err_delta = -1;
   const auto cur = health_net_errs(snap);
   const auto prev = health_net_errs(previous);
   if (cur < 0 || prev < 0) return;
   snap.net_err_delta = cur - prev;
   if (snap.net_err_delta < 0) snap.net_err_delta = 0;
+  if (ignore.net) return;
   if (snap.level == HealthLevel::Offline || snap.level == HealthLevel::Unsupported ||
       snap.level == HealthLevel::Checking) {
     return;

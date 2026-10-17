@@ -11,6 +11,35 @@
 namespace fatty {
 using json = nlohmann::json;
 
+namespace {
+
+HealthAlertIgnore parse_health_ignore(const json& raw) {
+  HealthAlertIgnore ig;
+  if (!raw.is_object()) return ig;
+  ig.ssh = raw.value("ssh", false);
+  ig.oom = raw.value("oom", false);
+  ig.failed_units = raw.value("failed_units", false);
+  ig.reboot = raw.value("reboot", false);
+  ig.docker = raw.value("docker", false);
+  ig.time = raw.value("time", false);
+  ig.net = raw.value("net", false);
+  return ig;
+}
+
+json health_ignore_json(const HealthAlertIgnore& ig) {
+  return {
+      {"ssh", ig.ssh},
+      {"oom", ig.oom},
+      {"failed_units", ig.failed_units},
+      {"reboot", ig.reboot},
+      {"docker", ig.docker},
+      {"time", ig.time},
+      {"net", ig.net},
+  };
+}
+
+}  // namespace
+
 Server Server::make_new() {
   Server s;
   s.id = new_uuid();
@@ -484,6 +513,7 @@ Config load_config_from(const std::filesystem::path& path) {
     s.key_path = raw.value("key_path", "");
     s.remote_shell = normalize_remote_shell(raw.value("remote_shell", std::string("bash")));
     s.health_enabled = raw.value("health_enabled", true);
+    s.health_ignore = parse_health_ignore(raw.value("health_ignore", json::object()));
     const std::string legacy = raw.value("password_encrypted", "");
     if (!vault_ok && !legacy.empty()) {
       try {
@@ -654,6 +684,9 @@ Config load_config_from(const std::filesystem::path& path) {
   st.health_steal_crit = json_int(settings_raw, "health_steal_crit", 30, 1, 100);
   st.health_load_warn = json_int(settings_raw, "health_load_warn", 100, 1, 500);
   st.health_load_crit = json_int(settings_raw, "health_load_crit", 150, 1, 500);
+  st.health_ssh_warn = json_int(settings_raw, "health_ssh_warn", kHealthSshFailWarn, 0, 100000);
+  st.health_ssh_crit = json_int(settings_raw, "health_ssh_crit", kHealthSshFailCrit, 0, 100000);
+  if (st.health_ssh_crit < st.health_ssh_warn) st.health_ssh_crit = st.health_ssh_warn;
   st.health_show_cpu = settings_raw.value("health_show_cpu", true);
   st.health_show_ram = settings_raw.value("health_show_ram", true);
   st.health_show_swap = settings_raw.value("health_show_swap", true);
@@ -702,6 +735,7 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
         {"key_path", s.key_path},
         {"remote_shell", normalize_remote_shell(s.remote_shell)},
         {"health_enabled", s.health_enabled},
+        {"health_ignore", health_ignore_json(s.health_ignore)},
     };
     payload["servers"].push_back(item);
     s.password_blob = item["password_vault"].get<std::string>();
@@ -798,6 +832,8 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"health_steal_crit", config.settings.health_steal_crit},
       {"health_load_warn", config.settings.health_load_warn},
       {"health_load_crit", config.settings.health_load_crit},
+      {"health_ssh_warn", config.settings.health_ssh_warn},
+      {"health_ssh_crit", config.settings.health_ssh_crit},
       {"health_show_cpu", config.settings.health_show_cpu},
       {"health_show_ram", config.settings.health_show_ram},
       {"health_show_swap", config.settings.health_show_swap},

@@ -38,7 +38,7 @@ wxTextCtrl* labeled_entry(wxWindow* parent, wxFlexGridSizer* grid, const wxStrin
 }  // namespace
 
 ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxString& title, bool is_new)
-    : PositionedDialog(parent, title, wxSize(520, 480)), server_(server), is_new_(is_new) {
+    : PositionedDialog(parent, title, wxSize(520, 640)), server_(server), is_new_(is_new) {
   stored_password_ = is_new ? "" : server.password;
   auto* body = new wxPanel(this);
   auto* grid = new wxFlexGridSizer(9, 2, 8, 8);
@@ -90,6 +90,42 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   health_->SetValue(server.health_enabled);
   grid->Add(health_, 1, wxEXPAND);
 
+  auto* ignore_label = new wxStaticText(body, wxID_ANY, L"Не учитывать в статусе (цифры в деталях остаются):");
+  ignore_label->SetName(L"muted");
+  ignore_label->SetForegroundColour(Theme::muted());
+  ignore_ssh_ = new ThemedCheckBox(body, wxID_ANY, L"SSH (неудачные входы)");
+  ignore_oom_ = new ThemedCheckBox(body, wxID_ANY, L"OOM");
+  ignore_failed_ = new ThemedCheckBox(body, wxID_ANY, L"Упавшие службы");
+  ignore_reboot_ = new ThemedCheckBox(body, wxID_ANY, L"Нужна перезагрузка");
+  ignore_docker_ = new ThemedCheckBox(body, wxID_ANY, L"Docker unhealthy");
+  ignore_time_ = new ThemedCheckBox(body, wxID_ANY, L"Время");
+  ignore_net_ = new ThemedCheckBox(body, wxID_ANY, L"Сеть (рост ошибок)");
+  ignore_ssh_->SetValue(server.health_ignore.ssh);
+  ignore_oom_->SetValue(server.health_ignore.oom);
+  ignore_failed_->SetValue(server.health_ignore.failed_units);
+  ignore_reboot_->SetValue(server.health_ignore.reboot);
+  ignore_docker_->SetValue(server.health_ignore.docker);
+  ignore_time_->SetValue(server.health_ignore.time);
+  ignore_net_->SetValue(server.health_ignore.net);
+  auto* ignore_row1 = new wxBoxSizer(wxHORIZONTAL);
+  ignore_row1->Add(ignore_ssh_, 0, wxRIGHT, 12);
+  ignore_row1->Add(ignore_oom_, 0, wxRIGHT, 12);
+  ignore_row1->Add(ignore_failed_, 0);
+  auto* ignore_row2 = new wxBoxSizer(wxHORIZONTAL);
+  ignore_row2->Add(ignore_reboot_, 0, wxRIGHT, 12);
+  ignore_row2->Add(ignore_docker_, 0, wxRIGHT, 12);
+  ignore_row2->Add(ignore_time_, 0, wxRIGHT, 12);
+  ignore_row2->Add(ignore_net_, 0);
+  auto sync_ignore = [this] {
+    const bool on = health_->GetValue();
+    for (auto* c : {ignore_ssh_, ignore_oom_, ignore_failed_, ignore_reboot_, ignore_docker_, ignore_time_,
+                    ignore_net_}) {
+      c->Enable(on);
+    }
+  };
+  health_->Bind(wxEVT_CHECKBOX, [sync_ignore](wxCommandEvent&) { sync_ignore(); });
+  sync_ignore();
+
   error_ = new wxStaticText(body, wxID_ANY, L"");
   error_->SetName(L"error");
   error_->SetForegroundColour(Theme::err());
@@ -103,8 +139,11 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   save->SetDefault();
 
   auto* root = new wxBoxSizer(wxVERTICAL);
-  root->Add(grid, 1, wxEXPAND | wxALL, 12);
-  root->Add(error_, 0, wxEXPAND | wxLEFT | wxRIGHT, 12);
+  root->Add(grid, 0, wxEXPAND | wxALL, 12);
+  root->Add(ignore_label, 0, wxEXPAND | wxLEFT | wxRIGHT, 12);
+  root->Add(ignore_row1, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 12);
+  root->Add(ignore_row2, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 8);
+  root->Add(error_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 12);
   root->Add(btns, 0, wxEXPAND | wxALL, 12);
   body->SetSizer(root);
   auto* outer = new wxBoxSizer(wxVERTICAL);
@@ -197,6 +236,13 @@ void ServerDialog::on_ok(wxCommandEvent&) {
   result.key_path = key_path;
   result.remote_shell = normalize_remote_shell(std::string(shell_->GetValue().utf8_string()));
   result.health_enabled = health_->GetValue();
+  result.health_ignore.ssh = ignore_ssh_->GetValue();
+  result.health_ignore.oom = ignore_oom_->GetValue();
+  result.health_ignore.failed_units = ignore_failed_->GetValue();
+  result.health_ignore.reboot = ignore_reboot_->GetValue();
+  result.health_ignore.docker = ignore_docker_->GetValue();
+  result.health_ignore.time = ignore_time_->GetValue();
+  result.health_ignore.net = ignore_net_->GetValue();
   accepted = true;
   EndModal(wxID_OK);
 }

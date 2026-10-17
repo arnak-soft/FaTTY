@@ -332,6 +332,15 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
       thresh_row(L"steal", st.health_steal_warn, st.health_steal_crit, &health_steal_warn_, &health_steal_crit_);
   auto* load_row =
       thresh_row(L"Нагрузка", st.health_load_warn, st.health_load_crit, &health_load_warn_, &health_load_crit_);
+  auto* ssh_row =
+      thresh_row(L"SSH fail", st.health_ssh_warn, st.health_ssh_crit, &health_ssh_warn_, &health_ssh_crit_);
+  auto* ssh_hint = new wxStaticText(
+      health_page, wxID_ANY,
+      L"SSH fail — число неудачных входов за сутки (не проценты). По VPS отдельные тревоги можно "
+      L"отключить в карточке сервера.");
+  ssh_hint->SetName(L"muted");
+  ssh_hint->SetForegroundColour(Theme::muted());
+  ssh_hint->Wrap(FromDIP(520));
   hsz->Add(health_auto_, 0, wxALL, 8);
   hsz->Add(health_hint, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
   hsz->Add(irow, 0, wxALL, 8);
@@ -349,6 +358,8 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   hsz->Add(iowait_row, 0, wxALL, 8);
   hsz->Add(steal_row, 0, wxALL, 8);
   hsz->Add(load_row, 0, wxALL, 8);
+  hsz->Add(ssh_row, 0, wxALL, 8);
+  hsz->Add(ssh_hint, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
   health_page->SetSizer(hsz);
   nb->AddPage(health_page, L"Состояние");
   health_interval_->Bind(wxEVT_CHOICE, [this](wxCommandEvent&) {
@@ -616,6 +627,8 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   int steal_crit = config_.settings.health_steal_crit;
   int load_warn = config_.settings.health_load_warn;
   int load_crit = config_.settings.health_load_crit;
+  int ssh_warn = config_.settings.health_ssh_warn;
+  int ssh_crit = config_.settings.health_ssh_crit;
   parse_int(std::string(health_interval_sec_->GetValue().utf8_string()), health_interval);
   parse_int(std::string(health_timeout_->GetValue().utf8_string()), health_timeout);
   parse_int(std::string(health_disk_warn_->GetValue().utf8_string()), disk_warn);
@@ -632,6 +645,8 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   parse_int(std::string(health_steal_crit_->GetValue().utf8_string()), steal_crit);
   parse_int(std::string(health_load_warn_->GetValue().utf8_string()), load_warn);
   parse_int(std::string(health_load_crit_->GetValue().utf8_string()), load_crit);
+  parse_int(std::string(health_ssh_warn_->GetValue().utf8_string()), ssh_warn);
+  parse_int(std::string(health_ssh_crit_->GetValue().utf8_string()), ssh_crit);
   config_.settings.health_interval_sec = clamp_int(health_interval, 300, 30 * 24 * 3600);
   config_.settings.health_timeout_sec = clamp_int(health_timeout, 5, 120);
   config_.settings.health_disk_warn = clamp_int(disk_warn, 1, 100);
@@ -648,6 +663,9 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.health_steal_crit = clamp_int(std::max(steal_crit, config_.settings.health_steal_warn), 1, 100);
   config_.settings.health_load_warn = clamp_int(load_warn, 1, 500);
   config_.settings.health_load_crit = clamp_int(std::max(load_crit, config_.settings.health_load_warn), 1, 500);
+  config_.settings.health_ssh_warn = clamp_int(ssh_warn, 0, 100000);
+  config_.settings.health_ssh_crit =
+      clamp_int(std::max(ssh_crit, config_.settings.health_ssh_warn), 0, 100000);
   config_.settings.health_show_cpu = health_cpu_->GetValue();
   config_.settings.health_show_ram = health_ram_->GetValue();
   config_.settings.health_show_swap = health_swap_->GetValue();

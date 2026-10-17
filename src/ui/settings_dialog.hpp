@@ -72,6 +72,8 @@ class SettingsDialog : public PositionedDialog {
   wxTextCtrl* health_steal_crit_{};
   wxTextCtrl* health_load_warn_{};
   wxTextCtrl* health_load_crit_{};
+  wxTextCtrl* health_ssh_warn_{};
+  wxTextCtrl* health_ssh_crit_{};
   ThemedCheckBox* health_cpu_{};
   ThemedCheckBox* health_ram_{};
   ThemedCheckBox* health_swap_{};

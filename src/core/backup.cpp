@@ -12,11 +12,6 @@
 namespace fatty {
 namespace {
 
-double unix_now() {
-  using clock = std::chrono::system_clock;
-  return std::chrono::duration<double>(clock::now().time_since_epoch()).count();
-}
-
 std::string backup_stamp(double unix_ts) {
   auto tp = std::chrono::system_clock::from_time_t(static_cast<std::time_t>(unix_ts));
   auto t = std::chrono::system_clock::to_time_t(tp);

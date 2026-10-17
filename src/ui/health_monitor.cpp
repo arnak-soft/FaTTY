@@ -31,6 +31,26 @@ void HealthMonitor::stop() {
 
 void HealthMonitor::wake() { tick(); }
 
+void HealthMonitor::reevaluate_cached() {
+  const auto st = deps_.settings ? deps_.settings() : AppSettings{};
+  const auto th = thresholds_from(st);
+  const auto servers = deps_.servers ? deps_.servers() : std::vector<Server>{};
+  {
+    std::lock_guard lock(mutex_);
+    for (auto& [id, entry] : entries_) {
+      HealthAlertIgnore ignore;
+      for (const auto& s : servers) {
+        if (s.id == id) {
+          ignore = s.health_ignore;
+          break;
+        }
+      }
+      apply_health_thresholds(entry.latest, th, ignore);
+    }
+  }
+  if (deps_.on_change) deps_.on_change();
+}
+
 void HealthMonitor::refresh(const std::string& server_id) {
   if (server_id.empty()) {
     refresh_all();
@@ -105,6 +125,8 @@ HealthThresholds HealthMonitor::thresholds_from(const AppSettings& st) const {
   t.steal_crit = st.health_steal_crit;
   t.load_warn = st.health_load_warn;
   t.load_crit = st.health_load_crit;
+  t.ssh_warn = st.health_ssh_warn;
+  t.ssh_crit = st.health_ssh_crit;
   return t;
 }
 
@@ -213,7 +235,7 @@ void HealthMonitor::start_check(Server server) {
       snap.server_name = server.name;
       snap.checked_at = unix_now();
       if (snap.level != HealthLevel::Unsupported) {
-        apply_health_thresholds(snap, thresholds);
+        apply_health_thresholds(snap, thresholds, server.health_ignore);
       }
       if (snap.cpu_pct < 0 && snap.mem_pct < 0 && snap.swap_pct < 0 && snap.disks.empty() && snap.load1 < 0 &&
           snap.uptime_sec < 0) {
@@ -264,9 +286,18 @@ void HealthMonitor::store_snapshot(HealthSnapshot snap, bool persist_now) {
     prior.checking = false;
     snap.rebooted = false;
     snap.net_err_delta = -1;
+    HealthAlertIgnore ignore;
+    if (deps_.servers) {
+      for (const auto& s : deps_.servers()) {
+        if (s.id == snap.server_id) {
+          ignore = s.health_ignore;
+          break;
+        }
+      }
+    }
     if (prior.checked_at > 0 && snap.checked_at > 0) {
       snap.rebooted = health_rebooted_since(snap, prior);
-      health_apply_net_delta(snap, prior);
+      health_apply_net_delta(snap, prior, ignore);
       if (prior.level != snap.level &&
           (health_level_is_alert(prior.level) || health_level_is_alert(snap.level))) {
         prior_for_journal = prior;

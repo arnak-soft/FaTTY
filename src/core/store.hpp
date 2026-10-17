@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/health.hpp"
 #include "core/vault.hpp"
 
 #include <filesystem>
@@ -21,6 +22,7 @@ struct Server {
   std::string key_path;
   std::string remote_shell = "bash";
   bool health_enabled = true;
+  HealthAlertIgnore health_ignore;
 
   static Server make_new();
   Server duplicate(const std::string& new_name) const;
@@ -130,6 +132,8 @@ struct AppSettings {
   int health_steal_crit = 30;
   int health_load_warn = 100;
   int health_load_crit = 150;
+  int health_ssh_warn = 20;
+  int health_ssh_crit = 100;
   bool health_show_cpu = true;
   bool health_show_ram = true;
   bool health_show_swap = true;

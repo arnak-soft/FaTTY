@@ -252,6 +252,23 @@ FATTYCWD_abc:/root
   extra.checked_at = 2;
   apply_health_thresholds(extra, {});
   expect(extra.level == HealthLevel::Warn, "ssh fail + unsynced is warn");
+  {
+    HealthSnapshot quiet = extra;
+    HealthAlertIgnore ig;
+    ig.ssh = true;
+    ig.time = true;
+    apply_health_thresholds(quiet, {}, ig);
+    expect(quiet.level == HealthLevel::Ok || quiet.level == HealthLevel::Unknown, "ignore ssh+time clears warn");
+    HealthThresholds high_ssh;
+    high_ssh.ssh_warn = 100;
+    high_ssh.ssh_crit = 500;
+    HealthSnapshot raised = extra;
+    raised.time_synced = 1;
+    raised.time_offset_known = false;
+    apply_health_thresholds(raised, high_ssh);
+    expect(raised.level == HealthLevel::Ok || raised.level == HealthLevel::Unknown,
+           "raised ssh threshold skips warn at 25");
+  }
   HealthSnapshot prev_net;
   prev_net.net_rx_bytes = 500;
   prev_net.net_tx_bytes = 1000;

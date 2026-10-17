@@ -81,6 +81,8 @@ json portable_settings(const AppSettings& settings) {
       {"health_steal_crit", settings.health_steal_crit},
       {"health_load_warn", settings.health_load_warn},
       {"health_load_crit", settings.health_load_crit},
+      {"health_ssh_warn", settings.health_ssh_warn},
+      {"health_ssh_crit", settings.health_ssh_crit},
       {"health_show_cpu", settings.health_show_cpu},
       {"health_show_ram", settings.health_show_ram},
       {"health_show_swap", settings.health_show_swap},
@@ -138,6 +140,9 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   settings.health_steal_crit = clamp_int(raw.value("health_steal_crit", settings.health_steal_crit), 1, 100);
   settings.health_load_warn = clamp_int(raw.value("health_load_warn", settings.health_load_warn), 1, 500);
   settings.health_load_crit = clamp_int(raw.value("health_load_crit", settings.health_load_crit), 1, 500);
+  settings.health_ssh_warn = clamp_int(raw.value("health_ssh_warn", settings.health_ssh_warn), 0, 100000);
+  settings.health_ssh_crit = clamp_int(raw.value("health_ssh_crit", settings.health_ssh_crit), 0, 100000);
+  if (settings.health_ssh_crit < settings.health_ssh_warn) settings.health_ssh_crit = settings.health_ssh_warn;
   settings.health_show_cpu = raw.value("health_show_cpu", settings.health_show_cpu);
   settings.health_show_ram = raw.value("health_show_ram", settings.health_show_ram);
   settings.health_show_swap = raw.value("health_show_swap", settings.health_show_swap);
@@ -163,6 +168,14 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
         {"username", server.username},
         {"key_path", server.key_path},
         {"health_enabled", server.health_enabled},
+        {"health_ignore",
+         {{"ssh", server.health_ignore.ssh},
+          {"oom", server.health_ignore.oom},
+          {"failed_units", server.health_ignore.failed_units},
+          {"reboot", server.health_ignore.reboot},
+          {"docker", server.health_ignore.docker},
+          {"time", server.health_ignore.time},
+          {"net", server.health_ignore.net}}},
     };
     if (include_secrets) {
       item["password"] = server.password;
@@ -292,6 +305,16 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       s.password = raw.value("password", "");
       s.key_path = raw.value("key_path", "");
       s.health_enabled = raw.value("health_enabled", true);
+      if (raw.contains("health_ignore") && raw["health_ignore"].is_object()) {
+        const auto& ig = raw["health_ignore"];
+        s.health_ignore.ssh = ig.value("ssh", false);
+        s.health_ignore.oom = ig.value("oom", false);
+        s.health_ignore.failed_units = ig.value("failed_units", false);
+        s.health_ignore.reboot = ig.value("reboot", false);
+        s.health_ignore.docker = ig.value("docker", false);
+        s.health_ignore.time = ig.value("time", false);
+        s.health_ignore.net = ig.value("net", false);
+      }
       imported_servers.push_back(std::move(s));
     }
   }
