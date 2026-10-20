@@ -1316,6 +1316,7 @@ ThemedCheckBox::ThemedCheckBox(wxWindow* parent, wxWindowID id, const wxString& 
   SetCanFocus(true);
   SetBackgroundStyle(wxBG_STYLE_PAINT);
   Bind(wxEVT_PAINT, &ThemedCheckBox::on_paint, this);
+  Bind(wxEVT_SIZE, &ThemedCheckBox::on_size, this);
   Bind(wxEVT_LEFT_UP, [this](wxMouseEvent&) { toggle(); });
   Bind(wxEVT_SET_FOCUS, [this](wxFocusEvent& e) {
     Refresh();
@@ -1366,6 +1367,18 @@ void ThemedCheckBox::toggle() {
   ev.SetEventObject(this);
   ev.SetInt(value_ ? 1 : 0);
   ProcessWindowEvent(ev);
+}
+
+void ThemedCheckBox::on_size(wxSizeEvent& e) {
+  if (wxWindow* p = GetParent()) {
+    wxRect dirty(GetPosition(), GetSize());
+    if (last_size_.x > 0 && last_size_.y > 0) dirty.Union(wxRect(GetPosition(), last_size_));
+    dirty.Inflate(FromDIP(4), FromDIP(4));
+    p->RefreshRect(dirty, true);
+  }
+  last_size_ = GetSize();
+  Refresh();
+  e.Skip();
 }
 
 void ThemedCheckBox::on_paint(wxPaintEvent&) {
@@ -1431,6 +1444,7 @@ void ThemedChoice::init(const wxString& value, const wxArrayString& choices) {
     }
   }
   Bind(wxEVT_PAINT, &ThemedChoice::on_paint, this);
+  Bind(wxEVT_SIZE, &ThemedChoice::on_size, this);
   Bind(wxEVT_LEFT_UP, [this](wxMouseEvent&) { open_popup(); });
   Bind(wxEVT_SET_FOCUS, [this](wxFocusEvent& e) {
     Refresh();
@@ -1524,6 +1538,18 @@ void ThemedChoice::move_selection(int delta) {
   int next = selection_ < 0 ? (delta > 0 ? 0 : static_cast<int>(items_.size()) - 1) : selection_ + delta;
   next = std::clamp(next, 0, static_cast<int>(items_.size()) - 1);
   choose(next, true);
+}
+
+void ThemedChoice::on_size(wxSizeEvent& e) {
+  if (wxWindow* p = GetParent()) {
+    wxRect dirty(GetPosition(), GetSize());
+    if (last_size_.x > 0 && last_size_.y > 0) dirty.Union(wxRect(GetPosition(), last_size_));
+    dirty.Inflate(FromDIP(4), FromDIP(4));
+    p->RefreshRect(dirty, true);
+  }
+  last_size_ = GetSize();
+  Refresh();
+  e.Skip();
 }
 
 void ThemedChoice::open_popup() {

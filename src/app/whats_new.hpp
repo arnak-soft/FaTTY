@@ -8,8 +8,8 @@ namespace fatty {
 // Пользователю при первом запуске новой версии. 1–4 коротких пункта
 // с последнего git-тега. Агент обновляет после каждого заметного изменения.
 inline constexpr std::string_view kWhatsNew =
-    "• Состояние: пороги SSH fail в настройках; на VPS — отключить отдельные тревоги\n"
-    "• На карточке видно, почему «средне»/«высокое»; поле «Команда» снова видно";
+    "• Состояние VPS: цвета в деталях (SSH, OOM, дельты, время) больше не пропадают\n"
+    "• Карточка VPS: без «шлейфа» у списка Shell при изменении размера окна";
 
 std::string release_version_id(std::string_view version);
 bool should_show_whats_new(std::string_view last_seen, std::string_view current,

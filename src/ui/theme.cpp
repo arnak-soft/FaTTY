@@ -187,7 +187,8 @@ void apply_dark_titlebar(wxWindow* window) {
 }
 
 // Роли задаются через SetName: "accent", "title", "section", "muted", "meta",
-// "chrome" (панель-полоса), "terminal" (моно-вывод), "mono" (моноширинный шрифт).
+// "warn", "ok", "error", "chrome" (панель-полоса), "terminal" (моно-вывод),
+// "mono" (моноширинный шрифт). Без роли StaticText снова получает Theme::text().
 void apply_theme(wxWindow* window) {
   if (!window) return;
   polish_native_chrome(window);
@@ -229,6 +230,12 @@ void apply_theme(wxWindow* window) {
   } else if (name == L"error") {
     window->SetBackgroundColour(parent_bg);
     window->SetForegroundColour(Theme::err());
+  } else if (name == L"warn") {
+    window->SetBackgroundColour(parent_bg);
+    window->SetForegroundColour(Theme::warn());
+  } else if (name == L"ok") {
+    window->SetBackgroundColour(parent_bg);
+    window->SetForegroundColour(Theme::ok());
   } else if (name == L"meta") {
     window->SetBackgroundColour(parent_bg);
     window->SetForegroundColour(Theme::meta());

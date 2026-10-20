@@ -173,7 +173,9 @@ class ThemedCheckBox : public wxControl {
  private:
   void toggle();
   void on_paint(wxPaintEvent&);
+  void on_size(wxSizeEvent&);
   bool value_ = false;
+  wxSize last_size_{};
 };
 
 // Выпадающий список в цветах темы. Заменяет светлые wxChoice и wxComboBox.
@@ -201,10 +203,12 @@ class ThemedChoice : public wxControl {
   void choose(int index, bool notify);
   void move_selection(int delta);
   void on_paint(wxPaintEvent&);
+  void on_size(wxSizeEvent&);
 
   std::vector<wxString> items_;
   int selection_ = -1;
   bool open_ = false;
+  wxSize last_size_{};
 };
 
 // Полоса «Файл / Настройки / Справка» вместо системного меню.

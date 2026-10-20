@@ -36,6 +36,74 @@ wxColour health_colour(HealthLevel level) {
 
 HealthLevel bar_level(double pct, int warn, int crit) { return level_from_pct(pct, warn, crit); }
 
+wxString tone_name(HealthLevel level) {
+  switch (level) {
+    case HealthLevel::Crit:
+    case HealthLevel::Offline:
+      return L"error";
+    case HealthLevel::Warn:
+      return L"warn";
+    case HealthLevel::Ok:
+      return L"ok";
+    default:
+      return L"muted";
+  }
+}
+
+HealthLevel delta_tone(long long delta_kb) {
+  if (delta_kb > 0) return HealthLevel::Warn;
+  if (delta_kb < 0) return HealthLevel::Ok;
+  return HealthLevel::Unknown;
+}
+
+HealthLevel ssh_tone(int count, int warn, int crit, bool ignore) {
+  if (ignore || count < 0) return HealthLevel::Unknown;
+  if (count >= crit) return HealthLevel::Crit;
+  if (count >= warn) return HealthLevel::Warn;
+  return HealthLevel::Ok;
+}
+
+HealthLevel net_err_tone(int delta, bool ignore) {
+  if (ignore || delta < 0) return HealthLevel::Unknown;
+  if (delta >= kHealthNetErrCrit) return HealthLevel::Crit;
+  if (delta >= kHealthNetErrWarn) return HealthLevel::Warn;
+  return HealthLevel::Ok;
+}
+
+HealthLevel time_tone(const HealthSnapshot& snap, bool ignore) {
+  if (ignore) return HealthLevel::Unknown;
+  const double off = snap.time_offset_known ? std::fabs(snap.time_offset_sec) : 0;
+  if (off >= kHealthTimeOffsetCritSec) return HealthLevel::Crit;
+  if (snap.time_synced == 0 || off >= kHealthTimeOffsetWarnSec) return HealthLevel::Warn;
+  if (snap.time_synced == 1) return HealthLevel::Ok;
+  return HealthLevel::Unknown;
+}
+
+wxStaticText* make_tone_text(wxWindow* parent, const wxString& text, HealthLevel level) {
+  auto* t = new wxStaticText(parent, wxID_ANY, text);
+  t->SetName(tone_name(level));
+  t->Wrap(parent->FromDIP(420));
+  return t;
+}
+
+wxStaticText* make_section(wxWindow* parent, const wxString& text) {
+  auto* t = new wxStaticText(parent, wxID_ANY, text);
+  t->SetName(L"section");
+  return t;
+}
+
+void add_kv_row(wxWindow* parent, wxSizer* root, const wxString& label, const wxString& value, HealthLevel level) {
+  auto* row = new wxBoxSizer(wxHORIZONTAL);
+  auto* lab = new wxStaticText(parent, wxID_ANY, label);
+  lab->SetName(L"muted");
+  auto* val = new wxStaticText(parent, wxID_ANY, value);
+  val->SetName(tone_name(level));
+  val->Wrap(parent->FromDIP(320));
+  row->Add(lab, 0, wxALIGN_TOP);
+  row->Add(val, 1, wxLEFT | wxALIGN_TOP, parent->FromDIP(10));
+  root->Add(row, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, parent->FromDIP(8));
+}
+
 HealthThresholds thresholds_of(const AppSettings& st) {
   HealthThresholds t;
   t.disk_warn = st.health_disk_warn;
@@ -661,20 +729,17 @@ void HealthWindow::show_detail() {
   }
 
   auto* title = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(s->name));
-  title->SetFont(Theme::ui_title());
-  title->SetForegroundColour(Theme::text_bright());
+  title->SetName(L"title");
   auto* sub = new wxStaticText(
       detail_, wxID_ANY,
       wxString::FromUTF8(s->username + "@" + s->host + ":" + std::to_string(s->port) + "  •  " +
                          health_level_label(snap.level) + "  •  " + format_health_when(snap.checked_at)));
-  sub->SetForegroundColour(health_colour(snap.level));
+  sub->SetName(tone_name(snap.level));
   const auto th = thresholds_of(st);
   const auto why = health_alert_summary(snap, th, 6, s->health_ignore);
   wxStaticText* why_line = nullptr;
   if (!why.empty()) {
-    why_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8("Почему: " + why));
-    why_line->SetForegroundColour(health_colour(snap.level));
-    why_line->Wrap(FromDIP(420));
+    why_line = make_tone_text(detail_, wxString::FromUTF8("Почему: " + why), snap.level);
   }
 
   if (st.health_show_cpu) {
@@ -743,105 +808,85 @@ void HealthWindow::show_detail() {
 
   auto prev = view_snap(monitor_->previous(s->id), st, s->health_ignore);
   const auto trend = health_trend(snap, prev);
+  const auto& ig = s->health_ignore;
   if (trend.has_prev && (trend.mem || trend.swap || trend.disk || trend.net)) {
     std::string head = "С прошлой проверки";
     const auto span = format_health_span(trend.prev_checked_at, snap.checked_at);
     if (!span.empty()) head += " (" + span + ")";
-    head += ":";
-    auto* trend_title = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(head));
-    trend_title->SetForegroundColour(Theme::muted());
-    root->Add(trend_title, 0, wxLEFT | wxRIGHT | wxTOP, 12);
-    std::string line;
+    root->Add(make_section(detail_, wxString::FromUTF8(head)), 0, wxLEFT | wxRIGHT | wxTOP, 12);
     if (st.health_show_ram && trend.mem) {
-      line += "RAM " + format_signed_kib(trend.mem_used_delta_kb);
+      add_kv_row(detail_, root, L"RAM", wxString::FromUTF8(format_signed_kib(trend.mem_used_delta_kb)),
+                 delta_tone(trend.mem_used_delta_kb));
     }
     if (st.health_show_swap && trend.swap) {
-      if (!line.empty()) line += "   ";
-      line += "Swap " + format_signed_kib(trend.swap_used_delta_kb);
+      add_kv_row(detail_, root, L"Swap", wxString::FromUTF8(format_signed_kib(trend.swap_used_delta_kb)),
+                 delta_tone(trend.swap_used_delta_kb));
     }
     if (st.health_show_disk && trend.disk) {
-      if (!line.empty()) line += "   ";
-      line += "Диск " + trend.disk_mount + " " + format_signed_kib(trend.disk_used_delta_kb);
+      std::string disk = format_signed_kib(trend.disk_used_delta_kb);
       if (std::fabs(trend.disk_pct_delta) >= 0.05) {
-        line += " (" + format_signed_pct(trend.disk_pct_delta) + ")";
+        disk += " (" + format_signed_pct(trend.disk_pct_delta) + ")";
       }
-    }
-    if (!line.empty()) {
-      auto* trend_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(line));
-      trend_line->SetForegroundColour(Theme::text());
-      trend_line->Wrap(FromDIP(420));
-      root->Add(trend_line, 0, wxLEFT | wxRIGHT | (trend.net ? wxTOP : wxBOTTOM), 12);
+      add_kv_row(detail_, root, wxString::FromUTF8("Диск " + trend.disk_mount), wxString::FromUTF8(disk),
+                 delta_tone(trend.disk_used_delta_kb));
     }
     if (trend.net) {
-      std::string net = "Сеть ↓" + format_bps(trend.net_rx_bps) + "  ↑" + format_bps(trend.net_tx_bps);
+      std::string net = "↓" + format_bps(trend.net_rx_bps) + "  ↑" + format_bps(trend.net_tx_bps);
+      auto net_lvl = HealthLevel::Ok;
       if (trend.net_err_delta > 0) {
-        net += "  +" + std::to_string(trend.net_err_delta) + " ошибок/дропов";
+        net += "  +" + std::to_string(trend.net_err_delta) + " ошибок";
+        net_lvl = net_err_tone(trend.net_err_delta, ig.net);
       }
-      auto* net_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(net));
-      net_line->SetForegroundColour(trend.net_err_delta > 0 ? Theme::warn() : Theme::text());
-      net_line->Wrap(FromDIP(420));
-      root->Add(net_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+      add_kv_row(detail_, root, L"Сеть", wxString::FromUTF8(net), net_lvl);
     }
   }
 
-  auto* meta = new wxStaticText(detail_, wxID_ANY,
-                                wxString::FromUTF8("Аптайм: " + format_uptime_sec(snap.uptime_sec)));
-  meta->SetForegroundColour(Theme::muted());
-  root->Add(meta, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
-  if (snap.reboot_required) {
-    auto* reboot = new wxStaticText(detail_, wxID_ANY, L"Нужна перезагрузка — установлены обновления ядра или системы.");
-    reboot->SetForegroundColour(Theme::warn());
-    reboot->Wrap(FromDIP(420));
-    root->Add(reboot, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+  root->Add(make_section(detail_, L"Сигналы"), 0, wxLEFT | wxRIGHT | wxTOP, 12);
+  add_kv_row(detail_, root, L"Аптайм", wxString::FromUTF8(format_uptime_sec(snap.uptime_sec)),
+             HealthLevel::Unknown);
+  if (snap.reboot_required && !ig.reboot) {
+    add_kv_row(detail_, root, L"Перезагрузка", L"нужна — обновления ядра или системы", HealthLevel::Warn);
+  } else if (snap.reboot_required) {
+    add_kv_row(detail_, root, L"Перезагрузка", L"нужна (не учитывается)", HealthLevel::Unknown);
   }
   if (snap.rebooted) {
-    auto* did = new wxStaticText(detail_, wxID_ANY, L"С прошлой проверки машина перезагружалась.");
-    did->SetForegroundColour(Theme::muted());
-    did->Wrap(FromDIP(420));
-    root->Add(did, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    add_kv_row(detail_, root, L"Reboot", L"машина перезагружалась с прошлой проверки", HealthLevel::Warn);
   }
   if (snap.oom_count > 0) {
-    std::string oom = "OOM: " + std::to_string(snap.oom_count) + " в логах ядра";
-    if (!snap.oom_last.empty()) oom += " (последний: " + snap.oom_last + ")";
-    auto* oom_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(oom));
-    oom_line->SetForegroundColour(snap.oom_count >= 3 ? Theme::err() : Theme::warn());
-    oom_line->Wrap(FromDIP(420));
-    root->Add(oom_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    std::string oom = std::to_string(snap.oom_count) + " в логах ядра";
+    if (!snap.oom_last.empty()) oom += " · " + snap.oom_last;
+    HealthLevel oom_lvl = HealthLevel::Unknown;
+    if (!ig.oom) oom_lvl = snap.oom_count >= 3 ? HealthLevel::Crit : HealthLevel::Warn;
+    add_kv_row(detail_, root, L"OOM", wxString::FromUTF8(oom), oom_lvl);
   }
   if (snap.net_rx_bytes >= 0 || snap.net_tx_bytes >= 0) {
-    std::string net = "Сеть";
-    if (!snap.net_if.empty()) net += " (" + snap.net_if + ")";
-    net += ": ↓" + format_bytes(std::max(0LL, snap.net_rx_bytes)) + "  ↑" +
-           format_bytes(std::max(0LL, snap.net_tx_bytes));
+    std::string net = "↓" + format_bytes(std::max(0LL, snap.net_rx_bytes)) + "  ↑" +
+                      format_bytes(std::max(0LL, snap.net_tx_bytes));
     const auto errs = health_net_errs(snap);
+    auto net_lvl = HealthLevel::Ok;
     if (errs > 0) {
-      net += "  ошибок/дропов: " + std::to_string(errs);
+      net += "  ·  ошибок " + std::to_string(errs);
       if (snap.net_err_delta > 0) net += " (+" + std::to_string(snap.net_err_delta) + ")";
+      net_lvl = net_err_tone(snap.net_err_delta, ig.net);
     }
-    auto* net_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(net));
-    net_line->SetForegroundColour(snap.net_err_delta >= kHealthNetErrCrit
-                                      ? Theme::err()
-                                      : (snap.net_err_delta >= kHealthNetErrWarn ? Theme::warn() : Theme::muted()));
-    net_line->Wrap(FromDIP(420));
-    root->Add(net_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    const wxString net_lab =
+        snap.net_if.empty() ? wxString(L"Сеть") : wxString::FromUTF8("Сеть (" + snap.net_if + ")");
+    add_kv_row(detail_, root, net_lab, wxString::FromUTF8(net), net_lvl);
   }
   if (snap.ssh_fail_count >= 0) {
-    std::string ssh = "SSH: " + std::to_string(snap.ssh_fail_count) + " неудачных входов за сутки";
-    auto* ssh_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(ssh));
-    ssh_line->SetForegroundColour(snap.ssh_fail_count >= kHealthSshFailCrit
-                                      ? Theme::err()
-                                      : (snap.ssh_fail_count >= kHealthSshFailWarn ? Theme::warn() : Theme::muted()));
-    ssh_line->Wrap(FromDIP(420));
-    root->Add(ssh_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    std::string ssh = std::to_string(snap.ssh_fail_count) + " неудачных входов за сутки";
+    if (ig.ssh) ssh += " (не учитывается)";
+    add_kv_row(detail_, root, L"SSH", wxString::FromUTF8(ssh),
+               ssh_tone(snap.ssh_fail_count, st.health_ssh_warn, st.health_ssh_crit, ig.ssh));
   }
   if (snap.time_synced >= 0 || snap.time_offset_known) {
-    std::string time = "Время: ";
+    std::string time;
     if (snap.time_synced == 1) {
-      time += "синхронизировано";
+      time = "синхронизировано";
     } else if (snap.time_synced == 0) {
-      time += "нет синхронизации";
+      time = "нет синхронизации";
     } else {
-      time += "статус неизвестен";
+      time = "статус неизвестен";
     }
     if (snap.time_offset_known) {
       std::ostringstream oss;
@@ -850,107 +895,93 @@ void HealthWindow::show_detail() {
       oss << snap.time_offset_sec;
       time += ", смещение " + oss.str() + " с";
     }
-    const double off = snap.time_offset_known ? std::fabs(snap.time_offset_sec) : 0;
-    auto* time_line = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(time));
-    time_line->SetForegroundColour(
-        (snap.time_synced == 0 || off >= kHealthTimeOffsetCritSec)
-            ? (off >= kHealthTimeOffsetCritSec ? Theme::err() : Theme::warn())
-            : (off >= kHealthTimeOffsetWarnSec ? Theme::warn() : Theme::muted()));
-    time_line->Wrap(FromDIP(420));
-    root->Add(time_line, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    if (ig.time) time += " (не учитывается)";
+    add_kv_row(detail_, root, L"Время", wxString::FromUTF8(time), time_tone(snap, ig.time));
   }
-  auto add_top = [&](const char* title, const std::vector<HealthProc>& procs) {
+  if (!snap.failed_units.empty()) {
+    std::string failed;
+    for (std::size_t i = 0; i < snap.failed_units.size(); ++i) {
+      if (i) failed += ", ";
+      failed += snap.failed_units[i];
+    }
+    HealthLevel units_lvl = HealthLevel::Unknown;
+    if (!ig.failed_units) {
+      units_lvl = snap.failed_units.size() >= 3 ? HealthLevel::Crit : HealthLevel::Warn;
+    }
+    add_kv_row(detail_, root,
+               wxString::FromUTF8("Службы ×" + std::to_string(snap.failed_units.size())),
+               wxString::FromUTF8(failed), units_lvl);
+  }
+
+  auto add_top = [&](const char* title_utf8, const std::vector<HealthProc>& procs, bool by_cpu) {
     if (procs.empty()) return;
-    auto* head = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(title));
-    head->SetForegroundColour(Theme::muted());
-    root->Add(head, 0, wxLEFT | wxRIGHT | wxTOP, 12);
+    root->Add(make_section(detail_, wxString::FromUTF8(title_utf8)), 0, wxLEFT | wxRIGHT | wxTOP, 12);
     for (const auto& p : procs) {
       std::string line = std::to_string(p.pid) + "  " + p.name + "  " + format_kib(p.rss_kb);
+      HealthLevel row_lvl = HealthLevel::Unknown;
       if (p.cpu_pct >= 0) {
         std::ostringstream oss;
         oss.setf(std::ios::fixed);
         oss.precision(p.cpu_pct >= 10 ? 0 : 1);
         oss << p.cpu_pct;
         line += "  " + oss.str() + "% CPU";
+        if (by_cpu || p.cpu_pct >= 50) {
+          row_lvl = level_from_pct(p.cpu_pct, st.health_cpu_warn, st.health_cpu_crit);
+          if (row_lvl == HealthLevel::Unknown || row_lvl == HealthLevel::Ok) row_lvl = HealthLevel::Unknown;
+        }
       }
-      auto* row = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(line));
-      row->SetForegroundColour(Theme::text());
-      row->Wrap(FromDIP(420));
-      root->Add(row, 0, wxLEFT | wxRIGHT | wxBOTTOM, 4);
+      root->Add(make_tone_text(detail_, wxString::FromUTF8(line), row_lvl), 0,
+                wxLEFT | wxRIGHT | wxBOTTOM, 4);
     }
   };
-  add_top("Топ по RAM:", snap.top_mem);
-  add_top("Топ по CPU:", snap.top_cpu);
-  if (!snap.failed_units.empty()) {
-    std::string failed = "Упавшие службы (" + std::to_string(snap.failed_units.size()) + "): ";
-    for (std::size_t i = 0; i < snap.failed_units.size(); ++i) {
-      if (i) failed += ", ";
-      failed += snap.failed_units[i];
-    }
-    auto* units = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(failed));
-    units->SetForegroundColour(snap.failed_units.size() >= 3 ? Theme::err() : Theme::warn());
-    units->Wrap(FromDIP(420));
-    root->Add(units, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
-  }
+  add_top("Топ по RAM", snap.top_mem, false);
+  add_top("Топ по CPU", snap.top_cpu, true);
   if (st.health_show_docker) {
     if (snap.docker_present) {
-      std::string docker = "Docker: " + std::to_string(std::max(0, snap.docker_running)) + " running, " +
-                           std::to_string(std::max(0, snap.docker_exited)) + " exited, " +
+      root->Add(make_section(detail_, L"Docker"), 0, wxLEFT | wxRIGHT | wxTOP, 12);
+      std::string docker = std::to_string(std::max(0, snap.docker_running)) + " running · " +
+                           std::to_string(std::max(0, snap.docker_exited)) + " exited · " +
                            std::to_string(std::max(0, snap.docker_unhealthy)) + " unhealthy";
-      auto* dline = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(docker));
-      dline->SetForegroundColour(snap.docker_unhealthy > 0
-                                     ? (snap.docker_unhealthy >= 3 ? Theme::err() : Theme::warn())
-                                     : Theme::text());
-      dline->Wrap(FromDIP(420));
-      root->Add(dline, 0, wxLEFT | wxRIGHT | wxTOP, 12);
+      HealthLevel docker_lvl = HealthLevel::Ok;
+      if (snap.docker_unhealthy > 0 && !ig.docker) {
+        docker_lvl = snap.docker_unhealthy >= 3 ? HealthLevel::Crit : HealthLevel::Warn;
+      } else if (ig.docker && snap.docker_unhealthy > 0) {
+        docker_lvl = HealthLevel::Unknown;
+      }
+      add_kv_row(detail_, root, L"Контейнеры", wxString::FromUTF8(docker), docker_lvl);
       if (!snap.docker_unhealthy_names.empty()) {
-        std::string names = "unhealthy: ";
+        std::string names;
         for (std::size_t i = 0; i < snap.docker_unhealthy_names.size(); ++i) {
           if (i) names += ", ";
           names += snap.docker_unhealthy_names[i];
         }
-        auto* nline = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(names));
-        nline->SetForegroundColour(Theme::warn());
-        nline->Wrap(FromDIP(420));
-        root->Add(nline, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+        add_kv_row(detail_, root, L"unhealthy", wxString::FromUTF8(names),
+                   ig.docker ? HealthLevel::Unknown : HealthLevel::Warn);
       } else if (!snap.docker_exited_names.empty() && snap.docker_exited > 0) {
-        std::string names = "exited: ";
+        std::string names;
         for (std::size_t i = 0; i < snap.docker_exited_names.size(); ++i) {
           if (i) names += ", ";
           names += snap.docker_exited_names[i];
         }
-        auto* nline = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(names));
-        nline->SetForegroundColour(Theme::muted());
-        nline->Wrap(FromDIP(420));
-        root->Add(nline, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
-      } else {
-        root->AddSpacer(FromDIP(12));
+        add_kv_row(detail_, root, L"exited", wxString::FromUTF8(names), HealthLevel::Unknown);
       }
     } else if (snap.checked_at > 0) {
-      auto* absent = new wxStaticText(detail_, wxID_ANY,
-                                      L"Docker: нет на сервере или нет прав (нужен доступ к docker.sock).");
-      absent->SetForegroundColour(Theme::muted());
-      absent->Wrap(FromDIP(420));
-      root->Add(absent, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+      add_kv_row(detail_, root, L"Docker", L"нет на сервере или нет прав", HealthLevel::Unknown);
     }
   }
   if (!snap.error.empty() && snap.level != HealthLevel::Ok) {
-    auto* err = new wxStaticText(detail_, wxID_ANY, wxString::FromUTF8(snap.error));
-    err->SetForegroundColour(Theme::err());
-    err->Wrap(FromDIP(420));
-    root->Add(err, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    root->Add(make_tone_text(detail_, wxString::FromUTF8(snap.error), HealthLevel::Crit), 0,
+              wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
   if (snap.error.empty() && snap.level == HealthLevel::Unknown && snap.checked_at > 0 && snap.cpu_pct < 0 &&
       snap.mem_pct < 0 && snap.disks.empty()) {
-    auto* hint = new wxStaticText(detail_, wxID_ANY, L"Нет цифр в последней проверке — нажмите «Обновить выбранный».");
-    hint->SetForegroundColour(Theme::muted());
-    hint->Wrap(FromDIP(420));
-    root->Add(hint, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    root->Add(make_tone_text(detail_, L"Нет цифр в последней проверке — нажмите «Обновить выбранный».",
+                             HealthLevel::Unknown),
+              0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
   if (!s->health_enabled) {
-    auto* off = new wxStaticText(detail_, wxID_ANY, L"Этот VPS исключён из проверки (карточка сервера).");
-    off->SetForegroundColour(Theme::muted());
-    root->Add(off, 0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    root->Add(make_tone_text(detail_, L"Этот VPS исключён из проверки (карточка сервера).", HealthLevel::Unknown),
+              0, wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
   detail_->SetSizer(root);
   apply_dark(detail_);

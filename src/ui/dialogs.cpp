@@ -84,7 +84,7 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   grid->Add(new wxStaticText(body, wxID_ANY, L"Shell по умолчанию"), 0, wxALIGN_CENTER_VERTICAL);
   shell_ = new ThemedChoice(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxArrayString{L"bash", L"sh"});
   shell_->SetSelection(normalize_remote_shell(server.remote_shell) == "sh" ? 1 : 0);
-  grid->Add(shell_, 1, wxEXPAND);
+  grid->Add(shell_, 0, wxEXPAND);
   grid->Add(new wxStaticText(body, wxID_ANY, L""), 0);
   health_ = new ThemedCheckBox(body, wxID_ANY, L"Учитывать в окне «Состояние VPS»");
   health_->SetValue(server.health_enabled);
