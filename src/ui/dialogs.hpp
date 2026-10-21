@@ -35,6 +35,10 @@ class ServerDialog : public PositionedDialog {
   ThemedCheckBox* clear_pw_{};
   ThemedChoice* shell_{};
   ThemedCheckBox* health_{};
+  wxPanel* colour_swatch_dark_{};
+  wxPanel* colour_swatch_light_{};
+  ThemedChoice* font_face_{};
+  wxTextCtrl* font_pt_{};
   ThemedCheckBox* ignore_ssh_{};
   ThemedCheckBox* ignore_oom_{};
   ThemedCheckBox* ignore_failed_{};
@@ -44,6 +48,8 @@ class ServerDialog : public PositionedDialog {
   ThemedCheckBox* ignore_net_{};
   wxStaticText* error_{};
   std::string stored_password_;
+  std::string ui_colour_dark_;
+  std::string ui_colour_light_;
 };
 
 class PresetDialog : public PositionedDialog {

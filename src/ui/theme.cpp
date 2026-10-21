@@ -17,6 +17,8 @@
 #include <wx/textctrl.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <string>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -36,6 +38,12 @@ namespace {
 
 bool g_dark = true;
 int g_mono_pt = 12;
+wxColour g_surface_accent;  // invalid = нет тона VPS
+
+wxColour with_surface(const wxColour& base, float amount_dark, float amount_light) {
+  if (!g_surface_accent.IsOk()) return base;
+  return Theme::blend(base, g_surface_accent, g_dark ? amount_dark : amount_light);
+}
 
 struct Palette {
   wxColour bg;
@@ -92,23 +100,29 @@ std::string theme_name() { return g_dark ? "dark" : "light"; }
 void set_mono_point_size(int pt) { g_mono_pt = std::clamp(pt, 8, 24); }
 int mono_point_size() { return g_mono_pt; }
 
-wxColour Theme::bg() { return pal().bg; }
-wxColour Theme::chrome() { return pal().chrome; }
-wxColour Theme::elevated() { return pal().elevated; }
-wxColour Theme::btn() { return pal().btn; }
+void set_surface_accent(const wxColour& accent) { g_surface_accent = accent; }
+wxColour surface_accent() { return g_surface_accent; }
+
+wxColour Theme::bg() { return with_surface(pal().bg, 0.18f, 0.12f); }
+wxColour Theme::chrome() { return with_surface(pal().chrome, 0.16f, 0.10f); }
+wxColour Theme::elevated() { return with_surface(pal().elevated, 0.22f, 0.14f); }
+wxColour Theme::btn() { return with_surface(pal().btn, 0.14f, 0.10f); }
 wxColour Theme::text() { return pal().text; }
 wxColour Theme::text_bright() { return pal().text_bright; }
 wxColour Theme::muted() { return pal().muted; }
-wxColour Theme::accent() { return pal().accent; }
-wxColour Theme::select() { return pal().select; }
+wxColour Theme::accent() {
+  if (g_surface_accent.IsOk()) return g_surface_accent;
+  return pal().accent;
+}
+wxColour Theme::select() { return with_surface(pal().select, 0.35f, 0.28f); }
 wxColour Theme::meta() { return pal().meta; }
 wxColour Theme::ok() { return pal().ok; }
 wxColour Theme::err() { return pal().err; }
 wxColour Theme::warn() { return pal().warn; }
 wxColour Theme::cancel() { return pal().cancel; }
-wxColour Theme::terminal() { return pal().terminal; }
-wxColour Theme::border() { return pal().border; }
-wxColour Theme::hover() { return pal().hover; }
+wxColour Theme::terminal() { return with_surface(pal().terminal, 0.12f, 0.08f); }
+wxColour Theme::border() { return with_surface(pal().border, 0.20f, 0.14f); }
+wxColour Theme::hover() { return with_surface(pal().hover, 0.18f, 0.12f); }
 wxColour Theme::blend(const wxColour& a, const wxColour& b, float t) {
   t = std::clamp(t, 0.f, 1.f);
   auto mix = [t](unsigned char x, unsigned char y) {
@@ -293,6 +307,60 @@ void style_text(wxTextCtrl* ctrl, bool terminal) {
   ctrl->SetBackgroundColour(terminal ? Theme::terminal() : Theme::elevated());
   ctrl->SetForegroundColour(Theme::text());
   ctrl->SetFont(terminal ? Theme::mono() : Theme::ui());
+}
+
+bool server_ui_colour(const std::string& colour_dark, const std::string& colour_light, wxColour& out) {
+  const auto& hex = theme_is_dark() ? colour_dark : colour_light;
+  if (parse_hex_colour(hex, out)) return true;
+  // Запас: если задан только один из двух — взять другой.
+  return parse_hex_colour(theme_is_dark() ? colour_light : colour_dark, out);
+}
+
+bool parse_hex_colour(std::string_view hex, wxColour& out) {
+  std::string s(hex);
+  while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.erase(s.begin());
+  while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.pop_back();
+  if (s.empty()) return false;
+  if (s.front() == '#') s.erase(s.begin());
+  auto hex_digit = [](char c) -> int {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+  };
+  auto byte_at = [&](std::size_t i) -> int {
+    const int hi = hex_digit(s[i]);
+    const int lo = hex_digit(s[i + 1]);
+    if (hi < 0 || lo < 0) return -1;
+    return (hi << 4) | lo;
+  };
+  if (s.size() == 3) {
+    const int r = hex_digit(s[0]), g = hex_digit(s[1]), b = hex_digit(s[2]);
+    if (r < 0 || g < 0 || b < 0) return false;
+    out.Set(r * 17, g * 17, b * 17);
+    return true;
+  }
+  if (s.size() == 6) {
+    const int r = byte_at(0), g = byte_at(2), b = byte_at(4);
+    if (r < 0 || g < 0 || b < 0) return false;
+    out.Set(r, g, b);
+    return true;
+  }
+  return false;
+}
+
+std::string colour_to_hex(const wxColour& colour) {
+  if (!colour.IsOk()) return {};
+  char buf[8];
+  std::snprintf(buf, sizeof(buf), "#%02X%02X%02X", colour.Red(), colour.Green(), colour.Blue());
+  return buf;
+}
+
+wxFont server_list_font(const std::string& face, int pt) {
+  wxFont font = Theme::ui();
+  if (!face.empty()) font.SetFaceName(wxString::FromUTF8(face));
+  if (pt > 0) font.SetPointSize(std::clamp(pt, 8, 48));
+  return font;
 }
 
 }  // namespace fatty

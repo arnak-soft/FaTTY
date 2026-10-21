@@ -514,6 +514,13 @@ Config load_config_from(const std::filesystem::path& path) {
     s.remote_shell = normalize_remote_shell(raw.value("remote_shell", std::string("bash")));
     s.health_enabled = raw.value("health_enabled", true);
     s.health_ignore = parse_health_ignore(raw.value("health_ignore", json::object()));
+    {
+      const auto legacy = trim(raw.value("ui_colour", ""));
+      s.ui_colour_dark = trim(raw.value("ui_colour_dark", legacy));
+      s.ui_colour_light = trim(raw.value("ui_colour_light", legacy));
+    }
+    s.ui_font = trim(raw.value("ui_font", ""));
+    s.ui_font_pt = clamp_int(raw.value("ui_font_pt", 0), 0, 48);
     const std::string legacy = raw.value("password_encrypted", "");
     if (!vault_ok && !legacy.empty()) {
       try {
@@ -736,6 +743,10 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
         {"remote_shell", normalize_remote_shell(s.remote_shell)},
         {"health_enabled", s.health_enabled},
         {"health_ignore", health_ignore_json(s.health_ignore)},
+        {"ui_colour_dark", s.ui_colour_dark},
+        {"ui_colour_light", s.ui_colour_light},
+        {"ui_font", s.ui_font},
+        {"ui_font_pt", s.ui_font_pt},
     };
     payload["servers"].push_back(item);
     s.password_blob = item["password_vault"].get<std::string>();

@@ -79,6 +79,7 @@ class AppFrame : public wxFrame {
   void advance_command_selection();
   void start_bundle(const std::string& bundle_id_override = {});
   void open_bundle_steps();
+  void apply_server_appearance();
   void append_output(const std::string& text, const wxColour* colour = nullptr);
   void set_busy(bool busy);
   void update_cwd_label();
@@ -185,7 +186,7 @@ class AppFrame : public wxFrame {
   JournalWindow* journal_window_ = nullptr;
   HealthWindow* health_window_ = nullptr;
   HelpWindow* help_window_ = nullptr;
-  BundleStepsWindow* bundle_steps_window_ = nullptr;
+  std::map<std::string, BundleStepsWindow*> bundle_steps_windows_;
   RoundButton* health_btn_ = nullptr;
 };
 

@@ -23,6 +23,13 @@ struct Server {
   std::string remote_shell = "bash";
   bool health_enabled = true;
   HealthAlertIgnore health_ignore;
+  /// Акцент окна для тёмной / светлой темы: `#RRGGBB` или пусто.
+  std::string ui_colour_dark;
+  std::string ui_colour_light;
+  /// Семейство шрифта для списков команд/связок; пусто — шрифт темы.
+  std::string ui_font;
+  /// Кегль списков; 0 — как в теме.
+  int ui_font_pt = 0;
 
   static Server make_new();
   Server duplicate(const std::string& new_name) const;

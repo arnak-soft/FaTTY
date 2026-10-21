@@ -32,6 +32,7 @@ class BundleStepsWindow : public wxFrame {
   void clear_detail();
   void run_selected();
   void run_bundle();
+  void apply_server_look();
   std::string group_label(const Command& cmd) const;
   void maybe_announce_awaited_step();
   void set_notice(const wxString& text, const char* tone = "meta");
@@ -47,6 +48,7 @@ class BundleStepsWindow : public wxFrame {
   std::string awaiting_name_;
   std::string awaiting_since_;
   std::vector<Command> steps_;
+  wxPanel* accent_bar_{};
   StripedListCtrl* list_{};
   wxStaticText* hint_{};
   wxStaticText* detail_title_{};

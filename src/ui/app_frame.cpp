@@ -152,7 +152,9 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       command_stats_ = std::move(snap.commands);
       bundle_stats_ = std::move(snap.bundles);
       refresh_commands();
-      if (bundle_steps_window_) bundle_steps_window_->refresh();
+      for (auto& [id, win] : bundle_steps_windows_) {
+        if (win) win->refresh();
+      }
     });
   });
   build_menu();
@@ -1392,6 +1394,10 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
         row_colour = Theme::warn();
       }
     }
+    if (row_colour == Theme::text()) {
+      wxColour accent;
+      if (server_ui_colour(s.ui_colour_dark, s.ui_colour_light, accent)) row_colour = accent;
+    }
     style_list_row(servers_, row, row_colour);
     if (s.id == keep) sel = row;
     ++row;
@@ -1407,6 +1413,7 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
   if (sel >= 0) servers_->SetItemState(sel, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
   rebuild_group_tabs();
   refresh_commands();
+  apply_server_appearance();
   if (health_window_) health_window_->reload();
   update_health_button();
 }
@@ -1420,6 +1427,7 @@ void AppFrame::restore_columns() {
 void AppFrame::apply_ui_theme() {
   set_theme(config_.settings.theme);
   set_mono_point_size(config_.settings.terminal_font_pt);
+  set_surface_accent(wxNullColour);
   apply_theme(this);
   style_list(servers_);
   style_list(commands_);
@@ -1427,7 +1435,9 @@ void AppFrame::apply_ui_theme() {
   if (journal_window_) apply_theme(journal_window_);
   if (health_window_) apply_theme(health_window_);
   if (help_window_) apply_theme(help_window_);
-  if (bundle_steps_window_) apply_theme(bundle_steps_window_);
+  for (auto& [id, win] : bundle_steps_windows_) {
+    if (win) apply_theme(win);
+  }
   for (auto& [id, win] : files_windows_) {
     if (win) apply_theme(win);
   }
@@ -1578,7 +1588,47 @@ void AppFrame::update_server_heading() {
       server_meta_->SetLabel(wxString::FromUTF8(s->username + "@" + s->host + ":" + std::to_string(s->port)));
     }
   }
+  apply_server_appearance();
   if (server_heading_->GetParent()) server_heading_->GetParent()->Layout();
+}
+
+void AppFrame::apply_server_appearance() {
+  auto* s = selected_server();
+  wxColour accent;
+  const bool has_colour = s && server_ui_colour(s->ui_colour_dark, s->ui_colour_light, accent);
+  set_surface_accent(has_colour ? accent : wxNullColour);
+  apply_theme(this);
+  style_list(servers_);
+  style_list(commands_);
+  if (bundles_) style_list(bundles_);
+  if (server_heading_) {
+    if (has_colour) {
+      server_heading_->SetName(L"");
+      server_heading_->SetFont(Theme::ui_heading());
+      server_heading_->SetForegroundColour(accent);
+    } else {
+      server_heading_->SetName(L"heading");
+      server_heading_->SetFont(Theme::ui_heading());
+      server_heading_->SetForegroundColour(Theme::text_bright());
+    }
+  }
+  const wxFont list_font =
+      s ? server_list_font(s->ui_font, s->ui_font_pt) : Theme::ui();
+  if (commands_) {
+    commands_->SetFont(list_font);
+    style_list(commands_);
+  }
+  if (bundles_) {
+    bundles_->SetFont(list_font);
+    style_list(bundles_);
+  }
+  if (quick_) {
+    style_text(quick_);
+    quick_->SetFont(list_font);
+  }
+  if (output_) style_text(output_, true);
+  if (terminal_) apply_theme(terminal_);
+  Refresh();
 }
 
 std::vector<std::string> AppFrame::command_column_ids() const {
@@ -1659,6 +1709,9 @@ void AppFrame::refresh_server_health() {
       row_colour = Theme::err();
     } else if (s.health_enabled && snap.level == HealthLevel::Warn) {
       row_colour = Theme::warn();
+    } else {
+      wxColour accent;
+      if (server_ui_colour(s.ui_colour_dark, s.ui_colour_light, accent)) row_colour = accent;
     }
     style_list_row(servers_, row, row_colour);
   }
@@ -2084,7 +2137,10 @@ void AppFrame::init_run_controllers() {
                 command_run_working_dir(config_, cmd), cmd.cd_before_run, effective_remote_shell(srv, cmd));
   };
   bh.on_finished = [this](const std::string& bundle_id, const std::string& name, const std::string& reason) {
-    if (bundle_steps_window_) bundle_steps_window_->notify_bundle_finished(bundle_id, name, reason);
+    auto it = bundle_steps_windows_.find(bundle_id);
+    if (it != bundle_steps_windows_.end() && it->second) {
+      it->second->notify_bundle_finished(bundle_id, name, reason);
+    }
   };
   bh.journal = journal_;
   bundle_run_ = std::make_unique<BundleController>(std::move(bh));
@@ -2286,31 +2342,47 @@ void AppFrame::open_bundle_steps() {
     wxMessageBox(L"В связке нет доступных команд (их удалили?).", L"Связка");
     return;
   }
-  if (!bundle_steps_window_) {
-    bundle_steps_window_ = new BundleStepsWindow(
-        this, config_, &command_stats_,
-        [this](const Command& cmd) {
-          auto* live = config_.command_by_id(cmd.id);
-          const Command* c = live ? live : &cmd;
-          auto* srv = config_.server_by_id(c->server_id);
-          if (!srv) {
-            wxMessageBox(L"VPS этой команды больше нет в списке.", L"Связка", wxOK | wxICON_ERROR,
-                         bundle_steps_window_ ? static_cast<wxWindow*>(bundle_steps_window_) : this);
-            return;
-          }
-          wxWindow* parent = bundle_steps_window_ ? static_cast<wxWindow*>(bundle_steps_window_) : this;
-          if (!confirm_saved_run(parent, *c, srv->name)) return;
-          if (bundle_steps_window_) bundle_steps_window_->await_step(c->id, c->name);
-          run_command(*srv, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command", {},
-                      command_run_working_dir(config_, *c), c->cd_before_run);
-        },
-        [this](const std::string& bundle_id) { start_bundle(bundle_id); }, &config_.settings, [this] { persist(); });
-    bundle_steps_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
-      bundle_steps_window_ = nullptr;
-      ev.Skip();
-    });
+  const std::string bundle_id = b->id;
+  auto it = bundle_steps_windows_.find(bundle_id);
+  if (it != bundle_steps_windows_.end() && it->second) {
+    it->second->show_bundle(bundle_id);
+    it->second->Show();
+    it->second->Raise();
+    return;
   }
-  bundle_steps_window_->show_bundle(b->id);
+  auto* win = new BundleStepsWindow(
+      this, config_, &command_stats_,
+      [this, bundle_id](const Command& cmd) {
+        auto* live = config_.command_by_id(cmd.id);
+        const Command* c = live ? live : &cmd;
+        auto* srv = config_.server_by_id(c->server_id);
+        auto wit = bundle_steps_windows_.find(bundle_id);
+        BundleStepsWindow* steps = (wit != bundle_steps_windows_.end()) ? wit->second : nullptr;
+        if (!srv) {
+          wxMessageBox(L"VPS этой команды больше нет в списке.", L"Связка", wxOK | wxICON_ERROR,
+                       steps ? static_cast<wxWindow*>(steps) : this);
+          return;
+        }
+        wxWindow* parent = steps ? static_cast<wxWindow*>(steps) : this;
+        if (!confirm_saved_run(parent, *c, srv->name)) return;
+        if (steps) steps->await_step(c->id, c->name);
+        run_command(*srv, c->command, c->timeout_sec, c->login_shell, c->name, c->id, "command", {},
+                    command_run_working_dir(config_, *c), c->cd_before_run);
+      },
+      [this](const std::string& id) { start_bundle(id); }, &config_.settings, [this] { persist(); });
+  const int cascade = static_cast<int>(bundle_steps_windows_.size());
+  if (cascade > 0) {
+    const wxPoint base = GetPosition();
+    win->SetPosition(base + wxPoint(FromDIP(28) * cascade, FromDIP(28) * cascade));
+  }
+  bundle_steps_windows_[bundle_id] = win;
+  win->Bind(wxEVT_CLOSE_WINDOW, [this, bundle_id](wxCloseEvent& ev) {
+    bundle_steps_windows_.erase(bundle_id);
+    ev.Skip();
+  });
+  win->show_bundle(bundle_id);
+  win->Show();
+  win->Raise();
 }
 
 void AppFrame::start_bundle(const std::string& bundle_id_override) {

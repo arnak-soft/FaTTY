@@ -344,7 +344,8 @@ void StripedListCtrl::Body::on_paint(wxPaintEvent&) {
     draw_empty_hint(dc, this, owner_->empty_hint_);
     return;
   }
-  dc.SetFont(Theme::ui());
+  const wxFont list_font = owner_->GetFont().IsOk() ? owner_->GetFont() : Theme::ui();
+  dc.SetFont(list_font);
   const int h = owner_->row_height();
   const int pad = FromDIP(6);
   const int badge = owner_->badge_size();
@@ -479,8 +480,15 @@ StripedListCtrl::StripedListCtrl(wxWindow* parent, wxWindowID id, long style)
 
 void StripedListCtrl::restyle() {
   SetBackgroundColour(Theme::elevated());
-  if (header_) header_->SetBackgroundColour(Theme::elevated());
-  if (body_) body_->SetBackgroundColour(Theme::elevated());
+  if (header_) {
+    header_->SetBackgroundColour(Theme::elevated());
+    header_->InvalidateBestSize();
+  }
+  if (body_) {
+    body_->SetBackgroundColour(Theme::elevated());
+    body_->SetRowCount(static_cast<size_t>(GetItemCount()));
+  }
+  Layout();
   Refresh();
 }
 
@@ -727,7 +735,12 @@ void StripedListCtrl::select_range(long from, long to) {
   if (to >= from) emit_selected(to);
 }
 
-int StripedListCtrl::row_height() const { return FromDIP(28); }
+int StripedListCtrl::row_height() const {
+  const wxFont font = GetFont().IsOk() ? GetFont() : Theme::ui();
+  wxClientDC dc(const_cast<StripedListCtrl*>(this));
+  dc.SetFont(font);
+  return std::max(FromDIP(28), dc.GetCharHeight() + FromDIP(10));
+}
 int StripedListCtrl::header_height() const { return FromDIP(28); }
 int StripedListCtrl::badge_size() const { return FromDIP(10); }
 int StripedListCtrl::badge_gap() const { return FromDIP(4); }

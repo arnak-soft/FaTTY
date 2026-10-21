@@ -176,6 +176,10 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
           {"docker", server.health_ignore.docker},
           {"time", server.health_ignore.time},
           {"net", server.health_ignore.net}}},
+        {"ui_colour_dark", server.ui_colour_dark},
+        {"ui_colour_light", server.ui_colour_light},
+        {"ui_font", server.ui_font},
+        {"ui_font_pt", server.ui_font_pt},
     };
     if (include_secrets) {
       item["password"] = server.password;
@@ -315,6 +319,13 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
         s.health_ignore.time = ig.value("time", false);
         s.health_ignore.net = ig.value("net", false);
       }
+      {
+        const auto legacy = trim(raw.value("ui_colour", ""));
+        s.ui_colour_dark = trim(raw.value("ui_colour_dark", legacy));
+        s.ui_colour_light = trim(raw.value("ui_colour_light", legacy));
+      }
+      s.ui_font = trim(raw.value("ui_font", ""));
+      s.ui_font_pt = clamp_int(raw.value("ui_font_pt", 0), 0, 48);
       imported_servers.push_back(std::move(s));
     }
   }

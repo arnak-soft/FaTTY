@@ -7,6 +7,8 @@
 
 #include <algorithm>
 #include <wx/checkbox.h>
+#include <wx/colordlg.h>
+#include <wx/dcclient.h>
 #include <wx/filedlg.h>
 #include <wx/listctrl.h>
 #include <wx/msgdlg.h>
@@ -38,10 +40,12 @@ wxTextCtrl* labeled_entry(wxWindow* parent, wxFlexGridSizer* grid, const wxStrin
 }  // namespace
 
 ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxString& title, bool is_new)
-    : PositionedDialog(parent, title, wxSize(520, 640)), server_(server), is_new_(is_new) {
+    : PositionedDialog(parent, title, wxSize(540, 720)), server_(server), is_new_(is_new) {
   stored_password_ = is_new ? "" : server.password;
+  ui_colour_dark_ = server.ui_colour_dark;
+  ui_colour_light_ = server.ui_colour_light;
   auto* body = new wxPanel(this);
-  auto* grid = new wxFlexGridSizer(9, 2, 8, 8);
+  auto* grid = new wxFlexGridSizer(12, 2, 8, 8);
   grid->AddGrowableCol(1);
   name_ = labeled_entry(body, grid, L"Имя", wxString::FromUTF8(server.name));
   host_ = labeled_entry(body, grid, L"Хост / IP", wxString::FromUTF8(server.host));
@@ -89,6 +93,110 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   health_ = new ThemedCheckBox(body, wxID_ANY, L"Учитывать в окне «Состояние VPS»");
   health_->SetValue(server.health_enabled);
   grid->Add(health_, 1, wxEXPAND);
+
+  auto make_swatch = [this, body](wxPanel*& panel) {
+    panel = new wxPanel(body, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(28, 22)));
+    panel->SetBackgroundStyle(wxBG_STYLE_PAINT);
+    panel->Bind(wxEVT_PAINT, [panel, this](wxPaintEvent&) {
+      wxPaintDC dc(panel);
+      dc.SetPen(wxPen(Theme::border()));
+      dc.SetBrush(wxBrush(panel->GetBackgroundColour()));
+      const wxSize sz = panel->GetClientSize();
+      dc.DrawRoundedRectangle(0, 0, sz.x, sz.y, FromDIP(3));
+    });
+  };
+  auto refresh_swatch = [](wxPanel* panel, const std::string& hex) {
+    wxColour c;
+    panel->SetBackgroundColour(parse_hex_colour(hex, c) ? c : Theme::btn());
+    panel->Refresh();
+  };
+
+  grid->Add(new wxStaticText(body, wxID_ANY, L"Цвет (тёмная тема)"), 0, wxALIGN_CENTER_VERTICAL);
+  auto* colour_dark_row = new wxBoxSizer(wxHORIZONTAL);
+  make_swatch(colour_swatch_dark_);
+  auto* pick_dark = make_button(body, L"Выбрать…", BtnIcon::None);
+  auto* clear_dark = make_button(body, L"Сбросить", BtnIcon::Cancel);
+  colour_dark_row->Add(colour_swatch_dark_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
+  colour_dark_row->Add(pick_dark, 0, wxRIGHT, 8);
+  colour_dark_row->Add(clear_dark, 0);
+  grid->Add(colour_dark_row, 1, wxEXPAND);
+  pick_dark->Bind(wxEVT_BUTTON, [this, refresh_swatch](wxCommandEvent&) {
+    wxColour cur = Theme::accent();
+    parse_hex_colour(ui_colour_dark_, cur);
+    wxColourData data;
+    data.SetColour(cur);
+    wxColourDialog dlg(this, &data);
+    if (dlg.ShowModal() != wxID_OK) return;
+    ui_colour_dark_ = colour_to_hex(dlg.GetColourData().GetColour());
+    refresh_swatch(colour_swatch_dark_, ui_colour_dark_);
+  });
+  clear_dark->Bind(wxEVT_BUTTON, [this, refresh_swatch](wxCommandEvent&) {
+    ui_colour_dark_.clear();
+    refresh_swatch(colour_swatch_dark_, ui_colour_dark_);
+  });
+
+  grid->Add(new wxStaticText(body, wxID_ANY, L"Цвет (светлая тема)"), 0, wxALIGN_CENTER_VERTICAL);
+  auto* colour_light_row = new wxBoxSizer(wxHORIZONTAL);
+  make_swatch(colour_swatch_light_);
+  auto* pick_light = make_button(body, L"Выбрать…", BtnIcon::None);
+  auto* clear_light = make_button(body, L"Сбросить", BtnIcon::Cancel);
+  colour_light_row->Add(colour_swatch_light_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
+  colour_light_row->Add(pick_light, 0, wxRIGHT, 8);
+  colour_light_row->Add(clear_light, 0);
+  grid->Add(colour_light_row, 1, wxEXPAND);
+  pick_light->Bind(wxEVT_BUTTON, [this, refresh_swatch](wxCommandEvent&) {
+    wxColour cur = Theme::accent();
+    parse_hex_colour(ui_colour_light_, cur);
+    wxColourData data;
+    data.SetColour(cur);
+    wxColourDialog dlg(this, &data);
+    if (dlg.ShowModal() != wxID_OK) return;
+    ui_colour_light_ = colour_to_hex(dlg.GetColourData().GetColour());
+    refresh_swatch(colour_swatch_light_, ui_colour_light_);
+  });
+  clear_light->Bind(wxEVT_BUTTON, [this, refresh_swatch](wxCommandEvent&) {
+    ui_colour_light_.clear();
+    refresh_swatch(colour_swatch_light_, ui_colour_light_);
+  });
+  refresh_swatch(colour_swatch_dark_, ui_colour_dark_);
+  refresh_swatch(colour_swatch_light_, ui_colour_light_);
+
+  grid->Add(new wxStaticText(body, wxID_ANY, L"Шрифт списков"), 0, wxALIGN_CENTER_VERTICAL);
+  auto* font_row = new wxBoxSizer(wxHORIZONTAL);
+  wxArrayString faces;
+  faces.Add(L"По умолчанию");
+  faces.Add(L"Segoe UI");
+  faces.Add(L"Calibri");
+  faces.Add(L"Tahoma");
+  faces.Add(L"Arial");
+  faces.Add(L"Consolas");
+  faces.Add(L"Cascadia Mono");
+  font_face_ = new ThemedChoice(body, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, faces);
+  {
+    int sel = 0;
+    if (!server.ui_font.empty()) {
+      const wxString want = wxString::FromUTF8(server.ui_font);
+      for (unsigned i = 1; i < faces.size(); ++i) {
+        if (faces[i].CmpNoCase(want) == 0) {
+          sel = static_cast<int>(i);
+          break;
+        }
+      }
+      if (sel == 0) {
+        font_face_->Append(want);
+        sel = font_face_->GetCount() - 1;
+      }
+    }
+    font_face_->SetSelection(sel);
+  }
+  font_pt_ = new wxTextCtrl(body, wxID_ANY,
+                            server.ui_font_pt > 0 ? std::to_wstring(server.ui_font_pt) : L"",
+                            wxDefaultPosition, FromDIP(wxSize(48, -1)));
+  style_text(font_pt_);
+  font_row->Add(font_face_, 1, wxEXPAND | wxRIGHT, 8);
+  font_row->Add(new wxStaticText(body, wxID_ANY, L"pt"), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 4);
+  font_row->Add(font_pt_, 0);
+  grid->Add(font_row, 1, wxEXPAND);
 
   auto* ignore_label = new wxStaticText(body, wxID_ANY, L"Не учитывать в статусе (цифры в деталях остаются):");
   ignore_label->SetName(L"muted");
@@ -243,6 +351,25 @@ void ServerDialog::on_ok(wxCommandEvent&) {
   result.health_ignore.docker = ignore_docker_->GetValue();
   result.health_ignore.time = ignore_time_->GetValue();
   result.health_ignore.net = ignore_net_->GetValue();
+  result.ui_colour_dark = ui_colour_dark_;
+  result.ui_colour_light = ui_colour_light_;
+  {
+    const int sel = font_face_->GetSelection();
+    if (sel <= 0) {
+      result.ui_font.clear();
+    } else {
+      result.ui_font = trim(std::string(font_face_->GetValue().utf8_string()));
+    }
+  }
+  int pt = 0;
+  const auto pt_raw = trim(std::string(font_pt_->GetValue().utf8_string()));
+  if (!pt_raw.empty()) {
+    if (!parse_int(pt_raw, pt) || pt < 0 || pt > 48) {
+      mark_error(font_pt_, L"Кегль — число 0–48 (пусто = по умолчанию).");
+      return;
+    }
+  }
+  result.ui_font_pt = pt;
   accepted = true;
   EndModal(wxID_OK);
 }

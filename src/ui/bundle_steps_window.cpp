@@ -42,6 +42,8 @@ BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config,
   setup_frame_geometry(this, settings, "bundle_steps", true, std::move(persist));
   if (!had_geometry) CentreOnParent();
   auto* panel = new wxPanel(this);
+  accent_bar_ = new wxPanel(panel, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(-1, 4)));
+  accent_bar_->SetBackgroundColour(Theme::accent());
   hint_ = new wxStaticText(
       panel, wxID_ANY,
       L"Запускайте выбранный шаг, когда будете готовы. Это шпаргалка сценария: шаги можно пропускать, повторять и менять порядок кликом.");
@@ -118,6 +120,7 @@ BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config,
   top->Add(run_bundle_btn, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
   top->Add(run, 0, wxALIGN_CENTER_VERTICAL);
   auto* root = new wxBoxSizer(wxVERTICAL);
+  root->Add(accent_bar_, 0, wxEXPAND);
   root->Add(top, 0, wxEXPAND | wxALL, 8);
   root->Add(list_card, 1, wxEXPAND | wxLEFT | wxRIGHT, 8);
   root->Add(info_card, 0, wxEXPAND | wxALL, 8);
@@ -149,8 +152,30 @@ void BundleStepsWindow::show_bundle(const std::string& bundle_id) {
   bundle_id_ = bundle_id;
   clear_notice();
   reload();
+  apply_server_look();
   Show();
   Raise();
+}
+
+void BundleStepsWindow::apply_server_look() {
+  auto* b = config_.bundle_by_id(bundle_id_);
+  auto* s = b ? config_.server_by_id(b->server_id) : nullptr;
+  wxColour accent = Theme::accent();
+  if (s) server_ui_colour(s->ui_colour_dark, s->ui_colour_light, accent);
+  if (accent_bar_) {
+    accent_bar_->SetBackgroundColour(accent);
+    accent_bar_->Refresh();
+  }
+  if (detail_title_) {
+    detail_title_->SetName(L"");
+    detail_title_->SetFont(Theme::ui_heading());
+    detail_title_->SetForegroundColour(accent.IsOk() ? accent : Theme::text_bright());
+  }
+  const wxFont list_font = s ? server_list_font(s->ui_font, s->ui_font_pt) : Theme::ui();
+  if (list_) {
+    list_->SetFont(list_font);
+    style_list(list_);
+  }
 }
 
 void BundleStepsWindow::refresh() {
@@ -176,9 +201,15 @@ void BundleStepsWindow::reload(const std::string& keep_command_id) {
   auto* b = config_.bundle_by_id(bundle_id_);
   if (!b) {
     SetTitle(L"Связка — по шагам");
+    apply_server_look();
     return;
   }
-  SetTitle(wxString::FromUTF8("Связка: " + b->name + " — по шагам"));
+  std::string title = "Связка: " + b->name;
+  if (auto* s = config_.server_by_id(b->server_id)) {
+    title += " · " + (s->name.empty() ? s->host : s->name);
+  }
+  title += " — по шагам";
+  SetTitle(wxString::FromUTF8(title));
   for (const auto& cid : b->command_ids) {
     if (auto* c = config_.command_by_id(cid)) steps_.push_back(*c);
   }
@@ -219,6 +250,7 @@ void BundleStepsWindow::reload(const std::string& keep_command_id) {
                         wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
     show_detail();
   }
+  apply_server_look();
 }
 
 void BundleStepsWindow::clear_detail() {
