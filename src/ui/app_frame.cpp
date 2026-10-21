@@ -1436,7 +1436,7 @@ void AppFrame::apply_ui_theme() {
   if (health_window_) apply_theme(health_window_);
   if (help_window_) apply_theme(help_window_);
   for (auto& [id, win] : bundle_steps_windows_) {
-    if (win) apply_theme(win);
+    if (win) win->apply_server_look();
   }
   for (auto& [id, win] : files_windows_) {
     if (win) apply_theme(win);
@@ -1628,6 +1628,9 @@ void AppFrame::apply_server_appearance() {
   }
   if (output_) style_text(output_, true);
   if (terminal_) apply_theme(terminal_);
+  for (auto& [id, win] : bundle_steps_windows_) {
+    if (win) win->apply_server_look();
+  }
   Refresh();
 }
 

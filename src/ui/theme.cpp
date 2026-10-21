@@ -110,10 +110,7 @@ wxColour Theme::btn() { return with_surface(pal().btn, 0.14f, 0.10f); }
 wxColour Theme::text() { return pal().text; }
 wxColour Theme::text_bright() { return pal().text_bright; }
 wxColour Theme::muted() { return pal().muted; }
-wxColour Theme::accent() {
-  if (g_surface_accent.IsOk()) return g_surface_accent;
-  return pal().accent;
-}
+wxColour Theme::accent() { return pal().accent; }
 wxColour Theme::select() { return with_surface(pal().select, 0.35f, 0.28f); }
 wxColour Theme::meta() { return pal().meta; }
 wxColour Theme::ok() { return pal().ok; }

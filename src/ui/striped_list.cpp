@@ -13,9 +13,13 @@
 namespace fatty {
 namespace {
 
-wxColour row_bg(int row, bool selected) {
-  if (selected) return Theme::select();
-  return Theme::stripe(row);
+wxColour row_bg(const wxColour& base, int row, bool selected) {
+  if (selected) {
+    return Theme::blend(base, Theme::accent(), theme_is_dark() ? 0.35f : 0.28f);
+  }
+  if (row % 2 == 0) return base;
+  return Theme::blend(base, theme_is_dark() ? wxColour(255, 255, 255) : wxColour(0, 0, 0),
+                      theme_is_dark() ? 0.11f : 0.07f);
 }
 
 void draw_sort_arrow(wxDC& dc, wxWindow* win, int x, int y, bool ascending, const wxColour& colour) {
@@ -94,7 +98,9 @@ wxSize StripedListCtrl::Header::DoGetBestSize() const { return {FromDIP(100), ow
 
 void StripedListCtrl::Header::on_paint(wxPaintEvent&) {
   wxAutoBufferedPaintDC dc(this);
-  dc.SetBackground(wxBrush(Theme::elevated()));
+  const wxColour base =
+      owner_->GetBackgroundColour().IsOk() ? owner_->GetBackgroundColour() : Theme::elevated();
+  dc.SetBackground(wxBrush(base));
   dc.Clear();
   const int h = GetClientSize().y;
   const int pad = FromDIP(6);
@@ -338,7 +344,9 @@ void StripedListCtrl::Body::set_hover_tip(const wxString& tip) {
 
 void StripedListCtrl::Body::on_paint(wxPaintEvent&) {
   wxAutoBufferedPaintDC dc(this);
-  dc.SetBackground(wxBrush(Theme::elevated()));
+  const wxColour base =
+      owner_->GetBackgroundColour().IsOk() ? owner_->GetBackgroundColour() : Theme::elevated();
+  dc.SetBackground(wxBrush(base));
   dc.Clear();
   if (owner_->rows_.empty()) {
     draw_empty_hint(dc, this, owner_->empty_hint_);
@@ -356,7 +364,7 @@ void StripedListCtrl::Body::on_paint(wxPaintEvent&) {
     const auto& item = owner_->rows_[static_cast<std::size_t>(row)];
     const int y = (row - first) * h;
     wxRect row_rc(0, y, GetClientSize().x, h);
-    const wxColour bg = row_bg(row, item.selected);
+    const wxColour bg = row_bg(base, row, item.selected);
     dc.SetPen(*wxTRANSPARENT_PEN);
     dc.SetBrush(wxBrush(bg));
     dc.DrawRectangle(row_rc);

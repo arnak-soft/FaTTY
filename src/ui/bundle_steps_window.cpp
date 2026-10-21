@@ -160,22 +160,27 @@ void BundleStepsWindow::show_bundle(const std::string& bundle_id) {
 void BundleStepsWindow::apply_server_look() {
   auto* b = config_.bundle_by_id(bundle_id_);
   auto* s = b ? config_.server_by_id(b->server_id) : nullptr;
-  wxColour accent = Theme::accent();
-  if (s) server_ui_colour(s->ui_colour_dark, s->ui_colour_light, accent);
+  wxColour accent;
+  const bool has = s && server_ui_colour(s->ui_colour_dark, s->ui_colour_light, accent);
+  const wxColour previous = surface_accent();
+  set_surface_accent(has ? accent : wxNullColour);
+  apply_theme(this);
+  set_surface_accent(previous);
   if (accent_bar_) {
-    accent_bar_->SetBackgroundColour(accent);
+    accent_bar_->SetBackgroundColour(has ? accent : Theme::accent());
     accent_bar_->Refresh();
   }
   if (detail_title_) {
     detail_title_->SetName(L"");
     detail_title_->SetFont(Theme::ui_heading());
-    detail_title_->SetForegroundColour(accent.IsOk() ? accent : Theme::text_bright());
+    detail_title_->SetForegroundColour(has ? accent : Theme::text_bright());
   }
   const wxFont list_font = s ? server_list_font(s->ui_font, s->ui_font_pt) : Theme::ui();
   if (list_) {
     list_->SetFont(list_font);
     style_list(list_);
   }
+  Refresh();
 }
 
 void BundleStepsWindow::refresh() {

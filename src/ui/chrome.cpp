@@ -350,6 +350,7 @@ void apply_rounded_region(wxWindow* window, int radius_px) {
 RoundedCard::RoundedCard(wxWindow* parent, int radius_dip)
     : wxPanel(parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE | wxTAB_TRAVERSAL),
       radius_dip_(radius_dip) {
+  SetName(L"card-page");
   SetBackgroundStyle(wxBG_STYLE_PAINT);
   Bind(wxEVT_PAINT, &RoundedCard::on_paint, this);
   Bind(wxEVT_SIZE, &RoundedCard::on_size, this);
@@ -358,8 +359,9 @@ RoundedCard::RoundedCard(wxWindow* parent, int radius_dip)
 void RoundedCard::on_paint(wxPaintEvent&) {
   wxAutoBufferedPaintDC dc(this);
   const wxColour bg = GetParent() ? GetParent()->GetBackgroundColour() : Theme::bg();
+  const wxColour fill = GetBackgroundColour().IsOk() ? GetBackgroundColour() : Theme::elevated();
   const int r = FromDIP(radius_dip_);
-  fill_round(dc, GetClientRect(), r, Theme::elevated(), Theme::border(), bg);
+  fill_round(dc, GetClientRect(), r, fill, Theme::border(), bg);
 }
 
 void RoundedCard::on_size(wxSizeEvent& e) {

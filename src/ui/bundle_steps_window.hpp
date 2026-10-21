@@ -25,6 +25,8 @@ class BundleStepsWindow : public wxFrame {
   void refresh();
   void await_step(const std::string& command_id, const std::string& name);
   void notify_bundle_finished(const std::string& bundle_id, const std::string& name, const std::string& reason);
+  /// Перекрасить окно в цвет VPS этой связки (не зависит от выбранного VPS в главном окне).
+  void apply_server_look();
 
  private:
   void reload(const std::string& keep_command_id = {});
@@ -32,7 +34,6 @@ class BundleStepsWindow : public wxFrame {
   void clear_detail();
   void run_selected();
   void run_bundle();
-  void apply_server_look();
   std::string group_label(const Command& cmd) const;
   void maybe_announce_awaited_step();
   void set_notice(const wxString& text, const char* tone = "meta");
