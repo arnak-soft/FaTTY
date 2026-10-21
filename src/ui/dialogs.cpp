@@ -532,8 +532,7 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
   auto* lists = new wxBoxSizer(wxHORIZONTAL);
   auto* left = new wxBoxSizer(wxVERTICAL);
   left->Add(new wxStaticText(body, wxID_ANY, L"Доступные команды (все группы)"), 0, wxBOTTOM, 4);
-  available_ = new wxListCtrl(body, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                              wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES);
+  available_ = new StripedListCtrl(body, wxID_ANY, wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
   available_->AppendColumn(L"Группа", wxLIST_FORMAT_LEFT, FromDIP(120));
   available_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(200));
   left->Add(available_, 1, wxEXPAND);
@@ -548,8 +547,7 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
 
   auto* right = new wxBoxSizer(wxVERTICAL);
   right->Add(new wxStaticText(body, wxID_ANY, L"Порядок запуска"), 0, wxBOTTOM, 4);
-  selected_ = new wxListCtrl(body, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                             wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES);
+  selected_ = new StripedListCtrl(body, wxID_ANY, wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
   selected_->AppendColumn(L"#", wxLIST_FORMAT_LEFT, FromDIP(36));
   selected_->AppendColumn(L"Группа", wxLIST_FORMAT_LEFT, FromDIP(110));
   selected_->AppendColumn(L"Команда", wxLIST_FORMAT_LEFT, FromDIP(180));
@@ -591,6 +589,8 @@ BundleDialog::BundleDialog(wxWindow* parent, const Bundle& bundle, const Config&
   SetSizerAndFit(outer);
   SetMinSize(FromDIP(wxSize(640, 420)));
   apply_dark(this);
+  style_list(available_);
+  style_list(selected_);
   rebuild_lists();
 
   add->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { add_selected(); });

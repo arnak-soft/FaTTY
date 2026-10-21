@@ -5,9 +5,9 @@
 #include "core/vault.hpp"
 #include "ui/layout.hpp"
 #include "ui/chrome.hpp"
+#include "ui/striped_list.hpp"
 
 #include <wx/dialog.h>
-#include <wx/listctrl.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 
@@ -130,8 +130,8 @@ class BundleDialog : public PositionedDialog {
   std::vector<std::string> selected_ids_;
   wxTextCtrl* name_{};
   wxTextCtrl* interval_{};
-  wxListCtrl* available_{};
-  wxListCtrl* selected_{};
+  StripedListCtrl* available_{};
+  StripedListCtrl* selected_{};
 };
 
 class ChangeMasterDialog : public PositionedDialog {
