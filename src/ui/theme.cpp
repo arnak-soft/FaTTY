@@ -211,8 +211,13 @@ void apply_theme(wxWindow* window) {
   }
   wxWindow* parent = window->GetParent();
   const wxColour parent_bg = parent ? parent->GetBackgroundColour() : Theme::bg();
-  if (dynamic_cast<RoundButton*>(window) || dynamic_cast<RoundedNotebook*>(window) ||
-      dynamic_cast<RoundedCard*>(window) || dynamic_cast<TabStrip*>(window)) {
+  if (dynamic_cast<RoundedCard*>(window)) {
+    // Фон карточки должен совпадать с fill в on_paint — иначе StaticText/поля
+    // рисуют «чужие» прямоугольники поверх подписей (тёмная тема, акцент VPS).
+    window->SetBackgroundColour(Theme::elevated());
+    window->SetForegroundColour(Theme::text());
+  } else if (dynamic_cast<RoundButton*>(window) || dynamic_cast<RoundedNotebook*>(window) ||
+             dynamic_cast<TabStrip*>(window)) {
     window->SetForegroundColour(Theme::text());
   } else if (name == L"card-page") {
     window->SetBackgroundColour(Theme::elevated());

@@ -72,20 +72,23 @@ BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config,
   detail_title_->SetFont(Theme::ui_heading());
   detail_title_->SetForegroundColour(Theme::text_bright());
 
-  auto* meta = new wxFlexGridSizer(2, FromDIP(8), FromDIP(16));
-  meta->AddGrowableCol(1, 1);
-  meta->Add(muted_label(info_card, L"Группа"), 0, wxALIGN_CENTER_VERTICAL);
-  detail_group_ = new wxStaticText(info_card, wxID_ANY, L"—");
-  meta->Add(detail_group_, 1, wxALIGN_CENTER_VERTICAL);
-  meta->Add(muted_label(info_card, L"Каталог"), 0, wxALIGN_CENTER_VERTICAL);
-  detail_folder_ = new wxStaticText(info_card, wxID_ANY, L"—", wxDefaultPosition, wxDefaultSize, wxST_ELLIPSIZE_MIDDLE);
-  meta->Add(detail_folder_, 1, wxALIGN_CENTER_VERTICAL | wxEXPAND);
-  meta->Add(muted_label(info_card, L"Последний раз"), 0, wxALIGN_CENTER_VERTICAL);
-  detail_last_ = new wxStaticText(info_card, wxID_ANY, L"—");
-  meta->Add(detail_last_, 1, wxALIGN_CENTER_VERTICAL);
-  meta->Add(muted_label(info_card, L"Ср. время"), 0, wxALIGN_CENTER_VERTICAL);
-  detail_avg_ = new wxStaticText(info_card, wxID_ANY, L"—");
-  meta->Add(detail_avg_, 1, wxALIGN_CENTER_VERTICAL);
+  const int label_w = FromDIP(110);
+  const int meta_gap = FromDIP(12);
+  auto add_meta_row = [&](const wxString& label, wxStaticText*& value, long value_style = 0) {
+    auto* row = new wxBoxSizer(wxHORIZONTAL);
+    auto* lab = muted_label(info_card, label);
+    lab->SetMinSize(wxSize(label_w, -1));
+    value = new wxStaticText(info_card, wxID_ANY, L"—", wxDefaultPosition, wxDefaultSize, value_style);
+    row->Add(lab, 0, wxALIGN_CENTER_VERTICAL);
+    row->Add(value, 1, wxALIGN_CENTER_VERTICAL | wxEXPAND | wxLEFT, meta_gap);
+    return row;
+  };
+  auto* meta = new wxBoxSizer(wxVERTICAL);
+  meta->Add(add_meta_row(L"Группа", detail_group_), 0, wxEXPAND | wxBOTTOM, FromDIP(4));
+  meta->Add(add_meta_row(L"Каталог", detail_folder_, wxST_ELLIPSIZE_MIDDLE), 0, wxEXPAND | wxBOTTOM,
+            FromDIP(4));
+  meta->Add(add_meta_row(L"Последний раз", detail_last_), 0, wxEXPAND | wxBOTTOM, FromDIP(4));
+  meta->Add(add_meta_row(L"Ср. время", detail_avg_), 0, wxEXPAND);
 
   detail_comment_ = new wxStaticText(info_card, wxID_ANY, L"");
   detail_comment_->SetName(L"muted");
@@ -97,7 +100,7 @@ BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config,
                                    wxTE_MULTILINE | wxTE_READONLY | wxTE_WORDWRAP | wxBORDER_NONE);
   style_text(detail_command_, false);
   detail_command_->SetFont(Theme::mono());
-  detail_command_->SetMinSize(FromDIP(wxSize(-1, 56)));
+  detail_command_->SetMinSize(FromDIP(wxSize(-1, 72)));
   bind_copy_on_select(detail_command_);
 
   notice_ = new wxStaticText(info_card, wxID_ANY, L"");
@@ -105,15 +108,18 @@ BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config,
   notice_->SetForegroundColour(Theme::meta());
   notice_->Hide();
 
+  const int pad = FromDIP(12);
+  auto* inner = new wxBoxSizer(wxVERTICAL);
+  inner->Add(detail_title_, 0, wxEXPAND | wxBOTTOM, FromDIP(8));
+  inner->Add(meta, 0, wxEXPAND | wxBOTTOM, FromDIP(6));
+  inner->Add(detail_comment_, 0, wxEXPAND | wxBOTTOM, FromDIP(6));
+  inner->Add(cmd_label, 0, wxBOTTOM, FromDIP(4));
+  inner->Add(detail_command_, 1, wxEXPAND);
+  inner->Add(notice_, 0, wxEXPAND | wxTOP, FromDIP(8));
   auto* info_sz = new wxBoxSizer(wxVERTICAL);
-  info_sz->Add(detail_title_, 0, wxEXPAND | wxBOTTOM, FromDIP(8));
-  info_sz->Add(meta, 0, wxEXPAND | wxBOTTOM, FromDIP(6));
-  info_sz->Add(detail_comment_, 0, wxEXPAND | wxBOTTOM, FromDIP(6));
-  info_sz->Add(cmd_label, 0, wxBOTTOM, FromDIP(4));
-  info_sz->Add(detail_command_, 1, wxEXPAND);
-  info_sz->Add(notice_, 0, wxEXPAND | wxTOP, FromDIP(8));
+  info_sz->Add(inner, 1, wxEXPAND | wxALL, pad);
   info_card->SetSizer(info_sz);
-  info_card->SetMinSize(FromDIP(wxSize(-1, 180)));
+  info_card->SetMinSize(FromDIP(wxSize(-1, 220)));
 
   auto* top = new wxBoxSizer(wxHORIZONTAL);
   top->Add(hint_, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
@@ -123,7 +129,8 @@ BundleStepsWindow::BundleStepsWindow(wxWindow* parent, Config& config,
   root->Add(accent_bar_, 0, wxEXPAND);
   root->Add(top, 0, wxEXPAND | wxALL, 8);
   root->Add(list_card, 1, wxEXPAND | wxLEFT | wxRIGHT, 8);
-  root->Add(info_card, 0, wxEXPAND | wxALL, 8);
+  // proportion 1: длинная команда не обрезается по нижнему краю карточки
+  root->Add(info_card, 1, wxEXPAND | wxALL, 8);
   panel->SetSizer(root);
   auto* outer = new wxBoxSizer(wxVERTICAL);
   outer->Add(panel, 1, wxEXPAND);
@@ -180,6 +187,7 @@ void BundleStepsWindow::apply_server_look() {
     list_->SetFont(list_font);
     style_list(list_);
   }
+  Layout();
   Refresh();
 }
 
