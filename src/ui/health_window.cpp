@@ -200,83 +200,6 @@ class MetricBar : public wxPanel {
   HealthLevel level_ = HealthLevel::Unknown;
 };
 
-class DiskChart : public wxPanel {
- public:
-  explicit DiskChart(wxWindow* parent) : wxPanel(parent, wxID_ANY) {
-    SetBackgroundStyle(wxBG_STYLE_PAINT);
-    Bind(wxEVT_PAINT, &DiskChart::on_paint, this);
-    Bind(wxEVT_SIZE, [this](wxSizeEvent& e) {
-      Refresh();
-      e.Skip();
-    });
-  }
-
-  struct Col {
-    wxString name;
-    double pct = -1;
-    HealthLevel level = HealthLevel::Unknown;
-    wxString caption;
-  };
-
-  void set_cols(std::vector<Col> cols) {
-    cols_ = std::move(cols);
-    Refresh();
-  }
-
- protected:
-  wxSize DoGetBestSize() const override { return FromDIP(wxSize(280, 160)); }
-
- private:
-  void on_paint(wxPaintEvent&) {
-    wxAutoBufferedPaintDC dc(this);
-    dc.SetBackground(wxBrush(Theme::elevated()));
-    dc.Clear();
-    wxGCDC gc(dc);
-    auto* gfx = gc.GetGraphicsContext();
-    const wxSize sz = GetClientSize();
-    gc.SetFont(Theme::ui_small());
-    gc.SetTextForeground(Theme::muted());
-    gc.DrawText(L"Диски", FromDIP(4), FromDIP(2));
-    if (cols_.empty()) {
-      gc.SetFont(Theme::ui());
-    gc.SetTextForeground(Theme::muted());
-      gc.DrawText(L"нет данных", FromDIP(8), sz.y / 2 - FromDIP(8));
-      return;
-    }
-    const int top = FromDIP(22);
-    const int bottom = sz.y - FromDIP(28);
-    const int h = std::max(FromDIP(40), bottom - top);
-    const int n = static_cast<int>(cols_.size());
-    const int gap = FromDIP(8);
-    const int col_w = std::max(FromDIP(18), (sz.x - FromDIP(16) - gap * (n + 1)) / n);
-    for (int i = 0; i < n; ++i) {
-      const auto& c = cols_[static_cast<std::size_t>(i)];
-      const int x = FromDIP(8) + i * (col_w + gap);
-      if (gfx) {
-        gfx->SetPen(wxNullPen);
-        gfx->SetBrush(wxBrush(Theme::btn()));
-        gfx->DrawRoundedRectangle(x, top, col_w, h, 4);
-        if (c.pct >= 0) {
-          const double fh = h * std::clamp(c.pct, 0.0, 100.0) / 100.0;
-          gfx->SetBrush(wxBrush(health_colour(c.level)));
-          gfx->DrawRoundedRectangle(x, top + (h - fh), col_w, fh, 4);
-        }
-      }
-      gc.SetFont(Theme::ui_small());
-    gc.SetTextForeground(Theme::text());
-      auto name = c.name;
-      if (name.size() > 10) name = name.Left(9) + L"…";
-      const wxSize ns = gc.GetTextExtent(name);
-      gc.DrawText(name, x + (col_w - ns.x) / 2, bottom + FromDIP(2));
-      gc.SetTextForeground(health_colour(c.level));
-      const wxSize ps = gc.GetTextExtent(c.caption);
-      gc.DrawText(c.caption, x + (col_w - ps.x) / 2, top - FromDIP(2) + (c.pct < 0 ? h / 2 : 0));
-    }
-  }
-
-  std::vector<Col> cols_;
-};
-
 class LoadChart : public wxPanel {
  public:
   explicit LoadChart(wxWindow* parent) : wxPanel(parent, wxID_ANY) {
@@ -602,8 +525,10 @@ HealthWindow::HealthWindow(wxWindow* parent, HealthMonitor* monitor, Config* con
   list_sz_ = new wxBoxSizer(wxVERTICAL);
   list_->SetSizer(list_sz_);
   auto* detail_card = new RoundedCard(split);
-  detail_ = new wxPanel(detail_card);
+  detail_ = new wxScrolledWindow(detail_card, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                                 wxTAB_TRAVERSAL | wxBORDER_NONE);
   detail_->SetName(L"card-page");
+  detail_->SetScrollRate(0, 16);
   auto* dsz = new wxBoxSizer(wxVERTICAL);
   dsz->Add(detail_, 1, wxEXPAND);
   detail_card->SetSizer(dsz);
@@ -719,6 +644,8 @@ void HealthWindow::show_detail() {
     root->Add(empty, 0, wxALL, 12);
     detail_->SetSizer(root);
     detail_->Layout();
+    detail_->FitInside();
+    detail_->Scroll(0, 0);
     return;
   }
   const auto st = settings_ ? *settings_ : AppSettings{};
@@ -787,18 +714,31 @@ void HealthWindow::show_detail() {
     root->Add(swap, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
   if (st.health_show_disk) {
-    auto* disks = new DiskChart(detail_);
-    std::vector<DiskChart::Col> cols;
-    for (const auto& d : snap.disks) {
-      DiskChart::Col c;
-      c.name = wxString::FromUTF8(d.mount);
-      c.pct = d.pct();
-      c.level = bar_level(c.pct, st.health_disk_warn, st.health_disk_crit);
-      c.caption = wxString::FromUTF8(format_pct(c.pct));
-      cols.push_back(std::move(c));
+    auto add_disk_bar = [&](const wxString& title, double pct, const wxString& cap, HealthLevel lvl) {
+      auto* disk = new MetricBar(detail_, title, 72);
+      disk->set(pct, cap, lvl);
+      root->Add(disk, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
+    };
+    if (snap.disks.empty()) {
+      add_disk_bar(L"Диск", -1, L"—", HealthLevel::Unknown);
+    } else {
+      for (const auto& d : snap.disks) {
+        wxString title = L"Диск";
+        if (!d.mount.empty() && d.mount != "/") {
+          title = wxString::FromUTF8(d.mount);
+          if (title.size() > 16) title = title.Left(15) + L"…";
+        }
+        wxString cap = L"—";
+        const double pct = d.pct();
+        if (d.total_kb > 0) {
+          cap = wxString::FromUTF8(format_pct(pct) + "  " + format_kib(d.used_kb) + " / " +
+                                   format_kib(d.total_kb));
+        } else if (pct >= 0) {
+          cap = wxString::FromUTF8(format_pct(pct));
+        }
+        add_disk_bar(title, pct, cap, bar_level(pct, st.health_disk_warn, st.health_disk_crit));
+      }
     }
-    disks->set_cols(std::move(cols));
-    root->Add(disks, 1, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 12);
   }
   if (st.health_show_load) {
     auto* load = new LoadChart(detail_);
@@ -986,6 +926,8 @@ void HealthWindow::show_detail() {
   detail_->SetSizer(root);
   apply_dark(detail_);
   detail_->Layout();
+  detail_->FitInside();
+  detail_->Scroll(0, 0);
   if (auto* p = detail_->GetParent()) p->Layout();
 }
 

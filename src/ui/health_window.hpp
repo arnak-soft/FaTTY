@@ -42,7 +42,7 @@ class HealthWindow : public wxFrame {
   std::string selected_id_;
   wxScrolledWindow* list_{};
   wxBoxSizer* list_sz_{};
-  wxPanel* detail_{};
+  wxScrolledWindow* detail_{};
   wxStaticText* status_{};
   wxStaticText* auto_label_{};
 };
