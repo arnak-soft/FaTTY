@@ -3,6 +3,7 @@
 #include "core/health.hpp"
 #include "core/vault.hpp"
 
+#include <cstdint>
 #include <filesystem>
 #include <map>
 #include <string>
@@ -82,6 +83,59 @@ struct Bundle {
   static Bundle make_new(const std::string& server_id);
 };
 
+/// Резервные копии VPS (не путать с локальными копиями config.json).
+enum class BackupKind { Files = 0, Database = 1, DockerDb = 2 };
+enum class BackupDestKind { SameVps = 0, OtherVps = 1, LocalPc = 2 };
+enum class BackupScheduleMode { Client = 0, Cron = 1 };
+enum class BackupOverflowAction { Warn = 0, DeleteOldest = 1, DeleteBytes = 2, DeleteStride = 3 };
+enum class BackupDbEngine { Postgres = 0, Mysql = 1, Mariadb = 2 };
+
+struct BackupJob {
+  std::string id;
+  std::string name;
+  bool enabled = false;
+  std::string source_server_id;
+  BackupKind kind = BackupKind::Files;
+
+  std::vector<std::string> paths;
+  std::vector<std::string> exclude_globs;
+
+  BackupDbEngine db_engine = BackupDbEngine::Postgres;
+  std::string db_name;
+  std::string db_user;
+  std::string db_password;
+  std::string db_password_blob;
+  int db_port = 0;
+  std::string docker_container;
+
+  BackupDestKind dest_kind = BackupDestKind::SameVps;
+  std::string dest_path;
+  std::string dest_server_id;
+
+  BackupScheduleMode schedule_mode = BackupScheduleMode::Client;
+  int interval_sec = 86400;
+  bool cron_installed = false;
+
+  std::int64_t max_total_bytes = 120LL * 1024 * 1024 * 1024;
+  int overflow_at_pct = 80;
+  std::vector<BackupOverflowAction> overflow_actions{BackupOverflowAction::Warn,
+                                                     BackupOverflowAction::DeleteOldest};
+  int stride_delete = 3;
+  int stride_keep = 1;
+  std::int64_t delete_bytes_amount = 10LL * 1024 * 1024 * 1024;
+  std::int64_t max_single_archive_bytes = 0;
+  std::int64_t min_dest_free_bytes = 1LL * 1024 * 1024 * 1024;
+
+  double last_run_unix = 0.0;
+  std::string last_status;
+  std::string last_error;
+  std::string last_archive_name;
+  std::int64_t last_archive_bytes = 0;
+
+  static BackupJob make_new(const std::string& source_server_id);
+  BackupJob duplicate(const std::string& new_name = "") const;
+};
+
 struct AppSettings {
   bool confirm_before_run = true;
   /// История разовой команды: отдельно на каждую вкладку групп (иначе только на VPS).
@@ -155,6 +209,7 @@ struct Config {
   std::vector<Command> commands;
   std::vector<CommandGroup> groups;
   std::vector<Bundle> bundles;
+  std::vector<BackupJob> backup_jobs;
   AppSettings settings;
   VaultMeta vault;
   bool has_vault = false;
@@ -181,6 +236,10 @@ struct Config {
   const Bundle* bundle_by_id(const std::string& id) const;
   void drop_command_from_bundles(const std::string& command_id);
   void drop_server_bundles(const std::string& server_id);
+  BackupJob* backup_job_by_id(const std::string& id);
+  const BackupJob* backup_job_by_id(const std::string& id) const;
+  std::vector<BackupJob> backup_jobs_for(const std::string& server_id) const;
+  void drop_server_backup_jobs(const std::string& server_id);
 };
 
 std::string normalize_remote_shell(std::string_view shell);

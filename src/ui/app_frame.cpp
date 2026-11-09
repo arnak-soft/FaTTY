@@ -15,6 +15,8 @@
 #include "ui/dialogs.hpp"
 #include "ui/files_window.hpp"
 #include "ui/help_window.hpp"
+#include "ui/backup_monitor.hpp"
+#include "ui/backup_window.hpp"
 #include "ui/health_monitor.hpp"
 #include "ui/health_window.hpp"
 #include "ui/journal_window.hpp"
@@ -162,6 +164,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
   build_ui();
   init_run_controllers();
   init_health_monitor();
+  init_backup_monitor();
   if (!config_.settings.window_geometry.empty() && geometry_on_screen(config_.settings.window_geometry)) {
     restore_window_geometry(this, config_.settings.window_geometry, true);
   }
@@ -247,6 +250,10 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       show_health();
       return;
     }
+    if (e.ControlDown() && !e.AltDown() && !e.ShiftDown() && (e.GetKeyCode() == 'B' || e.GetKeyCode() == 'b')) {
+      show_backups();
+      return;
+    }
     if (e.ControlDown() && e.GetKeyCode() == ',') {
       open_settings();
       return;
@@ -289,6 +296,7 @@ void AppFrame::build_menu() {
   file->Append(1001, L"Открыть папку конфига");
   file->Append(1002, L"Журнал команд…\tCtrl+J");
   file->Append(1005, L"Состояние VPS…\tCtrl+H");
+  file->Append(1006, L"Резервные копии VPS…\tCtrl+B");
   file->AppendSeparator();
   file->Append(1003, L"Экспорт…");
   file->Append(1004, L"Импорт…");
@@ -312,6 +320,7 @@ void AppFrame::build_menu() {
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { open_directory(app_dir()); }, 1001);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_journal(); }, 1002);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_health(); }, 1005);
+  Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_backups(); }, 1006);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     const ExportChoice opt = ask_export_options(this);
     if (!opt.accepted) return;
@@ -393,6 +402,7 @@ void AppFrame::build_ui() {
   auto* winscp = make_button(left, L"WinSCP", BtnIcon::WinSCP);
   auto* test = make_button(left, L"Проверить связь", BtnIcon::Network);
   health_btn_ = make_button(left, L"Состояние", BtnIcon::Pulse);
+  auto* backups_btn = make_button(left, L"Резерв", BtnIcon::Save);
   add_btn(sbtns, sadd);
   add_btn(sbtns, files);
   add_btn(sbtns, cons);
@@ -400,6 +410,7 @@ void AppFrame::build_ui() {
   add_btn(sbtns, winscp);
   add_btn(sbtns, test);
   add_btn(sbtns, health_btn_);
+  add_btn(sbtns, backups_btn);
   extra_tools_parent_ = left;
   extra_tools_sizer_ = new wxWrapSizer(wxHORIZONTAL);
   auto* ls = new wxBoxSizer(wxVERTICAL);
@@ -770,6 +781,7 @@ void AppFrame::build_ui() {
     auto* s = selected_server();
     show_health(s ? s->id : std::string{});
   });
+  backups_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { show_backups(); });
   gadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { add_group(); });
   groups_nb_->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
     if (updating_groups_) return;
@@ -1012,6 +1024,37 @@ void AppFrame::show_health(const std::string& select_id) {
   health_window_->reload();
   health_window_->Show();
   health_window_->Raise();
+}
+
+void AppFrame::init_backup_monitor() {
+  BackupMonitor::Deps d;
+  d.config = [this]() -> Config& { return config_; };
+  d.busy_server_id = [this] { return busy_server_id_; };
+  d.alive = alive_;
+  d.persist = [this] { persist(); };
+  d.on_change = [this, alive = alive_] {
+    if (!alive->load()) return;
+    if (backup_window_) backup_window_->reload();
+  };
+  d.on_log = [this, alive = alive_](const std::string& /*job_id*/, const std::string& line) {
+    if (!alive->load() || !backup_window_) return;
+    backup_window_->append_log(line);
+  };
+  backups_ = std::make_unique<BackupMonitor>(std::move(d));
+  backups_->start();
+}
+
+void AppFrame::show_backups() {
+  if (!backup_window_) {
+    backup_window_ = new BackupWindow(this, &config_, backups_.get(), &config_.settings, [this] { persist(); });
+    backup_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
+      backup_window_ = nullptr;
+      ev.Skip();
+    });
+  }
+  backup_window_->reload();
+  backup_window_->Show();
+  backup_window_->Raise();
 }
 
 void AppFrame::show_help(const std::string& tab) {
@@ -2660,6 +2703,7 @@ void AppFrame::show_servers_context_menu(long row) {
                                         [&](const CommandGroup& x) { return x.server_id == id; }),
                           config_.groups.end());
     config_.drop_server_bundles(id);
+    config_.drop_server_backup_jobs(id);
     persist();
     refresh_servers();
   }, 2008);

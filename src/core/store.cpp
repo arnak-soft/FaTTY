@@ -3,6 +3,7 @@
 #include "core/dpapi.hpp"
 #include "core/paths.hpp"
 #include "core/util.hpp"
+#include "core/vps_backup.hpp"
 
 #include <algorithm>
 #include <nlohmann/json.hpp>
@@ -360,6 +361,36 @@ void Config::drop_server_bundles(const std::string& server_id) {
                 bundles.end());
 }
 
+BackupJob* Config::backup_job_by_id(const std::string& id) {
+  for (auto& j : backup_jobs) {
+    if (j.id == id) return &j;
+  }
+  return nullptr;
+}
+
+const BackupJob* Config::backup_job_by_id(const std::string& id) const {
+  for (const auto& j : backup_jobs) {
+    if (j.id == id) return &j;
+  }
+  return nullptr;
+}
+
+std::vector<BackupJob> Config::backup_jobs_for(const std::string& server_id) const {
+  std::vector<BackupJob> out;
+  for (const auto& j : backup_jobs) {
+    if (j.source_server_id == server_id) out.push_back(j);
+  }
+  return out;
+}
+
+void Config::drop_server_backup_jobs(const std::string& server_id) {
+  backup_jobs.erase(std::remove_if(backup_jobs.begin(), backup_jobs.end(),
+                                   [&](const BackupJob& j) {
+                                     return j.source_server_id == server_id || j.dest_server_id == server_id;
+                                   }),
+                    backup_jobs.end());
+}
+
 namespace {
 
 int json_int(const json& j, const char* key, int def, int lo, int hi) {
@@ -588,6 +619,74 @@ Config load_config_from(const std::filesystem::path& path) {
     if (b.server_id.empty()) continue;
     cfg.bundles.push_back(std::move(b));
   }
+  for (const auto& raw : data.value("backup_jobs", json::array())) {
+    if (!raw.is_object()) continue;
+    BackupJob j;
+    j.id = raw.value("id", new_uuid());
+    if (j.id.empty()) j.id = new_uuid();
+    j.name = trim(raw.value("name", ""));
+    j.enabled = raw.value("enabled", false);
+    j.source_server_id = trim(raw.value("source_server_id", ""));
+    j.kind = backup_kind_from_key(raw.value("kind", std::string("files")));
+    if (raw.contains("paths") && raw["paths"].is_array()) {
+      for (const auto& p : raw["paths"]) {
+        if (!p.is_string()) continue;
+        auto t = trim(p.get<std::string>());
+        if (!t.empty()) j.paths.push_back(std::move(t));
+      }
+    }
+    if (raw.contains("exclude_globs") && raw["exclude_globs"].is_array()) {
+      for (const auto& p : raw["exclude_globs"]) {
+        if (!p.is_string()) continue;
+        auto t = trim(p.get<std::string>());
+        if (!t.empty()) j.exclude_globs.push_back(std::move(t));
+      }
+    }
+    j.db_engine = backup_db_engine_from_key(raw.value("db_engine", std::string("postgres")));
+    j.db_name = trim(raw.value("db_name", ""));
+    j.db_user = trim(raw.value("db_user", ""));
+    j.db_password_blob = raw.value("db_password_vault", "");
+    j.db_port = clamp_int(raw.value("db_port", 0), 0, 65535);
+    j.docker_container = trim(raw.value("docker_container", ""));
+    j.dest_kind = backup_dest_from_key(raw.value("dest_kind", std::string("same_vps")));
+    j.dest_path = trim(raw.value("dest_path", ""));
+    j.dest_server_id = trim(raw.value("dest_server_id", ""));
+    j.schedule_mode = backup_schedule_from_key(raw.value("schedule_mode", std::string("client")));
+    j.interval_sec = json_int(raw, "interval_sec", 86400, kBackupIntervalMinSec, kBackupIntervalMaxSec);
+    j.cron_installed = raw.value("cron_installed", false);
+    try {
+      j.max_total_bytes = std::max<std::int64_t>(kBackupMaxTotalMinBytes, raw.value("max_total_bytes", j.max_total_bytes));
+    } catch (...) {
+    }
+    j.overflow_at_pct = json_int(raw, "overflow_at_pct", 80, 1, 100);
+    j.overflow_actions.clear();
+    if (raw.contains("overflow_actions") && raw["overflow_actions"].is_array()) {
+      for (const auto& a : raw["overflow_actions"]) {
+        if (!a.is_string()) continue;
+        j.overflow_actions.push_back(backup_action_from_key(a.get<std::string>()));
+      }
+    }
+    if (j.overflow_actions.empty()) {
+      j.overflow_actions = {BackupOverflowAction::Warn, BackupOverflowAction::DeleteOldest};
+    }
+    j.stride_delete = json_int(raw, "stride_delete", 3, 1, 100);
+    j.stride_keep = json_int(raw, "stride_keep", 1, 1, 100);
+    try {
+      j.delete_bytes_amount = std::max<std::int64_t>(0, raw.value("delete_bytes_amount", j.delete_bytes_amount));
+      j.max_single_archive_bytes =
+          std::max<std::int64_t>(0, raw.value("max_single_archive_bytes", j.max_single_archive_bytes));
+      j.min_dest_free_bytes = std::max<std::int64_t>(0, raw.value("min_dest_free_bytes", j.min_dest_free_bytes));
+      j.last_run_unix = std::max(0.0, raw.value("last_run_unix", 0.0));
+      j.last_archive_bytes = std::max<std::int64_t>(0, raw.value("last_archive_bytes", 0));
+    } catch (...) {
+    }
+    j.last_status = raw.value("last_status", "");
+    j.last_error = raw.value("last_error", "");
+    j.last_archive_name = raw.value("last_archive_name", "");
+    clamp_backup_job(j);
+    if (j.source_server_id.empty()) continue;
+    cfg.backup_jobs.push_back(std::move(j));
+  }
   json settings_raw = data.value("settings", json::object());
   auto& st = cfg.settings;
   st.confirm_before_run = settings_raw.value("confirm_before_run", true);
@@ -713,6 +812,11 @@ void unlock_secrets(Config& config, const SessionVault& vault) {
       server.password = vault.decrypt_secret(server.password_blob);
     }
   }
+  for (auto& job : config.backup_jobs) {
+    if (!job.db_password_blob.empty()) {
+      job.db_password = vault.decrypt_secret(job.db_password_blob);
+    }
+  }
 }
 
 void save_config(Config& config, SessionVault& vault) {
@@ -789,6 +893,48 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
     item["interval_sec"] = b.interval_sec;
     item["command_ids"] = b.command_ids;
     payload["bundles"].push_back(std::move(item));
+  }
+  payload["backup_jobs"] = json::array();
+  for (auto& j : config.backup_jobs) {
+    clamp_backup_job(j);
+    json actions = json::array();
+    for (auto a : j.overflow_actions) actions.push_back(backup_action_key(a));
+    json item = {
+        {"id", j.id},
+        {"name", j.name},
+        {"enabled", j.enabled},
+        {"source_server_id", j.source_server_id},
+        {"kind", backup_kind_key(j.kind)},
+        {"paths", j.paths},
+        {"exclude_globs", j.exclude_globs},
+        {"db_engine", backup_db_engine_key(j.db_engine)},
+        {"db_name", j.db_name},
+        {"db_user", j.db_user},
+        {"db_password_vault", j.db_password.empty() ? j.db_password_blob : vault.encrypt_secret(j.db_password)},
+        {"db_port", j.db_port},
+        {"docker_container", j.docker_container},
+        {"dest_kind", backup_dest_key(j.dest_kind)},
+        {"dest_path", j.dest_path},
+        {"dest_server_id", j.dest_server_id},
+        {"schedule_mode", backup_schedule_key(j.schedule_mode)},
+        {"interval_sec", j.interval_sec},
+        {"cron_installed", j.cron_installed},
+        {"max_total_bytes", j.max_total_bytes},
+        {"overflow_at_pct", j.overflow_at_pct},
+        {"overflow_actions", actions},
+        {"stride_delete", j.stride_delete},
+        {"stride_keep", j.stride_keep},
+        {"delete_bytes_amount", j.delete_bytes_amount},
+        {"max_single_archive_bytes", j.max_single_archive_bytes},
+        {"min_dest_free_bytes", j.min_dest_free_bytes},
+        {"last_run_unix", j.last_run_unix},
+        {"last_status", j.last_status},
+        {"last_error", j.last_error},
+        {"last_archive_name", j.last_archive_name},
+        {"last_archive_bytes", j.last_archive_bytes},
+    };
+    j.db_password_blob = item["db_password_vault"].get<std::string>();
+    payload["backup_jobs"].push_back(std::move(item));
   }
   json settings = {
       {"confirm_before_run", config.settings.confirm_before_run},

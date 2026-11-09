@@ -48,6 +48,7 @@ set(FATTY_CORE_SOURCES
   src/core/journal.cpp
   src/core/config_io.cpp
   src/core/backup.cpp
+  src/core/vps_backup.cpp
   src/core/presets.cpp
   src/core/quote.cpp
   src/core/placeholders.cpp
@@ -62,6 +63,7 @@ set(FATTY_NET_SOURCES
   src/net/shell_session.cpp
   src/net/sftp_session.cpp
   src/net/updates.cpp
+  src/core/vps_backup_engine.cpp
   src/putty/ppk.cpp
   src/putty/putty.cpp
 )
@@ -80,6 +82,9 @@ set(FATTY_UI_SOURCES
   src/ui/help_window.cpp
   src/ui/health_monitor.cpp
   src/ui/health_window.cpp
+  src/ui/backup_monitor.cpp
+  src/ui/backup_window.cpp
+
   src/ui/terminal_view.cpp
   src/ui/splash.cpp
   src/ui/app_frame.cpp
@@ -178,6 +183,7 @@ add_executable(fatty_tests
   tests/test_quote.cpp
   tests/test_journal.cpp
   tests/test_backup.cpp
+  tests/test_vps_backup.cpp
   tests/test_placeholders.cpp
   tests/test_updates.cpp
   tests/test_config_roundtrip.cpp

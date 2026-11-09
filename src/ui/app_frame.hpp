@@ -7,6 +7,7 @@
 #include "net/ssh_session.hpp"
 #include "ui/bundle_controller.hpp"
 #include "ui/chrome.hpp"
+#include "ui/backup_monitor.hpp"
 #include "ui/health_monitor.hpp"
 #include "ui/run_controller.hpp"
 #include "ui/striped_list.hpp"
@@ -32,6 +33,7 @@ class FilesWindow;
 class JournalWindow;
 class HelpWindow;
 class HealthWindow;
+class BackupWindow;
 class BundleStepsWindow;
 
 class AppFrame : public wxFrame {
@@ -46,7 +48,9 @@ class AppFrame : public wxFrame {
   void build_ui();
   void init_run_controllers();
   void init_health_monitor();
+  void init_backup_monitor();
   void update_health_button();
+  void show_backups();
   void persist();
   void maybe_run_backup();
   void apply_ui_theme();
@@ -121,6 +125,7 @@ class AppFrame : public wxFrame {
   std::unique_ptr<RunController> runs_;
   std::unique_ptr<BundleController> bundle_run_;
   std::unique_ptr<HealthMonitor> health_;
+  std::unique_ptr<BackupMonitor> backups_;
   std::map<std::string, std::string> remote_cwd_;
   std::map<std::string, CommandRunStats> command_stats_;
   std::map<std::string, CommandRunStats> bundle_stats_;
@@ -185,6 +190,7 @@ class AppFrame : public wxFrame {
   std::map<std::string, FilesWindow*> files_windows_;
   JournalWindow* journal_window_ = nullptr;
   HealthWindow* health_window_ = nullptr;
+  BackupWindow* backup_window_ = nullptr;
   HelpWindow* help_window_ = nullptr;
   std::map<std::string, BundleStepsWindow*> bundle_steps_windows_;
   RoundButton* health_btn_ = nullptr;
