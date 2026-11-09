@@ -35,13 +35,17 @@ class PositionedDialog : public wxDialog {
   PositionedDialog(wxWindow* parent, const wxString& title, const wxSize& size = wxDefaultSize);
   void setup_layout(AppSettings* settings, const std::string& key, bool remember_size = false,
                     std::function<void()> persist = {});
+  /// EndModal не всегда шлёт CLOSE — сохраняем геометрию и здесь.
+  void EndModal(int retCode) override;
 
  protected:
   void on_close_layout(wxCloseEvent& event);
+  void save_layout_now();
 
   AppSettings* settings_ = nullptr;
   std::string key_;
   bool remember_size_ = false;
+  bool layout_saved_ = false;
   std::function<void()> persist_;
 };
 

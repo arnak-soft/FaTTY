@@ -29,7 +29,7 @@ class BackupJobDialog : public PositionedDialog {
  public:
   BackupJobDialog(wxWindow* parent, BackupJob job, Config& config, AppSettings* settings,
                   std::function<void()> persist)
-      : PositionedDialog(parent, L"Задание резервного копирования", wxDefaultSize),
+      : PositionedDialog(parent, L"Задание резервного копирования", wxSize(780, 700)),
         job_(std::move(job)),
         config_(config) {
     SetName(L"dialog");
@@ -295,7 +295,12 @@ class BackupJobDialog : public PositionedDialog {
     root->Add(error_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
     root->Add(buttons, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
     SetSizer(root);
-    SetMinSize(FromDIP(wxSize(640, 560)));
+    SetMinSize(FromDIP(wxSize(720, 640)));
+    // Если сохранённой геометрии ещё нет — стартуем с нормального размера, не с крошечного default.
+    if (!settings || settings->dialog_geometry.find("backup_job") == settings->dialog_geometry.end()) {
+      SetSize(FromDIP(wxSize(780, 700)));
+      if (GetParent()) CentreOnParent();
+    }
     setup_layout(settings, "backup_job", true, std::move(persist));
     sync_kind_ui();
     kind_->Bind(wxEVT_CHOICE, [this](wxCommandEvent&) { sync_kind_ui(); });

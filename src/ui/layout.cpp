@@ -153,15 +153,31 @@ void PositionedDialog::setup_layout(AppSettings* settings, const std::string& ke
   key_ = key;
   remember_size_ = remember_size;
   persist_ = std::move(persist);
+  layout_saved_ = false;
   if (settings_) restore_dialog_geometry(this, *settings_, key_, remember_size_);
+  // После восстановления не оставляем окно меньше минимума (SetMinSize сам размер не поднимает).
+  const wxSize min_size = GetMinSize();
+  const wxSize cur = GetSize();
+  if (min_size.x > 0 && min_size.y > 0 && (cur.x < min_size.x || cur.y < min_size.y)) {
+    SetSize(std::max(cur.x, min_size.x), std::max(cur.y, min_size.y));
+  }
   Bind(wxEVT_CLOSE_WINDOW, &PositionedDialog::on_close_layout, this);
 }
 
+void PositionedDialog::save_layout_now() {
+  if (layout_saved_ || !settings_ || key_.empty()) return;
+  store_dialog_geometry(this, *settings_, key_, remember_size_);
+  if (persist_) persist_();
+  layout_saved_ = true;
+}
+
+void PositionedDialog::EndModal(int retCode) {
+  save_layout_now();
+  wxDialog::EndModal(retCode);
+}
+
 void PositionedDialog::on_close_layout(wxCloseEvent& event) {
-  if (settings_ && !key_.empty()) {
-    store_dialog_geometry(this, *settings_, key_, remember_size_);
-    if (persist_) persist_();
-  }
+  save_layout_now();
   event.Skip();
 }
 

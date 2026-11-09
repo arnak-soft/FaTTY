@@ -10,8 +10,8 @@ namespace fatty {
 inline constexpr std::string_view kWhatsNew =
     "• Резервные копии VPS: папки, базы на хосте и в Docker (Ctrl+B)\n"
     "• Куда копировать: этот VPS, другая VPS или папка на этом ПК\n"
-    "• Лимит объёма, очистка старых и «удалить N через 1»; опционально cron\n"
-    "• Не путать с суточными копиями config.json в Настройки → Данные";
+    "• Лимит объёма, очистка «N через 1»; опционально cron на сервере\n"
+    "• Диалог задания: нормальный стартовый размер, память позиции и размера";
 
 std::string release_version_id(std::string_view version);
 bool should_show_whats_new(std::string_view last_seen, std::string_view current,
