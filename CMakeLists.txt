@@ -84,7 +84,7 @@ set(FATTY_UI_SOURCES
   src/ui/health_window.cpp
   src/ui/backup_monitor.cpp
   src/ui/backup_window.cpp
-
+  src/ui/command_transfer.cpp
   src/ui/terminal_view.cpp
   src/ui/splash.cpp
   src/ui/app_frame.cpp

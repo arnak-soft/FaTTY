@@ -484,12 +484,13 @@ bool edit_backup_job_dialog(wxWindow* parent, BackupJob& job, Config& config, Ap
 }
 
 BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* monitor, AppSettings* settings,
-                           std::function<void()> persist)
+                           std::function<void()> persist, std::string preferred_server_id)
     : wxFrame(parent, wxID_ANY, L"Резервные копии VPS"),
       config_(config),
       monitor_(monitor),
       settings_(settings),
-      persist_(std::move(persist)) {
+      persist_(std::move(persist)),
+      preferred_server_id_(std::move(preferred_server_id)) {
   SetName(L"frame");
   auto* panel = new wxPanel(this);
   panel->SetName(L"card-page");
@@ -499,6 +500,10 @@ BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* moni
       L"Это копии данных на VPS, не локальные копии config.json (Настройки → Данные). "
       L"Клиентский автозапуск работает только пока открыт FaTTY. Можно запускать вручную в любой момент.");
   root->Add(hint_, 0, wxALL, 8);
+
+  show_all_cb_ = new ThemedCheckBox(panel, wxID_ANY, L"Показать все VPS");
+  show_all_cb_->SetValue(settings_ && settings_->backup_show_all_servers);
+  root->Add(show_all_cb_, 0, wxLEFT | wxRIGHT | wxBOTTOM, 8);
 
   list_ = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize,
                          wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxBORDER_NONE);
@@ -513,12 +518,14 @@ BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* moni
   auto* buttons = new wxBoxSizer(wxHORIZONTAL);
   auto* add = make_button(panel, L"Добавить", BtnIcon::Plus);
   auto* edit = make_button(panel, L"Изменить", BtnIcon::Pencil);
+  auto* dup = make_button(panel, L"Дублировать", BtnIcon::Copy);
   auto* del = make_button(panel, L"Удалить", BtnIcon::Trash);
   run_btn_ = make_button(panel, L"Запустить", BtnIcon::Play);
   cron_btn_ = make_button(panel, L"Поставить cron", BtnIcon::Save);
   uncron_btn_ = make_button(panel, L"Снять cron", BtnIcon::Trash);
   buttons->Add(add, 0, wxRIGHT, 6);
   buttons->Add(edit, 0, wxRIGHT, 6);
+  buttons->Add(dup, 0, wxRIGHT, 6);
   buttons->Add(del, 0, wxRIGHT, 6);
   buttons->Add(run_btn_, 0, wxRIGHT, 6);
   buttons->Add(cron_btn_, 0, wxRIGHT, 6);
@@ -540,10 +547,18 @@ BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* moni
 
   add->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { add_job(); });
   edit->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { edit_selected(); });
+  dup->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { duplicate_selected(); });
   del->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { delete_selected(); });
   run_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { run_selected(); });
   cron_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { install_cron_selected(); });
   uncron_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { uninstall_cron_selected(); });
+  show_all_cb_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+    if (settings_) {
+      settings_->backup_show_all_servers = show_all_cb_->GetValue();
+      if (persist_) persist_();
+    }
+    rebuild_list();
+  });
   list_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { edit_selected(); });
   Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
     *alive_ = false;
@@ -556,17 +571,35 @@ BackupWindow::~BackupWindow() { *alive_ = false; }
 
 void BackupWindow::reload() { rebuild_list(); }
 
+void BackupWindow::set_preferred_server(const std::string& server_id) {
+  preferred_server_id_ = server_id;
+  rebuild_list();
+}
+
 void BackupWindow::append_log(const std::string& line) {
   if (!log_) return;
   log_->AppendText(wxString::FromUTF8(line));
   if (line.empty() || line.back() != '\n') log_->AppendText(L"\n");
 }
 
+std::string BackupWindow::default_source_server_id() const {
+  if (!config_ || config_->servers.empty()) return {};
+  if (!preferred_server_id_.empty() && config_->server_by_id(preferred_server_id_)) {
+    return preferred_server_id_;
+  }
+  return config_->servers.front().id;
+}
+
 void BackupWindow::rebuild_list() {
   list_->DeleteAllItems();
+  row_job_ids_.clear();
   if (!config_) return;
+  const bool show_all = settings_ && settings_->backup_show_all_servers;
   long row = 0;
   for (const auto& j : config_->backup_jobs) {
+    if (!show_all && !preferred_server_id_.empty() && j.source_server_id != preferred_server_id_) {
+      continue;
+    }
     const Server* s = config_->server_by_id(j.source_server_id);
     list_->InsertItem(row, wxString::FromUTF8(j.name));
     list_->SetItem(row, 1, wxString::FromUTF8(s ? (s->name.empty() ? s->host : s->name) : "?"));
@@ -576,15 +609,15 @@ void BackupWindow::rebuild_list() {
     if (!j.last_error.empty()) st += L" / " + wxString::FromUTF8(clip(j.last_error, 40));
     list_->SetItem(row, 4, st);
     list_->SetItem(row, 5, j.enabled ? L"да" : L"нет");
-    list_->SetItemData(row, static_cast<long>(row));
+    row_job_ids_.push_back(j.id);
     ++row;
   }
 }
 
 BackupJob* BackupWindow::selected_job() {
   long i = list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
-  if (i < 0 || !config_ || i >= static_cast<long>(config_->backup_jobs.size())) return nullptr;
-  return &config_->backup_jobs[static_cast<std::size_t>(i)];
+  if (i < 0 || !config_ || i >= static_cast<long>(row_job_ids_.size())) return nullptr;
+  return config_->backup_job_by_id(row_job_ids_[static_cast<std::size_t>(i)]);
 }
 
 void BackupWindow::add_job() {
@@ -592,12 +625,23 @@ void BackupWindow::add_job() {
     wxMessageBox(L"Сначала добавьте VPS.", L"Резервные копии");
     return;
   }
-  BackupJob job = BackupJob::make_new(config_->servers.front().id);
+  BackupJob job = BackupJob::make_new(default_source_server_id());
   if (!edit_backup_job_dialog(this, job, *config_, settings_, persist_)) return;
   if (!ask_confirm(this, L"Создать задание", L"Создать задание «" + wxString::FromUTF8(job.name) + L"»?", L"Создать",
                    false))
     return;
   config_->backup_jobs.push_back(std::move(job));
+  if (persist_) persist_();
+  rebuild_list();
+}
+
+void BackupWindow::duplicate_selected() {
+  auto* job = selected_job();
+  if (!job) return;
+  std::vector<std::string> names;
+  for (const auto& j : config_->backup_jobs) names.push_back(j.name);
+  auto clone = job->duplicate(copy_name(job->name, names));
+  config_->backup_jobs.push_back(std::move(clone));
   if (persist_) persist_();
   rebuild_list();
 }

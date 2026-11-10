@@ -761,6 +761,12 @@ Config load_config_from(const std::filesystem::path& path) {
   } catch (...) {
     st.last_backup = 0.0;
   }
+  st.workspace_mode = settings_raw.value("workspace_mode", std::string("commands"));
+  if (st.workspace_mode != "commands" && st.workspace_mode != "health" && st.workspace_mode != "backup" &&
+      st.workspace_mode != "files") {
+    st.workspace_mode = "commands";
+  }
+  st.backup_show_all_servers = settings_raw.value("backup_show_all_servers", false);
   json last_group_raw = settings_raw.value("last_group_by_server", json::object());
   if (!last_group_raw.is_object()) last_group_raw = json::object();
   if (last_group_raw.empty() && settings_raw.contains("last_folder_by_server")) {
@@ -972,6 +978,8 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"backup_enabled", config.settings.backup_enabled},
       {"last_backup", config.settings.last_backup},
       {"last_group_by_server", config.settings.last_group_by_server},
+      {"workspace_mode", config.settings.workspace_mode},
+      {"backup_show_all_servers", config.settings.backup_show_all_servers},
       {"health_auto", config.settings.health_auto},
       {"health_interval_sec", config.settings.health_interval_sec},
       {"health_timeout_sec", config.settings.health_timeout_sec},

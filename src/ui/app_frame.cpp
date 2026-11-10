@@ -12,6 +12,7 @@
 #include "net/sftp_session.hpp"
 #include "net/updates.hpp"
 #include "putty/putty.hpp"
+#include "ui/command_transfer.hpp"
 #include "ui/dialogs.hpp"
 #include "ui/files_window.hpp"
 #include "ui/help_window.hpp"
@@ -28,6 +29,7 @@
 #include "ui/striped_list.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
+#include "ui/workspace_mode.hpp"
 
 #include <wx/app.h>
 #include <wx/bookctrl.h>
@@ -247,11 +249,11 @@ AppFrame::AppFrame(Config config, SessionVault vault)
       return;
     }
     if (e.ControlDown() && !e.AltDown() && !e.ShiftDown() && (e.GetKeyCode() == 'H' || e.GetKeyCode() == 'h')) {
-      show_health();
+      set_workspace_mode(WorkspaceMode::Health);
       return;
     }
     if (e.ControlDown() && !e.AltDown() && !e.ShiftDown() && (e.GetKeyCode() == 'B' || e.GetKeyCode() == 'b')) {
-      show_backups();
+      set_workspace_mode(WorkspaceMode::Backup);
       return;
     }
     if (e.ControlDown() && e.GetKeyCode() == ',') {
@@ -278,6 +280,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     if (config_.settings.vsash_pos > 0) vsplit_->SetSashPosition(config_.settings.vsash_pos);
     restore_columns();
     restoring_ = false;
+    set_workspace_mode(workspace_mode_from_key(config_.settings.workspace_mode), false);
     maybe_show_whats_new();
     if (config_.settings.check_updates_on_start) {
       using clock = std::chrono::system_clock;
@@ -319,8 +322,8 @@ void AppFrame::build_menu() {
   menu_bar_->AddMenu(L"Справка", help);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { open_directory(app_dir()); }, 1001);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_journal(); }, 1002);
-  Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_health(); }, 1005);
-  Bind(wxEVT_MENU, [this](wxCommandEvent&) { show_backups(); }, 1006);
+  Bind(wxEVT_MENU, [this](wxCommandEvent&) { set_workspace_mode(WorkspaceMode::Health); }, 1005);
+  Bind(wxEVT_MENU, [this](wxCommandEvent&) { set_workspace_mode(WorkspaceMode::Backup); }, 1006);
   Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     const ExportChoice opt = ask_export_options(this);
     if (!opt.accepted) return;
@@ -396,21 +399,10 @@ void AppFrame::build_ui() {
   servers_card->SetSizer(servers_sz);
   auto* sbtns = new wxWrapSizer(wxHORIZONTAL);
   auto* sadd = make_button(left, L"Добавить", BtnIcon::Plus);
-  auto* files = make_button(left, L"Файлы", BtnIcon::Folder);
-  auto* cons = make_button(left, L"Открыть консоль", BtnIcon::Terminal);
-  auto* putty = make_button(left, L"PuTTY", BtnIcon::Putty);
-  auto* winscp = make_button(left, L"WinSCP", BtnIcon::WinSCP);
-  auto* test = make_button(left, L"Проверить связь", BtnIcon::Network);
-  health_btn_ = make_button(left, L"Состояние", BtnIcon::Pulse);
-  auto* backups_btn = make_button(left, L"Резерв", BtnIcon::Save);
+  auto* tools = make_button(left, L"Инструменты", BtnIcon::Terminal);
+  tools->SetToolTip(L"Консоль, PuTTY, WinSCP, проверка связи. Также — правый клик по VPS.");
   add_btn(sbtns, sadd);
-  add_btn(sbtns, files);
-  add_btn(sbtns, cons);
-  add_btn(sbtns, putty);
-  add_btn(sbtns, winscp);
-  add_btn(sbtns, test);
-  add_btn(sbtns, health_btn_);
-  add_btn(sbtns, backups_btn);
+  add_btn(sbtns, tools);
   extra_tools_parent_ = left;
   extra_tools_sizer_ = new wxWrapSizer(wxHORIZONTAL);
   auto* ls = new wxBoxSizer(wxVERTICAL);
@@ -422,10 +414,23 @@ void AppFrame::build_ui() {
   left->SetSizer(ls);
   // Внешние программы гасятся на время SSH; список команд остаётся доступен —
   // запуск ставит в очередь. Правка VPS — двойной клик и контекстное меню.
-  busy_disable_ = {cons, putty, winscp, test, files};
+  busy_disable_ = {tools};
   rebuild_extra_tools();
 
-  auto* right_nb = new RoundedNotebook(right);
+  commands_workspace_ = new wxPanel(right);
+  commands_workspace_->SetName(L"card-page");
+  mode_host_ = new wxPanel(right);
+  mode_host_->SetName(L"card-page");
+  mode_host_label_ = new wxStaticText(mode_host_, wxID_ANY, L"");
+  mode_host_label_->SetName(L"muted");
+  auto* mode_host_sz = new wxBoxSizer(wxVERTICAL);
+  mode_host_sz->AddStretchSpacer(1);
+  mode_host_sz->Add(mode_host_label_, 0, wxALIGN_CENTER | wxALL, pad);
+  mode_host_sz->AddStretchSpacer(1);
+  mode_host_->SetSizer(mode_host_sz);
+  mode_host_->Hide();
+
+  auto* right_nb = new RoundedNotebook(commands_workspace_);
 
   auto* groups_page = new wxPanel(right_nb);
   groups_page->SetName(L"card-page");
@@ -519,17 +524,41 @@ void AppFrame::build_ui() {
   auto* head = new wxBoxSizer(wxHORIZONTAL);
   head->Add(server_heading_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
   head->Add(server_meta_, 1, wxALIGN_CENTER_VERTICAL);
+
+  auto* mode_row = new wxBoxSizer(wxHORIZONTAL);
+  mode_btns_.clear();
+  for (int i = 0; i < kWorkspaceModeCount; ++i) {
+    const auto mode = workspace_mode_from_int(i);
+    auto* btn = make_button(right, workspace_mode_label(mode));
+    btn->SetToolTip(i == 0   ? L"Команды и связки выбранного VPS"
+                    : i == 1 ? L"Состояние выбранного VPS (Ctrl+H)"
+                    : i == 2 ? L"Резервные копии VPS (Ctrl+B)"
+                             : L"Файлы выбранного VPS по SFTP");
+    mode_btns_.push_back(btn);
+    mode_row->Add(btn, 0, wxRIGHT, gap);
+    btn->Bind(wxEVT_BUTTON, [this, mode](wxCommandEvent&) { set_workspace_mode(mode); });
+  }
+  if (mode_btns_.size() > static_cast<std::size_t>(WorkspaceMode::Health)) {
+    health_btn_ = mode_btns_[static_cast<std::size_t>(WorkspaceMode::Health)];
+  }
+
   auto* qrow = new wxBoxSizer(wxHORIZONTAL);
-  qrow->Add(new wxStaticText(right, wxID_ANY, L"Разовая команда:"), 0, wxALIGN_CENTER_VERTICAL);
-  quick_ = new wxTextCtrl(right, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
-  auto* qrun = make_button(right, L"Выполнить", BtnIcon::Play);
+  qrow->Add(new wxStaticText(commands_workspace_, wxID_ANY, L"Разовая команда:"), 0, wxALIGN_CENTER_VERTICAL);
+  quick_ = new wxTextCtrl(commands_workspace_, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+  auto* qrun = make_button(commands_workspace_, L"Выполнить", BtnIcon::Play);
   quick_->SetMinSize(wxSize(-1, qrun->GetBestSize().GetHeight()));
   qrow->Add(quick_, 1, wxALIGN_CENTER_VERTICAL | wxLEFT | wxRIGHT, pad);
   qrow->Add(qrun, 0, wxALIGN_CENTER_VERTICAL);
+  auto* cws = new wxBoxSizer(wxVERTICAL);
+  cws->Add(right_nb, 1, wxEXPAND);
+  cws->Add(qrow, 0, wxEXPAND | wxTOP, pad);
+  commands_workspace_->SetSizer(cws);
+
   auto* rs = new wxBoxSizer(wxVERTICAL);
   rs->Add(head, 0, wxEXPAND | wxBOTTOM, gap);
-  rs->Add(right_nb, 1, wxEXPAND);
-  rs->Add(qrow, 0, wxEXPAND | wxTOP, pad);
+  rs->Add(mode_row, 0, wxEXPAND | wxBOTTOM, gap);
+  rs->Add(commands_workspace_, 1, wxEXPAND);
+  rs->Add(mode_host_, 1, wxEXPAND);
   right->SetSizer(rs);
   hsplit_->SplitVertically(left, right, FromDIP(400));
   auto* ts = new wxBoxSizer(wxVERTICAL);
@@ -654,6 +683,9 @@ void AppFrame::build_ui() {
     reset_quick_history_nav();
     rebuild_group_tabs();
     refresh_commands();
+    if (workspace_mode_ != WorkspaceMode::Commands) {
+      set_workspace_mode(workspace_mode_, false);
+    }
   });
   servers_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) {
     auto* s = selected_server();
@@ -700,88 +732,7 @@ void AppFrame::build_ui() {
       refresh_servers(dlg.result.id);
     }
   });
-  files->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (!s) {
-      wxMessageBox(L"Сначала выберите VPS.", L"Файлы");
-      return;
-    }
-    auto it = files_windows_.find(s->id);
-    if (it != files_windows_.end() && it->second) {
-      it->second->Show();
-      it->second->Raise();
-      return;
-    }
-    auto start = guess_start_path(config_.commands_for(s->id));
-    auto* win = new FilesWindow(this, *s, start, &config_.settings, [this] { persist(); });
-    files_windows_[s->id] = win;
-    win->Bind(wxEVT_CLOSE_WINDOW, [this, id = s->id](wxCloseEvent& e) {
-      files_windows_.erase(id);
-      e.Skip();
-    });
-    win->Show();
-  });
-  cons->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (!s) return;
-    try {
-      open_system_console(*s, config_.settings.ssh_path);
-      status_->SetLabel(wxString::FromUTF8("Консоль открыта → " + s->name));
-    } catch (const std::exception& exc) {
-      wxMessageBox(wxString::FromUTF8(exc.what()), L"Консоль", wxOK | wxICON_ERROR, this);
-    }
-  });
-  putty->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (!s) return;
-    try {
-      open_putty_console(*s, config_.settings.putty_path);
-      status_->SetLabel(wxString::FromUTF8("PuTTY открыт → " + s->name));
-    } catch (const PuttyNotFoundError&) {
-      const auto choice = ask_missing_tool(this, L"PuTTY");
-      if (choice == MissingTool::Download) open_url(kPuttyDownloadUrl);
-      else if (choice == MissingTool::Locate) {
-        wxFileDialog dlg(this, L"putty.exe", L"", L"putty.exe", L"PuTTY|putty.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-        if (dlg.ShowModal() == wxID_OK) {
-          config_.settings.putty_path = std::string(dlg.GetPath().utf8_string());
-          persist();
-          open_putty_console(*s, config_.settings.putty_path);
-        }
-      }
-    } catch (const std::exception& exc) {
-      wxMessageBox(wxString::FromUTF8(exc.what()), L"PuTTY", wxOK | wxICON_ERROR, this);
-    }
-  });
-  winscp->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (!s) return;
-    try {
-      open_winscp(*s, config_.settings.winscp_path);
-      status_->SetLabel(wxString::FromUTF8("WinSCP открыт → " + s->name));
-    } catch (const WinSCPNotFoundError&) {
-      const auto choice = ask_missing_tool(this, L"WinSCP");
-      if (choice == MissingTool::Download) open_url(kWinscpDownloadUrl);
-      else if (choice == MissingTool::Locate) {
-        wxFileDialog dlg(this, L"WinSCP.exe", L"", L"WinSCP.exe", L"WinSCP|WinSCP.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
-        if (dlg.ShowModal() == wxID_OK) {
-          config_.settings.winscp_path = std::string(dlg.GetPath().utf8_string());
-          persist();
-          open_winscp(*s, config_.settings.winscp_path);
-        }
-      }
-    } catch (const std::exception& exc) {
-      wxMessageBox(wxString::FromUTF8(exc.what()), L"WinSCP", wxOK | wxICON_ERROR, this);
-    }
-  });
-  test->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (s) run_command(*s, "echo OK && hostname && whoami && pwd", 30, true, "Проверка " + s->name, "", "test");
-  });
-  health_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    show_health(s ? s->id : std::string{});
-  });
-  backups_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { show_backups(); });
+  tools->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { show_tools_menu(); });
   gadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { add_group(); });
   groups_nb_->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
     if (updating_groups_) return;
@@ -1017,6 +968,9 @@ void AppFrame::show_health(const std::string& select_id) {
         &config_.settings, [this] { persist(); });
     health_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
       health_window_ = nullptr;
+      if (workspace_mode_ == WorkspaceMode::Health) {
+        set_workspace_mode(WorkspaceMode::Commands, false);
+      }
       ev.Skip();
     });
   }
@@ -1045,16 +999,183 @@ void AppFrame::init_backup_monitor() {
 }
 
 void AppFrame::show_backups() {
+  auto* s = selected_server();
+  const std::string preferred = s ? s->id : std::string{};
   if (!backup_window_) {
-    backup_window_ = new BackupWindow(this, &config_, backups_.get(), &config_.settings, [this] { persist(); });
+    backup_window_ =
+        new BackupWindow(this, &config_, backups_.get(), &config_.settings, [this] { persist(); }, preferred);
     backup_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
       backup_window_ = nullptr;
+      if (workspace_mode_ == WorkspaceMode::Backup) {
+        set_workspace_mode(WorkspaceMode::Commands, false);
+      }
       ev.Skip();
     });
+  } else {
+    backup_window_->set_preferred_server(preferred);
   }
-  backup_window_->reload();
   backup_window_->Show();
   backup_window_->Raise();
+}
+
+void AppFrame::open_files_for_selected() {
+  auto* s = selected_server();
+  if (!s) {
+    wxMessageBox(L"Сначала выберите VPS.", L"Файлы");
+    return;
+  }
+  auto it = files_windows_.find(s->id);
+  if (it != files_windows_.end() && it->second) {
+    it->second->Show();
+    it->second->Raise();
+    return;
+  }
+  auto start = guess_start_path(config_.commands_for(s->id));
+  auto* win = new FilesWindow(this, *s, start, &config_.settings, [this] { persist(); });
+  files_windows_[s->id] = win;
+  win->Bind(wxEVT_CLOSE_WINDOW, [this, id = s->id](wxCloseEvent& e) {
+    files_windows_.erase(id);
+    if (workspace_mode_ == WorkspaceMode::Files) {
+      auto* cur = selected_server();
+      if (!cur || cur->id == id) set_workspace_mode(WorkspaceMode::Commands, false);
+    }
+    e.Skip();
+  });
+  win->Show();
+}
+
+void AppFrame::show_tools_menu() {
+  wxMenu menu;
+  menu.Append(2101, L"Открыть консоль");
+  menu.Append(2102, L"PuTTY");
+  menu.Append(2103, L"WinSCP");
+  menu.AppendSeparator();
+  menu.Append(2104, L"Проверить связь");
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto* s = selected_server();
+    if (!s) return;
+    try {
+      open_system_console(*s, config_.settings.ssh_path);
+      status_->SetLabel(wxString::FromUTF8("Консоль открыта → " + s->name));
+    } catch (const std::exception& exc) {
+      wxMessageBox(wxString::FromUTF8(exc.what()), L"Консоль", wxOK | wxICON_ERROR, this);
+    }
+  }, 2101);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto* s = selected_server();
+    if (!s) return;
+    try {
+      open_putty_console(*s, config_.settings.putty_path);
+      status_->SetLabel(wxString::FromUTF8("PuTTY открыт → " + s->name));
+    } catch (const PuttyNotFoundError&) {
+      const auto choice = ask_missing_tool(this, L"PuTTY");
+      if (choice == MissingTool::Download) open_url(kPuttyDownloadUrl);
+      else if (choice == MissingTool::Locate) {
+        wxFileDialog dlg(this, L"putty.exe", L"", L"putty.exe", L"PuTTY|putty.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+        if (dlg.ShowModal() == wxID_OK) {
+          config_.settings.putty_path = std::string(dlg.GetPath().utf8_string());
+          persist();
+          open_putty_console(*s, config_.settings.putty_path);
+        }
+      }
+    } catch (const std::exception& exc) {
+      wxMessageBox(wxString::FromUTF8(exc.what()), L"PuTTY", wxOK | wxICON_ERROR, this);
+    }
+  }, 2102);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto* s = selected_server();
+    if (!s) return;
+    try {
+      open_winscp(*s, config_.settings.winscp_path);
+      status_->SetLabel(wxString::FromUTF8("WinSCP открыт → " + s->name));
+    } catch (const WinSCPNotFoundError&) {
+      const auto choice = ask_missing_tool(this, L"WinSCP");
+      if (choice == MissingTool::Download) open_url(kWinscpDownloadUrl);
+      else if (choice == MissingTool::Locate) {
+        wxFileDialog dlg(this, L"WinSCP.exe", L"", L"WinSCP.exe", L"WinSCP|WinSCP.exe", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+        if (dlg.ShowModal() == wxID_OK) {
+          config_.settings.winscp_path = std::string(dlg.GetPath().utf8_string());
+          persist();
+          open_winscp(*s, config_.settings.winscp_path);
+        }
+      }
+    } catch (const std::exception& exc) {
+      wxMessageBox(wxString::FromUTF8(exc.what()), L"WinSCP", wxOK | wxICON_ERROR, this);
+    }
+  }, 2103);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto* s = selected_server();
+    if (s) run_command(*s, "echo OK && hostname && whoami && pwd", 30, true, "Проверка " + s->name, "", "test");
+  }, 2104);
+  show_themed_menu(this, &menu);
+}
+
+void AppFrame::update_workspace_mode_ui() {
+  const bool commands = workspace_mode_ == WorkspaceMode::Commands;
+  if (commands_workspace_) commands_workspace_->Show(commands);
+  if (mode_host_) {
+    mode_host_->Show(!commands);
+    if (!commands && mode_host_label_) {
+      wxString text;
+      switch (workspace_mode_) {
+        case WorkspaceMode::Health:
+          text = L"Окно «Состояние VPS» открыто для выбранного сервера.\nЧтобы запускать команды — режим «Команды».";
+          break;
+        case WorkspaceMode::Backup:
+          text =
+              L"Окно «Резервные копии VPS» — задания выбранного сервера.\n"
+              L"Галочка «Показать все VPS» снимает фильтр.";
+          break;
+        case WorkspaceMode::Files:
+          text = L"Окно «Файлы» открыто для выбранного VPS.\nЧтобы запускать команды — режим «Команды».";
+          break;
+        case WorkspaceMode::Commands:
+        default:
+          break;
+      }
+      mode_host_label_->SetLabel(text);
+      mode_host_label_->Wrap(mode_host_->FromDIP(420));
+    }
+  }
+  if (auto* right = commands_workspace_ ? commands_workspace_->GetParent() : nullptr) {
+    right->Layout();
+  }
+  for (std::size_t i = 0; i < mode_btns_.size(); ++i) {
+    auto* btn = mode_btns_[i];
+    if (!btn) continue;
+    if (health_btn_ && btn == health_btn_) continue;
+    const bool active = static_cast<int>(workspace_mode_) == static_cast<int>(i);
+    btn->SetName(active ? L"accent" : L"");
+    btn->Refresh();
+  }
+  update_health_button();
+}
+
+void AppFrame::set_workspace_mode(WorkspaceMode mode, bool user_action) {
+  workspace_mode_ = mode;
+  if (user_action) {
+    config_.settings.workspace_mode = workspace_mode_key(mode);
+    if (!restoring_) persist();
+  }
+  update_workspace_mode_ui();
+  auto* s = selected_server();
+  switch (mode) {
+    case WorkspaceMode::Health:
+      show_health(s ? s->id : std::string{});
+      break;
+    case WorkspaceMode::Backup:
+      show_backups();
+      break;
+    case WorkspaceMode::Files:
+      open_files_for_selected();
+      break;
+    case WorkspaceMode::Commands:
+    default:
+      break;
+  }
+  if (status_ && !busy_) {
+    status_->SetLabel(wxString::Format(L"Режим: %s", workspace_mode_label(workspace_mode_)));
+  }
 }
 
 void AppFrame::show_help(const std::string& tab) {
@@ -2263,13 +2384,14 @@ void AppFrame::init_health_monitor() {
 }
 
 void AppFrame::update_health_button() {
-  if (!health_btn_ || !health_) return;
+  if (!health_btn_) return;
+  const bool active = workspace_mode_ == WorkspaceMode::Health;
   std::vector<std::string> enabled;
   enabled.reserve(config_.servers.size());
   for (const auto& s : config_.servers) {
     if (s.health_enabled) enabled.push_back(s.id);
   }
-  const auto alert = health_fleet_alert(health_->snapshots(), enabled);
+  const auto alert = health_ ? health_fleet_alert(health_->snapshots(), enabled) : HealthFleetAlert{};
   if (alert.total() > 0) {
     health_btn_->SetName(L"danger");
     if (alert.total() == 1) {
@@ -2287,9 +2409,9 @@ void AppFrame::update_health_button() {
     }
     health_btn_->SetToolTip(tip);
   } else {
-    health_btn_->SetName(L"");
+    health_btn_->SetName(active ? L"accent" : L"");
     health_btn_->SetLabel(L"Состояние");
-    health_btn_->UnsetToolTip();
+    health_btn_->SetToolTip(L"Состояние выбранного VPS (Ctrl+H)");
   }
   health_btn_->Refresh();
   if (auto* parent = health_btn_->GetParent()) parent->Layout();
@@ -2548,6 +2670,7 @@ void AppFrame::show_servers_context_menu(long row) {
   menu.AppendSeparator();
   menu.Append(2007, L"Проверить связь");
   menu.Append(2009, L"Состояние VPS…");
+  menu.Append(2017, L"Резервные копии VPS…");
   menu.AppendSeparator();
   menu.Append(2008, L"Удалить");
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
@@ -2605,27 +2728,7 @@ void AppFrame::show_servers_context_menu(long row) {
     persist();
     refresh_servers(clone.id);
   }, 2002);
-  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    if (!s) {
-      wxMessageBox(L"Сначала выберите VPS.", L"Файлы");
-      return;
-    }
-    auto it = files_windows_.find(s->id);
-    if (it != files_windows_.end() && it->second) {
-      it->second->Show();
-      it->second->Raise();
-      return;
-    }
-    auto start = guess_start_path(config_.commands_for(s->id));
-    auto* win = new FilesWindow(this, *s, start, &config_.settings, [this] { persist(); });
-    files_windows_[s->id] = win;
-    win->Bind(wxEVT_CLOSE_WINDOW, [this, id = s->id](wxCloseEvent& e) {
-      files_windows_.erase(id);
-      e.Skip();
-    });
-    win->Show();
-  }, 2003);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { set_workspace_mode(WorkspaceMode::Files); }, 2003);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) return;
@@ -2682,10 +2785,8 @@ void AppFrame::show_servers_context_menu(long row) {
     auto* s = selected_server();
     if (s) run_command(*s, "echo OK && hostname && whoami && pwd", 30, true, "Проверка " + s->name, "", "test");
   }, 2007);
-  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
-    auto* s = selected_server();
-    show_health(s ? s->id : std::string{});
-  }, 2009);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { set_workspace_mode(WorkspaceMode::Health); }, 2009);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { set_workspace_mode(WorkspaceMode::Backup); }, 2017);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) return;
@@ -2719,7 +2820,10 @@ void AppFrame::show_commands_context_menu(long row) {
   menu.Append(2012, L"Дублировать");
   menu.Append(2013, L"Удалить");
   menu.AppendSeparator();
-  menu.Append(2014, L"Переместить в группу");
+  menu.Append(2014, L"Переместить в группу…");
+  menu.Append(2018, L"Копировать в группу…");
+  menu.Append(2019, L"Копировать на VPS…");
+  menu.Append(2024, L"Перенести на VPS…");
   menu.AppendSeparator();
   menu.Append(2015, L"Вверх");
   menu.Append(2016, L"Вниз");
@@ -2776,34 +2880,78 @@ void AppFrame::show_commands_context_menu(long row) {
     }
     auto* s = selected_server();
     if (!s) return;
-    wxArrayString labels;
-    std::vector<std::string> ids;
-    labels.Add(L"Общее");
-    ids.push_back("");
-    for (const auto& f : config_.groups_for(s->id)) {
-      labels.Add(wxString::FromUTF8(f.name));
-      ids.push_back(f.id);
-    }
-    const int n = wxGetSingleChoiceIndex(L"Куда переместить выбранные команды?", L"Переместить в группу", labels, this);
-    if (n < 0 || n >= static_cast<int>(ids.size())) return;
-    const std::string dest = ids[static_cast<std::size_t>(n)];
-    int moved = 0;
-    for (auto* c : sel) {
-      if (c->server_id != s->id) continue;
-      if (c->group_id == dest) continue;
-      c->group_id = dest;
-      ++moved;
-    }
+    auto dest = pick_group_id(this, config_, s->id, L"Переместить в группу", L"Куда переместить выбранные команды?");
+    if (!dest) return;
+    const int moved = move_commands_to_group(config_, sel, s->id, *dest);
     if (moved == 0) {
       wxMessageBox(L"Выбранные команды уже в этой группе.", L"Переместить в группу");
       return;
     }
-    config_.settings.last_group_by_server[s->id] = dest;
+    config_.settings.last_group_by_server[s->id] = *dest;
     persist();
     rebuild_group_tabs();
     refresh_commands();
     status_->SetLabel(wxString::Format(L"Перемещено команд: %d", moved));
   }, 2014);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto sel = selected_commands();
+    if (sel.empty()) {
+      wxMessageBox(L"Выберите одну или несколько команд.", L"Копировать в группу");
+      return;
+    }
+    auto* s = selected_server();
+    if (!s) return;
+    auto dest = pick_group_id(this, config_, s->id, L"Копировать в группу", L"Куда скопировать выбранные команды?");
+    if (!dest) return;
+    const int n = copy_commands_to_group(config_, sel, *dest);
+    if (n <= 0) return;
+    config_.settings.last_group_by_server[s->id] = *dest;
+    persist();
+    rebuild_group_tabs();
+    refresh_commands();
+    status_->SetLabel(wxString::Format(L"Скопировано команд: %d", n));
+  }, 2018);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto sel = selected_commands();
+    if (sel.empty()) {
+      wxMessageBox(L"Выберите одну или несколько команд.", L"Копировать на VPS");
+      return;
+    }
+    auto* s = selected_server();
+    auto dest = pick_server_and_group(this, config_, s ? s->id : std::string{}, L"Копировать на VPS");
+    if (!dest) return;
+    const int n = copy_commands_to_vps(config_, sel, *dest);
+    if (n <= 0) return;
+    config_.settings.last_group_by_server[dest->server_id] = dest->group_id;
+    persist();
+    refresh_servers(dest->server_id);
+    status_->SetLabel(wxString::Format(L"Скопировано на другой VPS: %d", n));
+  }, 2019);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto sel = selected_commands();
+    if (sel.empty()) {
+      wxMessageBox(L"Выберите одну или несколько команд.", L"Перенести на VPS");
+      return;
+    }
+    auto* s = selected_server();
+    auto dest = pick_server_and_group(this, config_, s ? s->id : std::string{}, L"Перенести на VPS");
+    if (!dest) return;
+    if (!ask_confirm(this, L"Перенести на VPS",
+                     wxString::Format(L"Перенести выбранные команды (%d) на другой VPS?\n"
+                                      L"Из связок текущего VPS они будут убраны.",
+                                      static_cast<int>(sel.size())),
+                     L"Перенести", false))
+      return;
+    const int n = move_commands_to_vps(config_, sel, *dest);
+    if (n <= 0) {
+      wxMessageBox(L"Команды уже на этом VPS и в этой группе.", L"Перенести на VPS");
+      return;
+    }
+    config_.settings.last_group_by_server[dest->server_id] = dest->group_id;
+    persist();
+    refresh_servers(dest->server_id);
+    status_->SetLabel(wxString::Format(L"Перенесено на другой VPS: %d", n));
+  }, 2024);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { move_selected_command(-1); }, 2015);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { move_selected_command(1); }, 2016);
   show_themed_menu(this, &menu);
@@ -2818,6 +2966,7 @@ void AppFrame::show_bundles_context_menu(long row) {
   menu.Append(2021, L"По шагам");
   menu.AppendSeparator();
   menu.Append(2022, L"Изменить");
+  menu.Append(2025, L"Копировать на VPS…");
   menu.Append(2023, L"Удалить");
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { start_bundle(); }, 2020);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { open_bundle_steps(); }, 2021);
@@ -2837,6 +2986,32 @@ void AppFrame::show_bundles_context_menu(long row) {
     persist();
     refresh_bundles();
   }, 2022);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto* b = selected_bundle();
+    if (!b) return;
+    auto* s = selected_server();
+    wxArrayString labels;
+    std::vector<std::string> ids;
+    for (const auto& srv : config_.servers) {
+      if (s && srv.id == s->id) continue;
+      labels.Add(wxString::FromUTF8(srv.name.empty() ? srv.host : srv.name));
+      ids.push_back(srv.id);
+    }
+    if (ids.empty()) {
+      wxMessageBox(L"Нет другого VPS для копирования связки.", L"Связка");
+      return;
+    }
+    const int n = wxGetSingleChoiceIndex(L"На какой VPS скопировать связку?", L"Копировать связку", labels, this);
+    if (n < 0 || n >= static_cast<int>(ids.size())) return;
+    std::string err;
+    if (!copy_bundle_to_vps(config_, *b, ids[static_cast<std::size_t>(n)], &err)) {
+      wxMessageBox(wxString::FromUTF8(err.empty() ? "Не удалось скопировать связку" : err), L"Связка");
+      return;
+    }
+    persist();
+    refresh_servers(ids[static_cast<std::size_t>(n)]);
+    status_->SetLabel(L"Связка скопирована на другой VPS");
+  }, 2025);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* b = selected_bundle();
     if (!b) return;

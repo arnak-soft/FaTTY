@@ -12,6 +12,7 @@
 #include "ui/run_controller.hpp"
 #include "ui/striped_list.hpp"
 #include "ui/terminal_view.hpp"
+#include "ui/workspace_mode.hpp"
 
 #include <wx/button.h>
 #include <wx/frame.h>
@@ -51,6 +52,10 @@ class AppFrame : public wxFrame {
   void init_backup_monitor();
   void update_health_button();
   void show_backups();
+  void set_workspace_mode(WorkspaceMode mode, bool user_action = true);
+  void update_workspace_mode_ui();
+  void open_files_for_selected();
+  void show_tools_menu();
   void persist();
   void maybe_run_backup();
   void apply_ui_theme();
@@ -155,6 +160,11 @@ class AppFrame : public wxFrame {
   StripedListCtrl* servers_{};
   wxStaticText* server_heading_{};
   wxStaticText* server_meta_{};
+  WorkspaceMode workspace_mode_ = WorkspaceMode::Commands;
+  std::vector<RoundButton*> mode_btns_;
+  wxPanel* commands_workspace_{};
+  wxPanel* mode_host_{};
+  wxStaticText* mode_host_label_{};
   RoundedNotebook* groups_nb_{};
   StripedListCtrl* commands_{};
   StripedListCtrl* bundles_{};

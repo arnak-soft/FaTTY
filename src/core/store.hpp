@@ -176,6 +176,10 @@ struct AppSettings {
   bool backup_enabled = true;
   double last_backup = 0.0;
   std::map<std::string, std::string> last_group_by_server;
+  /// Режим рабочей области: commands | health | backup | files.
+  std::string workspace_mode = "commands";
+  /// В окне резервных копий показывать задания всех VPS, а не только выбранного.
+  bool backup_show_all_servers = false;
   bool health_auto = false;
   int health_interval_sec = 86400;
   int health_timeout_sec = 20;
