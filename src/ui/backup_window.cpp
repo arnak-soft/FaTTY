@@ -485,27 +485,25 @@ bool edit_backup_job_dialog(wxWindow* parent, BackupJob& job, Config& config, Ap
 
 BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* monitor, AppSettings* settings,
                            std::function<void()> persist, std::string preferred_server_id)
-    : wxFrame(parent, wxID_ANY, L"Резервные копии VPS"),
+    : wxPanel(parent),
       config_(config),
       monitor_(monitor),
       settings_(settings),
       persist_(std::move(persist)),
       preferred_server_id_(std::move(preferred_server_id)) {
-  SetName(L"frame");
-  auto* panel = new wxPanel(this);
-  panel->SetName(L"card-page");
+  SetName(L"card-page");
   auto* root = new wxBoxSizer(wxVERTICAL);
   hint_ = muted_label(
-      panel,
+      this,
       L"Это копии данных на VPS, не локальные копии config.json (Настройки → Данные). "
       L"Клиентский автозапуск работает только пока открыт FaTTY. Можно запускать вручную в любой момент.");
   root->Add(hint_, 0, wxALL, 8);
 
-  show_all_cb_ = new ThemedCheckBox(panel, wxID_ANY, L"Показать все VPS");
+  show_all_cb_ = new ThemedCheckBox(this, wxID_ANY, L"Показать все VPS");
   show_all_cb_->SetValue(settings_ && settings_->backup_show_all_servers);
   root->Add(show_all_cb_, 0, wxLEFT | wxRIGHT | wxBOTTOM, 8);
 
-  list_ = new wxListCtrl(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+  list_ = new wxListCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
                          wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxBORDER_NONE);
   list_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(160));
   list_->AppendColumn(L"VPS", wxLIST_FORMAT_LEFT, FromDIP(120));
@@ -516,13 +514,13 @@ BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* moni
   root->Add(list_, 1, wxEXPAND | wxLEFT | wxRIGHT, 8);
 
   auto* buttons = new wxBoxSizer(wxHORIZONTAL);
-  auto* add = make_button(panel, L"Добавить", BtnIcon::Plus);
-  auto* edit = make_button(panel, L"Изменить", BtnIcon::Pencil);
-  auto* dup = make_button(panel, L"Дублировать", BtnIcon::Copy);
-  auto* del = make_button(panel, L"Удалить", BtnIcon::Trash);
-  run_btn_ = make_button(panel, L"Запустить", BtnIcon::Play);
-  cron_btn_ = make_button(panel, L"Поставить cron", BtnIcon::Save);
-  uncron_btn_ = make_button(panel, L"Снять cron", BtnIcon::Trash);
+  auto* add = make_button(this, L"Добавить", BtnIcon::Plus);
+  auto* edit = make_button(this, L"Изменить", BtnIcon::Pencil);
+  auto* dup = make_button(this, L"Дублировать", BtnIcon::Copy);
+  auto* del = make_button(this, L"Удалить", BtnIcon::Trash);
+  run_btn_ = make_button(this, L"Запустить", BtnIcon::Play);
+  cron_btn_ = make_button(this, L"Поставить cron", BtnIcon::Save);
+  uncron_btn_ = make_button(this, L"Снять cron", BtnIcon::Trash);
   buttons->Add(add, 0, wxRIGHT, 6);
   buttons->Add(edit, 0, wxRIGHT, 6);
   buttons->Add(dup, 0, wxRIGHT, 6);
@@ -532,17 +530,12 @@ BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* moni
   buttons->Add(uncron_btn_, 0);
   root->Add(buttons, 0, wxALL, 8);
 
-  log_ = new wxTextCtrl(panel, wxID_ANY, L"", wxDefaultPosition, FromDIP(wxSize(-1, 140)),
+  log_ = new wxTextCtrl(this, wxID_ANY, L"", wxDefaultPosition, FromDIP(wxSize(-1, 140)),
                         wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2);
-  root->Add(new wxStaticText(panel, wxID_ANY, L"Журнал запуска"), 0, wxLEFT | wxRIGHT, 8);
+  root->Add(new wxStaticText(this, wxID_ANY, L"Журнал запуска"), 0, wxLEFT | wxRIGHT, 8);
   root->Add(log_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
 
-  panel->SetSizer(root);
-  auto* outer = new wxBoxSizer(wxVERTICAL);
-  outer->Add(panel, 1, wxEXPAND);
-  SetSizer(outer);
-  SetMinSize(FromDIP(wxSize(780, 560)));
-  setup_frame_geometry(this, settings_, "backup_window", true, persist_);
+  SetSizer(root);
   apply_dark(this);
 
   add->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { add_job(); });
@@ -560,10 +553,6 @@ BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* moni
     rebuild_list();
   });
   list_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { edit_selected(); });
-  Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
-    *alive_ = false;
-    e.Skip();
-  });
   rebuild_list();
 }
 

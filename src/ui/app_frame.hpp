@@ -17,6 +17,7 @@
 #include <wx/button.h>
 #include <wx/frame.h>
 #include <wx/gauge.h>
+#include <wx/sizer.h>
 #include <wx/splitter.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
@@ -51,11 +52,17 @@ class AppFrame : public wxFrame {
   void init_health_monitor();
   void init_backup_monitor();
   void update_health_button();
-  void show_backups();
+  void ensure_mode_panels();
   void set_workspace_mode(WorkspaceMode mode, bool user_action = true);
   void update_workspace_mode_ui();
+  void sync_mode_panels_to_server();
   void open_files_for_selected();
   void show_tools_menu();
+  void ensure_shell_slot(const std::string& server_id);
+  void activate_shell_for_selected();
+  void stop_all_shells();
+  TerminalView* active_terminal();
+  ShellSession* active_shell();
   void persist();
   void maybe_run_backup();
   void apply_ui_theme();
@@ -99,7 +106,6 @@ class AppFrame : public wxFrame {
   bool shell_takes_automation(const std::string& server_id = {}) const;
   void settle_shell_after_run();
   void show_journal();
-  void show_health(const std::string& select_id = {});
   void show_help(const std::string& tab = {});
   void check_updates_interactive();
   void check_updates_async(bool interactive);
@@ -162,23 +168,30 @@ class AppFrame : public wxFrame {
   wxStaticText* server_meta_{};
   WorkspaceMode workspace_mode_ = WorkspaceMode::Commands;
   std::vector<RoundButton*> mode_btns_;
+  wxPanel* mode_stack_{};
   wxPanel* commands_workspace_{};
-  wxPanel* mode_host_{};
-  wxStaticText* mode_host_label_{};
+  wxPanel* files_host_{};
+  wxBoxSizer* files_host_sz_{};
   RoundedNotebook* groups_nb_{};
   StripedListCtrl* commands_{};
   StripedListCtrl* bundles_{};
   std::vector<std::string> group_tab_ids_;
   RoundedNotebook* bottom_nb_{};
   wxTextCtrl* output_{};
-  TerminalView* terminal_{};
+  wxPanel* shell_stack_{};
+  wxBoxSizer* shell_stack_sz_{};
+  TerminalView* terminal_{};  // активный терминал выбранного VPS
   RoundButton* shell_connect_btn_{};
   RoundButton* shell_disconnect_btn_{};
   ThemedCheckBox* shell_automation_cb_{};
   ThemedMenuBar* menu_bar_{};
   wxStaticText* shell_status_{};
-  std::unique_ptr<ShellSession> shell_;
-  std::string shell_server_id_;
+  struct VpsShell {
+    std::unique_ptr<ShellSession> session;
+    TerminalView* terminal = nullptr;
+  };
+  std::map<std::string, VpsShell> shells_;
+  std::string shell_active_id_;
   // Сессионный флаг: при каждом запуске FaTTY снова включается.
   bool session_automation_to_shell_ = true;
   wxTextCtrl* quick_{};
@@ -199,8 +212,8 @@ class AppFrame : public wxFrame {
   wxStaticText* status_{};
   std::map<std::string, FilesWindow*> files_windows_;
   JournalWindow* journal_window_ = nullptr;
-  HealthWindow* health_window_ = nullptr;
-  BackupWindow* backup_window_ = nullptr;
+  HealthWindow* health_panel_ = nullptr;
+  BackupWindow* backup_panel_ = nullptr;
   HelpWindow* help_window_ = nullptr;
   std::map<std::string, BundleStepsWindow*> bundle_steps_windows_;
   RoundButton* health_btn_ = nullptr;

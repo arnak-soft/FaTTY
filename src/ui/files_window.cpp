@@ -32,26 +32,22 @@ namespace fatty {
 
 FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string start_path, AppSettings* settings,
                          std::function<void()> persist)
-    : wxFrame(parent, wxID_ANY, wxString::FromUTF8("Файлы — " + (server.name.empty() ? server.host : server.name)),
-              wxDefaultPosition, wxDefaultSize),
+    : wxPanel(parent),
       server_(server),
       start_path_(std::move(start_path)) {
-  set_icon(this);
-  const bool had_geometry = settings && settings->dialog_geometry.count("files");
-  SetSize(FromDIP(wxSize(780, 520)));
-  setup_frame_geometry(this, settings, "files", true, std::move(persist));
-  if (!had_geometry) CentreOnParent();
-  auto* panel = new wxPanel(this);
-  path_ = new wxTextCtrl(panel, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
-  auto* up = make_button(panel, L"Вверх", BtnIcon::ArrowUp);
-  auto* mkdir = make_button(panel, L"Новая папка", BtnIcon::FolderPlus);
-  auto* upload_btn = make_button(panel, L"Загрузить", BtnIcon::Upload);
-  auto* download_btn = make_button(panel, L"Скачать", BtnIcon::Download);
-  auto* del = make_button(panel, L"Удалить", BtnIcon::Trash);
-  auto* stop = make_button(panel, L"Стоп", BtnIcon::Stop);
+  (void)settings;
+  (void)persist;
+  SetName(L"card-page");
+  path_ = new wxTextCtrl(this, wxID_ANY, L"", wxDefaultPosition, wxDefaultSize, wxTE_PROCESS_ENTER);
+  auto* up = make_button(this, L"Вверх", BtnIcon::ArrowUp);
+  auto* mkdir = make_button(this, L"Новая папка", BtnIcon::FolderPlus);
+  auto* upload_btn = make_button(this, L"Загрузить", BtnIcon::Upload);
+  auto* download_btn = make_button(this, L"Скачать", BtnIcon::Download);
+  auto* del = make_button(this, L"Удалить", BtnIcon::Trash);
+  auto* stop = make_button(this, L"Стоп", BtnIcon::Stop);
   stop_btn_ = stop;
   busy_disable_ = {up, mkdir, upload_btn, download_btn, del, path_};
-  auto* list_card = new RoundedCard(panel);
+  auto* list_card = new RoundedCard(this);
   list_ = new wxListCtrl(list_card, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLC_REPORT | wxLC_SINGLE_SEL | wxBORDER_NONE);
   list_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(280));
   list_->AppendColumn(L"Тип", wxLIST_FORMAT_LEFT, FromDIP(120));
@@ -60,8 +56,8 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
   auto* list_sz = new wxBoxSizer(wxVERTICAL);
   list_sz->Add(list_, 1, wxEXPAND);
   list_card->SetSizer(list_sz);
-  gauge_ = new wxGauge(panel, wxID_ANY, 100);
-  status_ = new wxStaticText(panel, wxID_ANY, L"Подключение…");
+  gauge_ = new wxGauge(this, wxID_ANY, 100);
+  status_ = new wxStaticText(this, wxID_ANY, L"Подключение…");
   status_->SetName(L"muted");
   auto* top = new wxBoxSizer(wxHORIZONTAL);
   top->Add(path_, 1, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
@@ -79,10 +75,7 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
   root->Add(list_card, 1, wxEXPAND | wxALL, 8);
   root->Add(gauge_, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
   root->Add(status_, 0, wxEXPAND | wxALL, 8);
-  panel->SetSizer(root);
-  auto* outer = new wxBoxSizer(wxVERTICAL);
-  outer->Add(panel, 1, wxEXPAND);
-  SetSizer(outer);
+  SetSizer(root);
   apply_dark(this);
   up->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { go_up(); });
   path_->Bind(wxEVT_TEXT_ENTER, [this](wxCommandEvent&) {
@@ -140,13 +133,6 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
     }
   });
   stop->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { session_->cancel_transfer(); });
-  Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
-    alive_->store(false);
-    session_->cancel_transfer();
-    session_->close();
-    e.Skip();
-  });
-  bind_escape_close(this);
   CallAfter([this] { connect(); });
 }
 

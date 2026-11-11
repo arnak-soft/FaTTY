@@ -133,8 +133,10 @@ void RunController::start_ssh_run(Server server, std::string command, int timeou
       if (!result.cwd.empty()) new_cwd = result.cwd;
       if (host.append_output) {
         auto col = code == 0 ? Theme::ok() : Theme::err();
-        post([append = host.append_output, code, col] {
-          append("\n← код выхода " + std::to_string(code) + "\n", &col);
+        auto when = now_iso();
+        if (auto p = when.find('T'); p != std::string::npos) when[p] = ' ';
+        post([append = host.append_output, code, col, when = std::move(when)] {
+          append("\n← код выхода " + std::to_string(code) + "  •  " + when + "\n", &col);
         });
       }
     } catch (const std::exception& exc) {

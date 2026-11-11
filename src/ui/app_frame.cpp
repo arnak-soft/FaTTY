@@ -196,7 +196,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     if (bundle_run_) bundle_run_->cancel();
     if (runs_) runs_->clear_run_queue();
     if (health_) health_->stop();
-    if (shell_) shell_->stop();
+    stop_all_shells();
     // Закрытие подтверждено: гасим живой-токен, чтобы фоновые задачи не трогали окно.
     alive_->store(false);
     busy_timer_.Stop();
@@ -280,6 +280,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     if (config_.settings.vsash_pos > 0) vsplit_->SetSashPosition(config_.settings.vsash_pos);
     restore_columns();
     restoring_ = false;
+    activate_shell_for_selected();
     set_workspace_mode(workspace_mode_from_key(config_.settings.workspace_mode), false);
     maybe_show_whats_new();
     if (config_.settings.check_updates_on_start) {
@@ -417,18 +418,15 @@ void AppFrame::build_ui() {
   busy_disable_ = {tools};
   rebuild_extra_tools();
 
-  commands_workspace_ = new wxPanel(right);
+  mode_stack_ = new wxPanel(right);
+  mode_stack_->SetName(L"card-page");
+  commands_workspace_ = new wxPanel(mode_stack_);
   commands_workspace_->SetName(L"card-page");
-  mode_host_ = new wxPanel(right);
-  mode_host_->SetName(L"card-page");
-  mode_host_label_ = new wxStaticText(mode_host_, wxID_ANY, L"");
-  mode_host_label_->SetName(L"muted");
-  auto* mode_host_sz = new wxBoxSizer(wxVERTICAL);
-  mode_host_sz->AddStretchSpacer(1);
-  mode_host_sz->Add(mode_host_label_, 0, wxALIGN_CENTER | wxALL, pad);
-  mode_host_sz->AddStretchSpacer(1);
-  mode_host_->SetSizer(mode_host_sz);
-  mode_host_->Hide();
+  files_host_ = new wxPanel(mode_stack_);
+  files_host_->SetName(L"card-page");
+  files_host_sz_ = new wxBoxSizer(wxVERTICAL);
+  files_host_->SetSizer(files_host_sz_);
+  files_host_->Hide();
 
   auto* right_nb = new RoundedNotebook(commands_workspace_);
 
@@ -554,11 +552,15 @@ void AppFrame::build_ui() {
   cws->Add(qrow, 0, wxEXPAND | wxTOP, pad);
   commands_workspace_->SetSizer(cws);
 
+  auto* mode_stack_sz = new wxBoxSizer(wxVERTICAL);
+  mode_stack_sz->Add(commands_workspace_, 1, wxEXPAND);
+  mode_stack_sz->Add(files_host_, 1, wxEXPAND);
+  mode_stack_->SetSizer(mode_stack_sz);
+
   auto* rs = new wxBoxSizer(wxVERTICAL);
   rs->Add(head, 0, wxEXPAND | wxBOTTOM, gap);
   rs->Add(mode_row, 0, wxEXPAND | wxBOTTOM, gap);
-  rs->Add(commands_workspace_, 1, wxEXPAND);
-  rs->Add(mode_host_, 1, wxEXPAND);
+  rs->Add(mode_stack_, 1, wxEXPAND);
   right->SetSizer(rs);
   hsplit_->SplitVertically(left, right, FromDIP(400));
   auto* ts = new wxBoxSizer(wxVERTICAL);
@@ -604,14 +606,16 @@ void AppFrame::build_ui() {
   shell_automation_cb_ = new ThemedCheckBox(shellp, wxID_ANY, L"Вывод команд сюда");
   shell_automation_cb_->SetValue(true);
   shell_automation_cb_->SetToolTip(
-      L"Пока включено, F5 и связки пишут в эту вкладку (если Shell к тому же VPS). "
-      L"При каждом запуске FaTTY галочка снова включена.");
+      L"Пока включено, F5 и связки пишут в Shell выбранного VPS (если он подключён). "
+      L"У каждого VPS свой Shell. При каждом запуске FaTTY галочка снова включена.");
   shell_status_ = new wxStaticText(shellp, wxID_ANY, L"Выберите VPS и нажмите «Подключить»");
   shell_status_->SetName(L"muted");
   auto* shell_card = new RoundedCard(shellp);
-  terminal_ = new TerminalView(shell_card);
+  shell_stack_ = new wxPanel(shell_card);
+  shell_stack_sz_ = new wxBoxSizer(wxVERTICAL);
+  shell_stack_->SetSizer(shell_stack_sz_);
   auto* shell_card_sz = new wxBoxSizer(wxVERTICAL);
-  shell_card_sz->Add(terminal_, 1, wxEXPAND);
+  shell_card_sz->Add(shell_stack_, 1, wxEXPAND);
   shell_card->SetSizer(shell_card_sz);
   auto* st = new wxBoxSizer(wxHORIZONTAL);
   st->Add(shell_connect_btn_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, gap);
@@ -630,23 +634,16 @@ void AppFrame::build_ui() {
   bottom->SetSizer(bottom_sz);
   vsplit_->SplitHorizontally(top, bottom, FromDIP(420));
 
-  terminal_->set_write_callback([this](const std::string& data) {
-    if (shell_ && shell_->running()) shell_->write(data);
-  });
-  terminal_->set_resize_callback([this](int cols, int rows) {
-    if (shell_ && shell_->running()) shell_->resize(cols, rows);
-  });
-  terminal_->set_copy_callback([this](const std::string& t) {
-    status_->SetLabel(wxString::Format(L"Скопировано в буфер (%d симв.)", (int)t.size()));
-  });
   shell_connect_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { shell_connect(); });
   shell_disconnect_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { shell_disconnect(); });
   shell_automation_cb_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
     session_automation_to_shell_ = shell_automation_cb_->GetValue();
-    if (shell_ && shell_->running() && terminal_) terminal_->SetFocus();
+    if (auto* term = active_terminal()) term->SetFocus();
   });
   bottom_nb_->Bind(wxEVT_NOTEBOOK_PAGE_CHANGED, [this](wxBookCtrlEvent& e) {
-    if (e.GetSelection() == 1 && terminal_) terminal_->SetFocus();
+    if (e.GetSelection() == 1) {
+      if (auto* term = active_terminal()) term->SetFocus();
+    }
     e.Skip();
   });
 
@@ -683,9 +680,8 @@ void AppFrame::build_ui() {
     reset_quick_history_nav();
     rebuild_group_tabs();
     refresh_commands();
-    if (workspace_mode_ != WorkspaceMode::Commands) {
-      set_workspace_mode(workspace_mode_, false);
-    }
+    activate_shell_for_selected();
+    sync_mode_panels_to_server();
   });
   servers_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) {
     auto* s = selected_server();
@@ -697,7 +693,7 @@ void AppFrame::build_ui() {
       persist();
       if (health_) health_->reevaluate_cached();
       refresh_servers(s->id);
-      if (health_window_) health_window_->reload();
+      if (health_panel_) health_panel_->reload();
     }
   });
   commands_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) { request_saved_runs(); });
@@ -917,7 +913,10 @@ void AppFrame::show_journal() {
   if (!journal_window_) {
     journal_window_ = new JournalWindow(this, journal_, [this](const JournalEntry& e) {
       if (e.kind == "health") {
-        show_health(e.server_id);
+        if (!e.server_id.empty()) {
+          refresh_servers(e.server_id);
+        }
+        set_workspace_mode(WorkspaceMode::Health);
         return;
       }
       auto* s = config_.server_by_id(e.server_id);
@@ -955,31 +954,6 @@ void AppFrame::show_journal() {
   journal_window_->Raise();
 }
 
-void AppFrame::show_health(const std::string& select_id) {
-  if (!health_window_) {
-    health_window_ = new HealthWindow(
-        this, health_.get(), &config_,
-        [this](const std::string& id) {
-          if (health_) health_->refresh(id);
-        },
-        [this] {
-          if (health_) health_->refresh_all();
-        },
-        &config_.settings, [this] { persist(); });
-    health_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
-      health_window_ = nullptr;
-      if (workspace_mode_ == WorkspaceMode::Health) {
-        set_workspace_mode(WorkspaceMode::Commands, false);
-      }
-      ev.Skip();
-    });
-  }
-  if (!select_id.empty()) health_window_->select_server(select_id);
-  health_window_->reload();
-  health_window_->Show();
-  health_window_->Raise();
-}
-
 void AppFrame::init_backup_monitor() {
   BackupMonitor::Deps d;
   d.config = [this]() -> Config& { return config_; };
@@ -988,60 +962,61 @@ void AppFrame::init_backup_monitor() {
   d.persist = [this] { persist(); };
   d.on_change = [this, alive = alive_] {
     if (!alive->load()) return;
-    if (backup_window_) backup_window_->reload();
+    if (backup_panel_) backup_panel_->reload();
   };
   d.on_log = [this, alive = alive_](const std::string& /*job_id*/, const std::string& line) {
-    if (!alive->load() || !backup_window_) return;
-    backup_window_->append_log(line);
+    if (!alive->load() || !backup_panel_) return;
+    backup_panel_->append_log(line);
   };
   backups_ = std::make_unique<BackupMonitor>(std::move(d));
   backups_->start();
 }
 
-void AppFrame::show_backups() {
-  auto* s = selected_server();
-  const std::string preferred = s ? s->id : std::string{};
-  if (!backup_window_) {
-    backup_window_ =
-        new BackupWindow(this, &config_, backups_.get(), &config_.settings, [this] { persist(); }, preferred);
-    backup_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
-      backup_window_ = nullptr;
-      if (workspace_mode_ == WorkspaceMode::Backup) {
-        set_workspace_mode(WorkspaceMode::Commands, false);
-      }
-      ev.Skip();
-    });
-  } else {
-    backup_window_->set_preferred_server(preferred);
+void AppFrame::ensure_mode_panels() {
+  if (!mode_stack_) return;
+  if (!health_panel_ && health_) {
+    health_panel_ = new HealthWindow(
+        mode_stack_, health_.get(), &config_,
+        [this](const std::string& id) {
+          if (health_) health_->refresh(id);
+        },
+        [this] {
+          if (health_) health_->refresh_all();
+        },
+        &config_.settings, [this] { persist(); });
+    if (auto* sz = mode_stack_->GetSizer()) sz->Add(health_panel_, 1, wxEXPAND);
+    health_panel_->Hide();
   }
-  backup_window_->Show();
-  backup_window_->Raise();
+  if (!backup_panel_ && backups_) {
+    auto* s = selected_server();
+    backup_panel_ = new BackupWindow(mode_stack_, &config_, backups_.get(), &config_.settings,
+                                     [this] { persist(); }, s ? s->id : std::string{});
+    if (auto* sz = mode_stack_->GetSizer()) sz->Add(backup_panel_, 1, wxEXPAND);
+    backup_panel_->Hide();
+  }
 }
 
 void AppFrame::open_files_for_selected() {
   auto* s = selected_server();
-  if (!s) {
-    wxMessageBox(L"Сначала выберите VPS.", L"Файлы");
+  if (!s || !files_host_) {
+    if (!s) wxMessageBox(L"Сначала выберите VPS.", L"Файлы");
     return;
+  }
+  for (auto& [id, win] : files_windows_) {
+    if (win) win->Hide();
   }
   auto it = files_windows_.find(s->id);
   if (it != files_windows_.end() && it->second) {
     it->second->Show();
-    it->second->Raise();
+    files_host_->Layout();
     return;
   }
   auto start = guess_start_path(config_.commands_for(s->id));
-  auto* win = new FilesWindow(this, *s, start, &config_.settings, [this] { persist(); });
+  auto* win = new FilesWindow(files_host_, *s, start, &config_.settings, [this] { persist(); });
   files_windows_[s->id] = win;
-  win->Bind(wxEVT_CLOSE_WINDOW, [this, id = s->id](wxCloseEvent& e) {
-    files_windows_.erase(id);
-    if (workspace_mode_ == WorkspaceMode::Files) {
-      auto* cur = selected_server();
-      if (!cur || cur->id == id) set_workspace_mode(WorkspaceMode::Commands, false);
-    }
-    e.Skip();
-  });
+  files_host_sz_->Add(win, 1, wxEXPAND);
   win->Show();
+  files_host_->Layout();
 }
 
 void AppFrame::show_tools_menu() {
@@ -1111,35 +1086,12 @@ void AppFrame::show_tools_menu() {
 }
 
 void AppFrame::update_workspace_mode_ui() {
-  const bool commands = workspace_mode_ == WorkspaceMode::Commands;
-  if (commands_workspace_) commands_workspace_->Show(commands);
-  if (mode_host_) {
-    mode_host_->Show(!commands);
-    if (!commands && mode_host_label_) {
-      wxString text;
-      switch (workspace_mode_) {
-        case WorkspaceMode::Health:
-          text = L"Окно «Состояние VPS» открыто для выбранного сервера.\nЧтобы запускать команды — режим «Команды».";
-          break;
-        case WorkspaceMode::Backup:
-          text =
-              L"Окно «Резервные копии VPS» — задания выбранного сервера.\n"
-              L"Галочка «Показать все VPS» снимает фильтр.";
-          break;
-        case WorkspaceMode::Files:
-          text = L"Окно «Файлы» открыто для выбранного VPS.\nЧтобы запускать команды — режим «Команды».";
-          break;
-        case WorkspaceMode::Commands:
-        default:
-          break;
-      }
-      mode_host_label_->SetLabel(text);
-      mode_host_label_->Wrap(mode_host_->FromDIP(420));
-    }
-  }
-  if (auto* right = commands_workspace_ ? commands_workspace_->GetParent() : nullptr) {
-    right->Layout();
-  }
+  ensure_mode_panels();
+  if (commands_workspace_) commands_workspace_->Show(workspace_mode_ == WorkspaceMode::Commands);
+  if (health_panel_) health_panel_->Show(workspace_mode_ == WorkspaceMode::Health);
+  if (backup_panel_) backup_panel_->Show(workspace_mode_ == WorkspaceMode::Backup);
+  if (files_host_) files_host_->Show(workspace_mode_ == WorkspaceMode::Files);
+  if (mode_stack_) mode_stack_->Layout();
   for (std::size_t i = 0; i < mode_btns_.size(); ++i) {
     auto* btn = mode_btns_[i];
     if (!btn) continue;
@@ -1151,28 +1103,25 @@ void AppFrame::update_workspace_mode_ui() {
   update_health_button();
 }
 
+void AppFrame::sync_mode_panels_to_server() {
+  auto* s = selected_server();
+  if (health_panel_) {
+    if (s) health_panel_->select_server(s->id);
+    health_panel_->reload();
+  }
+  if (backup_panel_) backup_panel_->set_preferred_server(s ? s->id : std::string{});
+  if (workspace_mode_ == WorkspaceMode::Files) open_files_for_selected();
+}
+
 void AppFrame::set_workspace_mode(WorkspaceMode mode, bool user_action) {
   workspace_mode_ = mode;
   if (user_action) {
     config_.settings.workspace_mode = workspace_mode_key(mode);
     if (!restoring_) persist();
   }
+  ensure_mode_panels();
   update_workspace_mode_ui();
-  auto* s = selected_server();
-  switch (mode) {
-    case WorkspaceMode::Health:
-      show_health(s ? s->id : std::string{});
-      break;
-    case WorkspaceMode::Backup:
-      show_backups();
-      break;
-    case WorkspaceMode::Files:
-      open_files_for_selected();
-      break;
-    case WorkspaceMode::Commands:
-    default:
-      break;
-  }
+  sync_mode_panels_to_server();
   if (status_ && !busy_) {
     status_->SetLabel(wxString::Format(L"Режим: %s", workspace_mode_label(workspace_mode_)));
   }
@@ -1328,8 +1277,9 @@ void AppFrame::open_settings() {
                          health_->reevaluate_cached();
                          health_->wake();
                        }
-                       if (health_window_) health_window_->reload();
-                       if (config_.settings.automation_to_shell_when_connected && shell_ && shell_->running()) {
+                       if (health_panel_) health_panel_->reload();
+                       if (config_.settings.automation_to_shell_when_connected && active_shell() &&
+                           active_shell()->running()) {
                          session_automation_to_shell_ = true;
                          update_shell_ui();
                        }
@@ -1578,8 +1528,9 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
   rebuild_group_tabs();
   refresh_commands();
   apply_server_appearance();
-  if (health_window_) health_window_->reload();
+  if (health_panel_) health_panel_->reload();
   update_health_button();
+  activate_shell_for_selected();
 }
 
 void AppFrame::restore_columns() {
@@ -1597,13 +1548,20 @@ void AppFrame::apply_ui_theme() {
   style_list(commands_);
   if (bundles_) style_list(bundles_);
   if (journal_window_) apply_theme(journal_window_);
-  if (health_window_) apply_theme(health_window_);
+  if (health_panel_) apply_theme(health_panel_);
+  if (backup_panel_) apply_theme(backup_panel_);
   if (help_window_) apply_theme(help_window_);
   for (auto& [id, win] : bundle_steps_windows_) {
     if (win) win->apply_server_look();
   }
   for (auto& [id, win] : files_windows_) {
     if (win) apply_theme(win);
+  }
+  for (auto& [id, slot] : shells_) {
+    if (slot.terminal) {
+      apply_theme(slot.terminal);
+      slot.terminal->sync_font();
+    }
   }
   setup_server_columns();
   setup_command_columns();
@@ -2110,13 +2068,17 @@ void AppFrame::refresh_bundles() {
 
 void AppFrame::append_output(const std::string& text, const wxColour* colour) {
   if (shell_takes_automation()) {
-    if (bottom_nb_ && bottom_nb_->GetSelection() != 1) {
-      bottom_nb_->SetSelection(1);
+    const std::string id = busy_server_id_;
+    TerminalView* term = nullptr;
+    auto it = shells_.find(id);
+    if (it != shells_.end()) term = it->second.terminal;
+    if (bottom_nb_ && bottom_nb_->GetSelection() != 1) bottom_nb_->SetSelection(1);
+    if (id == shell_active_id_) {
       CallAfter([this] {
-        if (terminal_) terminal_->SetFocus();
+        if (auto* t = active_terminal()) t->SetFocus();
       });
     }
-    if (!terminal_) return;
+    if (!term) return;
     std::string chunk = text;
     if (colour) {
       std::string open;
@@ -2128,25 +2090,99 @@ void AppFrame::append_output(const std::string& text, const wxColour* colour) {
         open = "\x1b[36m";
       if (!open.empty()) chunk = open + text + "\x1b[0m";
     }
-    terminal_->feed(chunk);
+    term->feed(chunk);
     return;
   }
   output_->SetDefaultStyle(wxTextAttr(colour ? *colour : Theme::text()));
   output_->AppendText(wxString::FromUTF8(text));
 }
 
+TerminalView* AppFrame::active_terminal() {
+  if (shell_active_id_.empty()) return terminal_;
+  auto it = shells_.find(shell_active_id_);
+  return it == shells_.end() ? terminal_ : it->second.terminal;
+}
+
+ShellSession* AppFrame::active_shell() {
+  if (shell_active_id_.empty()) return nullptr;
+  auto it = shells_.find(shell_active_id_);
+  if (it == shells_.end()) return nullptr;
+  return it->second.session.get();
+}
+
+void AppFrame::ensure_shell_slot(const std::string& server_id) {
+  if (server_id.empty() || !shell_stack_ || !shell_stack_sz_) return;
+  auto& slot = shells_[server_id];
+  if (slot.terminal) return;
+  slot.terminal = new TerminalView(shell_stack_);
+  shell_stack_sz_->Add(slot.terminal, 1, wxEXPAND);
+  slot.terminal->Hide();
+  slot.terminal->set_write_callback([this, server_id](const std::string& data) {
+    auto it = shells_.find(server_id);
+    if (it == shells_.end() || !it->second.session || !it->second.session->running()) return;
+    it->second.session->write(data);
+  });
+  slot.terminal->set_resize_callback([this, server_id](int cols, int rows) {
+    auto it = shells_.find(server_id);
+    if (it == shells_.end() || !it->second.session || !it->second.session->running()) return;
+    it->second.session->resize(cols, rows);
+  });
+  slot.terminal->set_copy_callback([this](const std::string& t) {
+    status_->SetLabel(wxString::Format(L"Скопировано в буфер (%d симв.)", (int)t.size()));
+  });
+}
+
+void AppFrame::activate_shell_for_selected() {
+  auto* s = selected_server();
+  if (!s) {
+    shell_active_id_.clear();
+    terminal_ = nullptr;
+    update_shell_ui();
+    if (shell_status_) shell_status_->SetLabel(L"Выберите VPS и нажмите «Подключить»");
+    return;
+  }
+  ensure_shell_slot(s->id);
+  for (auto& [id, slot] : shells_) {
+    if (slot.terminal) slot.terminal->Show(id == s->id);
+  }
+  shell_active_id_ = s->id;
+  terminal_ = shells_[s->id].terminal;
+  if (shell_stack_) shell_stack_->Layout();
+  update_shell_ui();
+  auto* sh = active_shell();
+  if (sh && sh->running()) {
+    if (shell_status_) {
+      shell_status_->SetLabel(wxString::FromUTF8("Shell → " + s->name + " (" + s->host + ")"));
+    }
+  } else if (shell_status_) {
+    shell_status_->SetLabel(wxString::FromUTF8("Shell для «" + s->name + "» не подключён"));
+  }
+}
+
+void AppFrame::stop_all_shells() {
+  for (auto& [id, slot] : shells_) {
+    if (slot.session) {
+      slot.session->stop();
+      slot.session.reset();
+    }
+  }
+  shell_active_id_.clear();
+  terminal_ = nullptr;
+}
+
 bool AppFrame::shell_takes_automation(const std::string& server_id) const {
   if (!session_automation_to_shell_) return false;
-  if (!shell_ || !shell_->running() || !terminal_) return false;
-  if (shell_server_id_.empty()) return false;
   const std::string& id = !server_id.empty() ? server_id : busy_server_id_;
-  if (!id.empty() && id != shell_server_id_) return false;
+  if (id.empty()) return false;
+  auto it = shells_.find(id);
+  if (it == shells_.end() || !it->second.session || !it->second.session->running()) return false;
   return true;
 }
 
 void AppFrame::update_shell_ui() {
-  const bool on = shell_ && shell_->running();
-  if (shell_connect_btn_) shell_connect_btn_->Enable(!on);
+  auto* sh = active_shell();
+  const bool on = sh && sh->running();
+  if (shell_connect_btn_) shell_connect_btn_->Enable(!on && selected_server() != nullptr);
   if (shell_disconnect_btn_) shell_disconnect_btn_->Enable(on);
   if (shell_automation_cb_) {
     shell_automation_cb_->Enable(on);
@@ -2162,12 +2198,15 @@ void AppFrame::shell_connect() {
     wxMessageBox(L"Сначала выберите VPS.", L"Shell", wxOK | wxICON_INFORMATION, this);
     return;
   }
-  if (shell_ && shell_->running()) {
+  ensure_shell_slot(s->id);
+  activate_shell_for_selected();
+  auto& slot = shells_[s->id];
+  if (slot.session && slot.session->running()) {
     shell_disconnect();
   }
-  terminal_->reset();
-  shell_server_id_ = s->id;
-  shell_status_->SetLabel(wxString::FromUTF8("Подключение к " + s->name + "…"));
+  if (!slot.terminal) return;
+  slot.terminal->reset();
+  if (shell_status_) shell_status_->SetLabel(wxString::FromUTF8("Подключение к " + s->name + "…"));
   update_shell_ui();
   if (bottom_nb_) bottom_nb_->SetSelection(1);
 
@@ -2175,42 +2214,52 @@ void AppFrame::shell_connect() {
     session_automation_to_shell_ = true;
   }
 
-  shell_ = std::make_unique<ShellSession>();
+  slot.session = std::make_unique<ShellSession>();
   auto alive = alive_;
+  const std::string sid = s->id;
   Server srv = *s;
-  const int cols = terminal_->cols();
-  const int rows = terminal_->rows();
-  shell_->start(
+  const int cols = slot.terminal->cols();
+  const int rows = slot.terminal->rows();
+  slot.session->start(
       srv, cols, rows,
-      [this, alive](const std::string& chunk) {
-        wxTheApp->CallAfter([this, alive, chunk] {
-          if (!alive->load() || !terminal_) return;
-          terminal_->feed(chunk, true);
+      [this, alive, sid](const std::string& chunk) {
+        wxTheApp->CallAfter([this, alive, sid, chunk] {
+          if (!alive->load()) return;
+          auto it = shells_.find(sid);
+          if (it == shells_.end() || !it->second.terminal) return;
+          it->second.terminal->feed(chunk, true);
         });
       },
-      [this, alive](const std::string& reason) {
-        wxTheApp->CallAfter([this, alive, reason] {
+      [this, alive, sid](const std::string& reason) {
+        wxTheApp->CallAfter([this, alive, sid, reason] {
           if (!alive->load()) return;
-          shell_server_id_.clear();
-          update_shell_ui();
-          if (shell_status_) {
-            shell_status_->SetLabel(wxString::FromUTF8(reason.empty() ? "Отключено" : reason));
+          auto it = shells_.find(sid);
+          if (it != shells_.end()) it->second.session.reset();
+          if (sid == shell_active_id_) {
+            update_shell_ui();
+            if (shell_status_) {
+              shell_status_->SetLabel(wxString::FromUTF8(reason.empty() ? "Отключено" : reason));
+            }
           }
           if (status_) status_->SetLabel(wxString::FromUTF8("Shell: " + reason));
         });
       });
-  shell_status_->SetLabel(wxString::FromUTF8("Shell → " + s->name + " (" + s->host + ")"));
+  if (shell_status_) shell_status_->SetLabel(wxString::FromUTF8("Shell → " + s->name + " (" + s->host + ")"));
   status_->SetLabel(wxString::FromUTF8("Shell подключён → " + s->name));
   update_shell_ui();
-  terminal_->SetFocus();
+  slot.terminal->SetFocus();
 }
 
 void AppFrame::shell_disconnect() {
-  if (shell_) shell_->stop();
-  shell_.reset();
-  shell_server_id_.clear();
+  auto* s = selected_server();
+  if (!s) return;
+  auto it = shells_.find(s->id);
+  if (it != shells_.end() && it->second.session) {
+    it->second.session->stop();
+    it->second.session.reset();
+  }
   update_shell_ui();
-  if (shell_status_) shell_status_->SetLabel(L"Отключено");
+  if (shell_status_) shell_status_->SetLabel(wxString::FromUTF8("Shell для «" + s->name + "» отключён"));
   if (status_) status_->SetLabel(L"Shell отключён");
 }
 
@@ -2229,36 +2278,47 @@ void AppFrame::set_busy(bool busy) {
     busy_gauge_->Show();
     busy_gauge_->Pulse();
     busy_timer_.Start(250);
-    if (shell_takes_automation() && terminal_) {
+    if (shell_takes_automation()) {
       if (bottom_nb_ && bottom_nb_->GetSelection() != 1) bottom_nb_->SetSelection(1);
       CallAfter([this] {
-        if (terminal_) terminal_->SetFocus();
+        if (auto* t = active_terminal()) t->SetFocus();
       });
     }
   } else {
-    const bool settle = shell_takes_automation();
+    const std::string settle_id = busy_server_id_;
+    const bool settle = shell_takes_automation(settle_id);
     busy_server_id_.clear();
     busy_timer_.Stop();
     busy_gauge_->Hide();
     if (auto* sizer = busy_gauge_->GetContainingSizer()) sizer->Layout();
     if (health_) health_->wake();
-    if (settle) settle_shell_after_run();
-    if (session_automation_to_shell_ && shell_ && shell_->running() && terminal_ &&
+    if (settle) {
+      busy_server_id_ = settle_id;
+      settle_shell_after_run();
+      busy_server_id_.clear();
+    }
+    if (session_automation_to_shell_ && active_shell() && active_shell()->running() &&
         bottom_nb_ && bottom_nb_->GetSelection() == 1) {
       CallAfter([this] {
-        if (terminal_) terminal_->SetFocus();
+        if (auto* t = active_terminal()) t->SetFocus();
       });
     }
   }
 }
 
 void AppFrame::settle_shell_after_run() {
-  if (!shell_ || !shell_->running() || !terminal_ || terminal_->alt_screen()) return;
+  const std::string id = busy_server_id_;
+  auto it = shells_.find(id);
+  if (it == shells_.end() || !it->second.session || !it->second.session->running() || !it->second.terminal ||
+      it->second.terminal->alt_screen())
+    return;
+  auto* term = it->second.terminal;
+  auto* sh = it->second.session.get();
   std::string echoed;
   if (config_.settings.shell_follow_command_cwd) {
     std::string cwd;
-    auto it = remote_cwd_.find(shell_server_id_);
-    if (it != remote_cwd_.end()) cwd = trim(it->second);
+    auto cwd_it = remote_cwd_.find(id);
+    if (cwd_it != remote_cwd_.end()) cwd = trim(cwd_it->second);
     if (cwd.empty() || cwd == "~") {
       echoed = "cd";
     } else if (cwd.size() >= 2 && cwd[0] == '~' && cwd[1] == '/') {
@@ -2267,8 +2327,8 @@ void AppFrame::settle_shell_after_run() {
       echoed = "cd " + shlex_quote(cwd);
     }
   }
-  terminal_->expect_prompt_after(echoed);
-  shell_->write("\x15" + echoed + "\n");
+  term->expect_prompt_after(echoed);
+  sh->write("\x15" + echoed + "\n");
 }
 
 void AppFrame::init_run_controllers() {
@@ -2321,7 +2381,7 @@ void AppFrame::init_health_monitor() {
   d.alive = alive_;
   d.on_change = [this, alive = alive_] {
     if (!alive->load()) return;
-    if (health_window_) health_window_->reload();
+    if (health_panel_) health_panel_->reload();
     refresh_server_health();
     update_health_button();
   };
@@ -2683,7 +2743,7 @@ void AppFrame::show_servers_context_menu(long row) {
       persist();
       if (health_) health_->reevaluate_cached();
       refresh_servers(s->id);
-      if (health_window_) health_window_->reload();
+      if (health_panel_) health_panel_->reload();
     }
   }, 2001);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {

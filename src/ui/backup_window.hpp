@@ -3,11 +3,9 @@
 #include "core/store.hpp"
 #include "ui/backup_monitor.hpp"
 #include "ui/chrome.hpp"
-#include "ui/layout.hpp"
 
-#include <wx/checkbox.h>
-#include <wx/frame.h>
 #include <wx/listctrl.h>
+#include <wx/panel.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
 
@@ -19,7 +17,8 @@
 
 namespace fatty {
 
-class BackupWindow : public wxFrame {
+/// Панель заданий резервного копирования VPS (встраивается в главное окно).
+class BackupWindow : public wxPanel {
  public:
   BackupWindow(wxWindow* parent, Config* config, BackupMonitor* monitor, AppSettings* settings = nullptr,
                std::function<void()> persist = {}, std::string preferred_server_id = {});

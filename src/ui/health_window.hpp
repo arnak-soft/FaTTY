@@ -3,22 +3,21 @@
 #include "core/health.hpp"
 #include "core/store.hpp"
 #include "ui/health_monitor.hpp"
-#include "ui/layout.hpp"
 
-#include <wx/frame.h>
 #include <wx/panel.h>
 #include <wx/scrolwin.h>
+#include <wx/sizer.h>
 #include <wx/stattext.h>
 
 #include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace fatty {
 
-class HealthWindow : public wxFrame {
+/// Панель состояния VPS (встраивается в главное окно).
+class HealthWindow : public wxPanel {
  public:
   HealthWindow(wxWindow* parent, HealthMonitor* monitor, Config* config,
                std::function<void(const std::string&)> on_refresh, std::function<void()> on_refresh_all,

@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FaTTY — мокапы режимов</title>
+<style>
+  :root {
+    --bg: #161b22;
+    --chrome: #1c222b;
+    --elevated: #1d232c;
+    --btn: #2a313c;
+    --text: #d9dee5;
+    --bright: #f2f5f8;
+    --muted: #8b949e;
+    --accent: #2f81f7;
+    --select: #1f3a5f;
+    --ok: #3fb950;
+    --err: #f85149;
+    --warn: #d29922;
+    --terminal: #0d1117;
+    --border: #303845;
+    --hover: #323c4a;
+    --radius: 8px;
+    --font: "Segoe UI", system-ui, sans-serif;
+    --mono: "Cascadia Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 13px/1.4 var(--font);
+    color: var(--text);
+    background: #0d1117;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* —— picker —— */
+  .picker {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--chrome);
+    border-bottom: 1px solid var(--border);
+  }
+  .picker h1 {
+    margin: 0 16px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--bright);
+    white-space: nowrap;
+  }
+  .picker .desc {
+    color: var(--muted);
+    font-size: 12px;
+    margin-left: auto;
+    max-width: 52%;
+  }
+  .chosen {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  .pill {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--btn);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 7px 14px;
+    cursor: pointer;
+    font: inherit;
+  }
+  .pill:hover { background: var(--hover); }
+  .pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* —— window chrome —— */
+  .stage {
+    flex: 1;
+    min-height: 0;
+    padding: 16px;
+    display: flex;
+  }
+  .window {
+    flex: 1;
+    min-height: 0;
+    display: none;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,.45);
+  }
+  .window.show { display: flex; }
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--chrome);
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots i {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--btn); display: block;
+  }
+  .dots i:nth-child(1) { background: #f85149; }
+  .dots i:nth-child(2) { background: #d29922; }
+  .dots i:nth-child(3) { background: #3fb950; }
+
+  .app {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    grid-template-rows: 1fr;
+  }
+
+  /* —— left VPS —— */
+  .left {
+    background: var(--chrome);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    gap: 8px;
+    min-height: 0;
+  }
+  .section {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .search {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    color: var(--muted);
+  }
+  .vps-list { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+  .vps {
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .vps:hover { background: var(--hover); }
+  .vps.active {
+    background: var(--select);
+    border-color: rgba(47,129,247,.35);
+  }
+  .vps .name { color: var(--bright); font-weight: 600; }
+  .vps .meta { color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .vps .health {
+    float: right;
+    width: 8px; height: 8px; border-radius: 50%;
+    margin-top: 4px;
+    background: var(--ok);
+  }
+  .vps.warn .health { background: var(--warn); }
+  .vps.bad .health { background: var(--err); }
+  .left-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .btn {
+    appearance: none;
+    border: 0;
+    background: var(--btn);
+    color: var(--bright);
+    border-radius: var(--radius);
+    padding: 7px 10px;
+    cursor: pointer;
+    font: inherit;
+  }
+  .btn:hover { background: var(--hover); }
+  .btn.accent { background: var(--accent); color: #fff; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+
+  /* —— right workspace —— */
+  .right {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--bg);
+    position: relative;
+  }
+  .head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px 6px;
+  }
+  .head h2 { margin: 0; font-size: 16px; color: var(--bright); }
+  .head .sub { color: var(--muted); font-size: 12px; }
+  .modes {
+    display: flex;
+    gap: 6px;
+    padding: 0 14px 10px;
+    flex-wrap: wrap;
+  }
+  .mode {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--btn);
+    color: var(--text);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    cursor: pointer;
+    font: inherit;
+  }
+  .mode:hover { background: var(--hover); }
+  .mode.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .mode.danger:not(.active) {
+    border-color: rgba(248,81,73,.5);
+    color: #ffb4b0;
+  }
+
+  .workspace {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0 14px 14px;
+    gap: 8px;
+  }
+  .panel {
+    display: none;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .panel.active { display: flex; }
+
+  .tabs { display: flex; gap: 2px; }
+  .tab {
+    padding: 6px 12px;
+    border-radius: 6px 6px 0 0;
+    color: var(--muted);
+    cursor: pointer;
+    background: transparent;
+  }
+  .tab.on { background: var(--elevated); color: var(--bright); }
+  .card {
+    flex: 1;
+    min-height: 0;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; position: sticky; top: 0; background: var(--elevated); }
+  tr:hover td { background: rgba(50,60,74,.35); }
+  .ok { color: var(--ok); }
+  .err { color: var(--err); }
+  .muted { color: var(--muted); }
+  .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .bottom {
+    height: 160px;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid var(--border);
+    background: var(--chrome);
+  }
+  .bottom .tabs { padding: 6px 10px 0; }
+  .term {
+    flex: 1;
+    margin: 0 10px 10px;
+    background: var(--terminal);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+    font: 12px/1.45 var(--mono);
+    color: #c9d1d9;
+    overflow: auto;
+    white-space: pre-wrap;
+  }
+  .term .dim { color: var(--muted); }
+  .term .hi { color: #79c0ff; }
+
+  /* health cards */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .metric {
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px;
+  }
+  .metric .k { color: var(--muted); font-size: 11px; }
+  .metric .v { font-size: 20px; color: var(--bright); margin-top: 4px; }
+  .metric .bar {
+    margin-top: 8px; height: 4px; border-radius: 2px;
+    background: var(--btn); overflow: hidden;
+  }
+  .metric .bar > i { display: block; height: 100%; background: var(--accent); }
+  .metric.warn .bar > i { background: var(--warn); }
+  .metric.bad .bar > i { background: var(--err); }
+
+  /* files */
+  .files {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+  }
+  .files .card { padding: 8px; }
+  .path { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-bottom: 6px; }
+  .file {
+    display: flex; justify-content: space-between;
+    padding: 5px 6px; border-radius: 4px; cursor: pointer;
+  }
+  .file:hover { background: var(--hover); }
+
+  /* Variant B sheet */
+  .sheet-host { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  .sheet {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    z-index: 5;
+    display: none;
+    flex-direction: column;
+    border-top: 1px solid var(--border);
+    animation: slide .18s ease-out;
+  }
+  .sheet.open { display: flex; }
+  @keyframes slide {
+    from { transform: translateY(8px); opacity: .6; }
+    to { transform: none; opacity: 1; }
+  }
+  .sheet-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--chrome);
+    border-bottom: 1px solid var(--border);
+  }
+  .sheet-bar .back {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--btn);
+    color: var(--bright);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    cursor: pointer;
+    font: inherit;
+  }
+  .sheet-body {
+    flex: 1;
+    min-height: 0;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .dimmed { opacity: .35; pointer-events: none; filter: grayscale(.2); }
+
+  /* Variant C three columns */
+  .app.c {
+    grid-template-columns: 240px minmax(0, 1fr) 300px;
+  }
+  .shell-dock {
+    background: var(--chrome);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 10px;
+    gap: 8px;
+  }
+  .shell-dock .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--ok);
+  }
+  .shell-dock .badge::before {
+    content: "";
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ok);
+  }
+  .shell-dock .term { margin: 0; flex: 1; }
+
+  .hint {
+    padding: 8px 14px 12px;
+    color: var(--muted);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    background: var(--chrome);
+  }
+  .check {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--text); font-size: 12px;
+  }
+  .check input { accent-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="picker">
+  <h1>FaTTY · мокапы режимов</h1>
+  <button class="pill active" data-variant="a">A — выбрано</button>
+  <button class="pill" data-variant="b">B — лист</button>
+  <button class="pill" data-variant="c">C — 3 колонки</button>
+  <div class="desc" id="desc">Выбрано A: режимы на месте, Shell всегда снизу — свой на каждый VPS.</div>
+</div>
+
+<div class="stage">
+
+  <!-- ========== VARIANT A ========== -->
+  <div class="window show chosen" id="win-a" data-variant="a">
+    <div class="titlebar">
+      <div class="dots"><i></i><i></i><i></i></div>
+      FaTTY 1.8 — prod-api · режим A
+    </div>
+    <div class="app">
+      <aside class="left">
+        <div class="section">VPS-серверы</div>
+        <div class="search">Поиск VPS…</div>
+        <div class="vps-list">
+          <div class="vps active"><span class="health"></span><div class="name">prod-api</div><div class="meta">root@203.0.113.10:22</div></div>
+          <div class="vps warn"><span class="health"></span><div class="name">staging</div><div class="meta">deploy@10.0.0.4:22</div></div>
+          <div class="vps bad"><span class="health"></span><div class="name">backup-host</div><div class="meta">root@10.0.0.8:22</div></div>
+        </div>
+        <div class="left-actions">
+          <button class="btn">Добавить</button>
+          <button class="btn ghost">Инструменты</button>
+        </div>
+      </aside>
+      <section class="right" id="a-right">
+        <div class="head">
+          <h2>prod-api</h2>
+          <span class="sub">bash · ключ</span>
+        </div>
+        <div class="modes" data-target="a">
+          <button class="mode active" data-mode="commands">Команды</button>
+          <button class="mode danger" data-mode="health">Состояние · 1</button>
+          <button class="mode" data-mode="backup">Резерв</button>
+          <button class="mode" data-mode="files">Файлы</button>
+        </div>
+        <div class="workspace">
+          <div class="panel active" data-panel="commands">
+            <div class="tabs"><div class="tab on">Группы</div><div class="tab">Связки</div></div>
+            <div class="tabs"><div class="tab on">Общее</div><div class="tab">Deploy</div><div class="tab">Nginx</div></div>
+            <div class="card">
+              <table>
+                <thead><tr><th>Итог</th><th>Название</th><th>Команда</th><th>Каталог</th></tr></thead>
+                <tbody>
+                  <tr><td class="ok">OK</td><td>git pull</td><td class="muted">git pull --ff-only</td><td class="muted">/var/www/app</td></tr>
+                  <tr><td class="ok">OK</td><td>pm2 restart</td><td class="muted">pm2 restart app</td><td class="muted">—</td></tr>
+                  <tr><td class="err">ошибка</td><td>migrate</td><td class="muted">npm run migrate</td><td class="muted">/var/www/app</td></tr>
+                  <tr><td></td><td>nginx reload</td><td class="muted">nginx -t && systemctl reload nginx</td><td class="muted">—</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="row-actions">
+              <button class="btn">Добавить</button>
+              <button class="btn">Пресеты…</button>
+              <button class="btn">Группа</button>
+              <button class="btn accent">Запустить</button>
+            </div>
+          </div>
+          <div class="panel" data-panel="health">
+            <div class="metrics">
+              <div class="metric"><div class="k">CPU</div><div class="v">34%</div><div class="bar"><i style="width:34%"></i></div></div>
+              <div class="metric warn"><div class="k">RAM</div><div class="v">71%</div><div class="bar"><i style="width:71%"></i></div></div>
+              <div class="metric bad"><div class="k">Диск /</div><div class="v">82%</div><div class="bar"><i style="width:82%"></i></div></div>
+              <div class="metric"><div class="k">Load</div><div class="v">0.42</div><div class="bar"><i style="width:20%"></i></div></div>
+            </div>
+            <div class="card">
+              <table>
+                <thead><tr><th>Процесс</th><th>CPU</th><th>RAM</th></tr></thead>
+                <tbody>
+                  <tr><td>node app.js</td><td>12%</td><td>480M</td></tr>
+                  <tr><td>postgres</td><td>4%</td><td>1.1G</td></tr>
+                  <tr><td>nginx</td><td>1%</td><td>42M</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="row-actions">
+              <button class="btn accent">Обновить</button>
+              <button class="btn">Все VPS</button>
+            </div>
+          </div>
+          <div class="panel" data-panel="backup">
+            <label class="check"><input type="checkbox" /> Показать все VPS</label>
+            <div class="card">
+              <table>
+                <thead><tr><th>Название</th><th>Тип</th><th>Куда</th><th>Статус</th><th>Авто</th></tr></thead>
+                <tbody>
+                  <tr><td>www + conf</td><td>Папки</td><td>этот VPS</td><td class="ok">ok</td><td>да</td></tr>
+                  <tr><td>Postgres</td><td>БД</td><td>этот ПК</td><td class="muted">—</td><td>нет</td></tr>
+                  <tr><td>Docker pg</td><td>Docker</td><td>другой VPS</td><td class="warn">warn</td><td>да</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="row-actions">
+              <button class="btn">Добавить</button>
+              <button class="btn">Дублировать</button>
+              <button class="btn accent">Запустить</button>
+            </div>
+            <div class="term" style="height:90px;flex:0 0 auto"><span class="dim">— Журнал запуска —</span>
+готово: /var/backups/fatty/www-20260310.tgz (812 MB)</div>
+          </div>
+          <div class="panel" data-panel="files">
+            <div class="files">
+              <div class="card">
+                <div class="path">локально · D:\work\app</div>
+                <div class="file"><span>📁 src</span><span class="muted">папка</span></div>
+                <div class="file"><span>📄 package.json</span><span class="muted">2 КБ</span></div>
+                <div class="file"><span>📄 .env.example</span><span class="muted">1 КБ</span></div>
+              </div>
+              <div class="card">
+                <div class="path">VPS · /var/www/app</div>
+                <div class="file"><span>📁 dist</span><span class="muted">папка</span></div>
+                <div class="file"><span>📄 server.js</span><span class="muted">48 КБ</span></div>
+                <div class="file"><span>📄 .env</span><span class="muted">1 КБ</span></div>
+              </div>
+            </div>
+            <div class="row-actions">
+              <button class="btn">↑ Загрузить</button>
+              <button class="btn">↓ Скачать</button>
+              <button class="btn">Обновить</button>
+            </div>
+          </div>
+        </div>
+        <div class="bottom" id="a-bottom">
+          <div class="tabs"><div class="tab">Вывод</div><div class="tab on">Shell · prod-api</div></div>
+          <div class="term"><span class="dim">root@prod-api:~# </span><span class="hi">uptime</span>
+ 14:02:11 up 41 days,  2:18,  1 user,  load average: 0.12, 0.18, 0.09
+<span class="dim">root@prod-api:~# </span><span class="dim">▌</span>
+<span class="dim">у staging / backup-host — свои отдельные Shell</span></div>
+        </div>
+      </section>
+    </div>
+    <div class="hint">A (реализовано): режимы меняют только центр. Вывод/Shell всегда снизу; у каждого VPS свой Shell (сессия и буфер).</div>
+  </div>
+
+  <!-- ========== VARIANT B ========== -->
+  <div class="window" id="win-b" data-variant="b">
+    <div class="titlebar">
+      <div class="dots"><i></i><i></i><i></i></div>
+      FaTTY 1.8 — shop-main
+    </div>
+    <div class="app">
+      <aside class="left">
+        <div class="section">VPS-серверы</div>
+        <div class="search">Поиск VPS…</div>
+        <div class="vps-list">
+          <div class="vps active"><span class="health"></span><div class="name">shop-main</div><div class="meta">root@198.51.100.7:22</div></div>
+          <div class="vps"><span class="health"></span><div class="name">shop-db</div><div class="meta">root@198.51.100.8:22</div></div>
+        </div>
+        <div class="left-actions">
+          <button class="btn">Добавить</button>
+          <button class="btn ghost">Инструменты</button>
+        </div>
+      </aside>
+      <section class="right">
+        <div class="head">
+          <h2>shop-main</h2>
+          <span class="sub">домашний экран — Команды</span>
+        </div>
+        <div class="modes" data-target="b">
+          <button class="mode active" data-mode="commands">Команды</button>
+          <button class="mode" data-mode="health">Состояние</button>
+          <button class="mode" data-mode="backup">Резерв</button>
+          <button class="mode" data-mode="files">Файлы</button>
+        </div>
+        <div class="sheet-host">
+          <div class="workspace" id="b-home">
+            <div class="panel active" data-panel="commands">
+              <div class="tabs"><div class="tab on">Группы</div><div class="tab">Связки</div></div>
+              <div class="card">
+                <table>
+                  <thead><tr><th>Итог</th><th>Название</th><th>Команда</th></tr></thead>
+                  <tbody>
+                    <tr><td class="ok">OK</td><td>deploy</td><td class="muted">./deploy.sh</td></tr>
+                    <tr><td class="ok">OK</td><td>cache flush</td><td class="muted">redis-cli FLUSHDB</td></tr>
+                    <tr><td></td><td>logs</td><td class="muted">journalctl -u shop -n 50</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="row-actions">
+                <button class="btn">Добавить</button>
+                <button class="btn accent">Запустить</button>
+              </div>
+            </div>
+          </div>
+          <div class="bottom" id="b-bottom">
+            <div class="tabs"><div class="tab on">Вывод</div><div class="tab">Shell</div></div>
+            <div class="term"><span class="dim">ожидание команды…</span></div>
+          </div>
+
+          <div class="sheet" id="b-sheet-health">
+            <div class="sheet-bar">
+              <button class="back" data-back="b">← Команды</button>
+              <strong>Состояние · shop-main</strong>
+            </div>
+            <div class="sheet-body">
+              <div class="metrics">
+                <div class="metric"><div class="k">CPU</div><div class="v">12%</div><div class="bar"><i style="width:12%"></i></div></div>
+                <div class="metric"><div class="k">RAM</div><div class="v">54%</div><div class="bar"><i style="width:54%"></i></div></div>
+                <div class="metric"><div class="k">Диск</div><div class="v">61%</div><div class="bar"><i style="width:61%"></i></div></div>
+                <div class="metric"><div class="k">Uptime</div><div class="v">41д</div><div class="bar"><i style="width:40%"></i></div></div>
+              </div>
+              <div class="card">
+                <table>
+                  <thead><tr><th>Сигнал</th><th>Значение</th></tr></thead>
+                  <tbody>
+                    <tr><td>SSH fail / сутки</td><td>2</td></tr>
+                    <tr><td>OOM</td><td class="ok">нет</td></tr>
+                    <tr><td>Нужен reboot</td><td class="muted">нет</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="sheet" id="b-sheet-backup">
+            <div class="sheet-bar">
+              <button class="back" data-back="b">← Команды</button>
+              <strong>Резервные копии · shop-main</strong>
+            </div>
+            <div class="sheet-body">
+              <label class="check"><input type="checkbox" /> Показать все VPS</label>
+              <div class="card">
+                <table>
+                  <thead><tr><th>Название</th><th>Тип</th><th>Куда</th><th>Статус</th></tr></thead>
+                  <tbody>
+                    <tr><td>media</td><td>Папки</td><td>этот ПК</td><td class="ok">ok</td></tr>
+                    <tr><td>mysql</td><td>БД</td><td>этот VPS</td><td class="muted">—</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="row-actions">
+                <button class="btn">Добавить</button>
+                <button class="btn">Дублировать</button>
+                <button class="btn accent">Запустить</button>
+              </div>
+              <div class="term" style="height:80px;flex:0 0 auto;margin:0"><span class="dim">журнал задания…</span></div>
+            </div>
+          </div>
+
+          <div class="sheet" id="b-sheet-files">
+            <div class="sheet-bar">
+              <button class="back" data-back="b">← Команды</button>
+              <strong>Файлы · shop-main</strong>
+            </div>
+            <div class="sheet-body">
+              <div class="files" style="flex:1">
+                <div class="card">
+                  <div class="path">локально</div>
+                  <div class="file"><span>📁 project</span><span class="muted">папка</span></div>
+                </div>
+                <div class="card">
+                  <div class="path">/var/www/shop</div>
+                  <div class="file"><span>📁 public</span><span class="muted">папка</span></div>
+                  <div class="file"><span>📄 artisan</span><span class="muted">файл</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="hint">B: «Команды» всегда дома. Другие режимы — лист поверх внутри того же окна, с кнопкой «← Команды».</div>
+  </div>
+
+  <!-- ========== VARIANT C ========== -->
+  <div class="window" id="win-c" data-variant="c">
+    <div class="titlebar">
+      <div class="dots"><i></i><i></i><i></i></div>
+      FaTTY 1.8 — cdn-edge
+    </div>
+    <div class="app c">
+      <aside class="left">
+        <div class="section">VPS-серверы</div>
+        <div class="search">Поиск VPS…</div>
+        <div class="vps-list">
+          <div class="vps active"><span class="health"></span><div class="name">cdn-edge</div><div class="meta">root@203.0.113.55:22</div></div>
+          <div class="vps"><span class="health"></span><div class="name">origin</div><div class="meta">root@203.0.113.56:22</div></div>
+        </div>
+        <div class="left-actions">
+          <button class="btn">Добавить</button>
+          <button class="btn ghost">Инструменты</button>
+        </div>
+      </aside>
+      <section class="right">
+        <div class="head">
+          <h2>cdn-edge</h2>
+          <span class="sub">центр = режим · справа всегда Shell</span>
+        </div>
+        <div class="modes" data-target="c">
+          <button class="mode" data-mode="commands">Команды</button>
+          <button class="mode active" data-mode="health">Состояние</button>
+          <button class="mode" data-mode="backup">Резерв</button>
+          <button class="mode" data-mode="files">Файлы</button>
+        </div>
+        <div class="workspace">
+          <div class="panel" data-panel="commands">
+            <div class="card">
+              <table>
+                <thead><tr><th>Итог</th><th>Название</th><th>Команда</th></tr></thead>
+                <tbody>
+                  <tr><td class="ok">OK</td><td>purge cache</td><td class="muted">nginx -s reload</td></tr>
+                  <tr><td></td><td>sync</td><td class="muted">rsync -a …</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="row-actions"><button class="btn accent">Запустить</button></div>
+          </div>
+          <div class="panel active" data-panel="health">
+            <div class="metrics">
+              <div class="metric"><div class="k">CPU</div><div class="v">28%</div><div class="bar"><i style="width:28%"></i></div></div>
+              <div class="metric"><div class="k">RAM</div><div class="v">44%</div><div class="bar"><i style="width:44%"></i></div></div>
+              <div class="metric warn"><div class="k">Диск</div><div class="v">76%</div><div class="bar"><i style="width:76%"></i></div></div>
+              <div class="metric"><div class="k">Net in</div><div class="v">120 Mbps</div><div class="bar"><i style="width:50%"></i></div></div>
+            </div>
+            <div class="card">
+              <table>
+                <thead><tr><th>Топ процессов</th><th>CPU</th></tr></thead>
+                <tbody>
+                  <tr><td>nginx: worker</td><td>9%</td></tr>
+                  <tr><td>varnishd</td><td>6%</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel" data-panel="backup">
+            <div class="card">
+              <table>
+                <thead><tr><th>Название</th><th>Тип</th><th>Статус</th></tr></thead>
+                <tbody>
+                  <tr><td>cache dir</td><td>Папки</td><td class="ok">ok</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="panel" data-panel="files">
+            <div class="card" style="padding:10px">
+              <div class="path">/var/cache/cdn</div>
+              <div class="file"><span>📁 edge</span><span class="muted">папка</span></div>
+              <div class="file"><span>📄 status.json</span><span class="muted">4 КБ</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <aside class="shell-dock">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong style="color:var(--bright)">Shell</strong>
+          <span class="badge">подключено</span>
+        </div>
+        <div class="term">root@cdn-edge:~# <span class="hi">df -h /</span>
+Filesystem  Size  Used Avail
+/dev/vda1    80G   61G   16G
+root@cdn-edge:~# <span class="dim">▌</span></div>
+        <div class="row-actions">
+          <button class="btn">Отключить</button>
+          <button class="btn ghost">Вывод</button>
+        </div>
+      </aside>
+    </div>
+    <div class="hint">C: центр меняется по режиму. Shell/Вывод всегда справа — удобно параллельно с состоянием и бэкапами.</div>
+  </div>
+
+</div>
+
+<script>
+  const descriptions = {
+    a: "Выбрано A: режимы на месте, Shell всегда снизу — свой на каждый VPS.",
+    b: "Команды — домашний экран. Состояние/Резерв/Файлы открываются листом внутри окна.",
+    c: "Три колонки: VPS · режим · постоянный Shell справа."
+  };
+
+  const pills = document.querySelectorAll(".picker .pill");
+  const windows = document.querySelectorAll(".window");
+  const desc = document.getElementById("desc");
+
+  function showVariant(id) {
+    pills.forEach(p => p.classList.toggle("active", p.dataset.variant === id));
+    windows.forEach(w => w.classList.toggle("show", w.dataset.variant === id));
+    desc.textContent = descriptions[id];
+  }
+
+  pills.forEach(p => p.addEventListener("click", () => showVariant(p.dataset.variant)));
+
+  // Variant A/C: in-place panels
+  document.querySelectorAll('.modes[data-target="a"], .modes[data-target="c"]').forEach(group => {
+    const root = group.closest(".right");
+    group.querySelectorAll(".mode").forEach(btn => {
+      btn.addEventListener("click", () => {
+        group.querySelectorAll(".mode").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const mode = btn.dataset.mode;
+        root.querySelectorAll(".panel").forEach(p => {
+          p.classList.toggle("active", p.dataset.panel === mode);
+        });
+        // A: низ (Вывод/Shell) всегда виден
+      });
+    });
+  });
+
+  // Variant B: sheets
+  const bModes = document.querySelector('.modes[data-target="b"]');
+  const bHome = document.getElementById("b-home");
+  const bBottom = document.getElementById("b-bottom");
+  const sheets = {
+    health: document.getElementById("b-sheet-health"),
+    backup: document.getElementById("b-sheet-backup"),
+    files: document.getElementById("b-sheet-files")
+  };
+
+  function closeBSheets() {
+    Object.values(sheets).forEach(s => s.classList.remove("open"));
+    bHome.classList.remove("dimmed");
+    bBottom.classList.remove("dimmed");
+    bModes.querySelectorAll(".mode").forEach(b => b.classList.toggle("active", b.dataset.mode === "commands"));
+  }
+
+  bModes.querySelectorAll(".mode").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const mode = btn.dataset.mode;
+      bModes.querySelectorAll(".mode").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      Object.values(sheets).forEach(s => s.classList.remove("open"));
+      if (mode === "commands") {
+        bHome.classList.remove("dimmed");
+        bBottom.classList.remove("dimmed");
+        return;
+      }
+      bHome.classList.add("dimmed");
+      bBottom.classList.add("dimmed");
+      sheets[mode].classList.add("open");
+    });
+  });
+
+  document.querySelectorAll("[data-back='b']").forEach(btn => {
+    btn.addEventListener("click", closeBSheets);
+  });
+</script>
+</body>
+</html>

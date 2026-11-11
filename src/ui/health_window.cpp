@@ -500,26 +500,21 @@ class HostCard : public wxPanel {
 HealthWindow::HealthWindow(wxWindow* parent, HealthMonitor* monitor, Config* config,
                            std::function<void(const std::string&)> on_refresh, std::function<void()> on_refresh_all,
                            AppSettings* settings, std::function<void()> persist)
-    : wxFrame(parent, wxID_ANY, L"Состояние VPS", wxDefaultPosition, wxDefaultSize),
+    : wxPanel(parent),
       monitor_(monitor),
       config_(config),
       settings_(settings),
       on_refresh_(std::move(on_refresh)),
       on_refresh_all_(std::move(on_refresh_all)) {
-  set_icon(this);
-  const bool had_geometry = settings && settings->dialog_geometry.count("health");
-  SetSize(FromDIP(wxSize(980, 620)));
-  setup_frame_geometry(this, settings, "health", true, std::move(persist));
-  if (!had_geometry) CentreOnParent();
-
-  auto* panel = new wxPanel(this);
-  auto* refresh_sel = make_button(panel, L"Обновить выбранный", BtnIcon::Refresh);
-  auto* refresh_all = make_button(panel, L"Обновить все", BtnIcon::Repeat);
-  auto_label_ = new wxStaticText(panel, wxID_ANY, L"");
+  (void)persist;
+  SetName(L"card-page");
+  auto* refresh_sel = make_button(this, L"Обновить выбранный", BtnIcon::Refresh);
+  auto* refresh_all = make_button(this, L"Обновить все", BtnIcon::Repeat);
+  auto_label_ = new wxStaticText(this, wxID_ANY, L"");
   auto_label_->SetName(L"muted");
   auto_label_->SetForegroundColour(Theme::muted());
 
-  auto* split = new wxSplitterWindow(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
+  auto* split = new wxSplitterWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE);
   list_ = new wxScrolledWindow(split, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxTAB_TRAVERSAL | wxBORDER_NONE);
   list_->SetScrollRate(0, 16);
   list_sz_ = new wxBoxSizer(wxVERTICAL);
@@ -535,7 +530,7 @@ HealthWindow::HealthWindow(wxWindow* parent, HealthMonitor* monitor, Config* con
   split->SplitVertically(list_, detail_card, FromDIP(300));
   split->SetMinimumPaneSize(FromDIP(220));
 
-  status_ = new wxStaticText(panel, wxID_ANY, L"");
+  status_ = new wxStaticText(this, wxID_ANY, L"");
   status_->SetName(L"muted");
   status_->SetForegroundColour(Theme::muted());
 
@@ -548,10 +543,7 @@ HealthWindow::HealthWindow(wxWindow* parent, HealthMonitor* monitor, Config* con
   root->Add(top, 0, wxEXPAND | wxALL, 8);
   root->Add(split, 1, wxEXPAND | wxLEFT | wxRIGHT, 8);
   root->Add(status_, 0, wxEXPAND | wxALL, 8);
-  panel->SetSizer(root);
-  auto* outer = new wxBoxSizer(wxVERTICAL);
-  outer->Add(panel, 1, wxEXPAND);
-  SetSizer(outer);
+  SetSizer(root);
   apply_dark(this);
 
   refresh_sel->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
@@ -562,11 +554,6 @@ HealthWindow::HealthWindow(wxWindow* parent, HealthMonitor* monitor, Config* con
   refresh_all->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     if (on_refresh_all_) on_refresh_all_();
   });
-  Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& e) {
-    alive_->store(false);
-    e.Skip();
-  });
-  bind_escape_close(this);
   reload();
 }
 
