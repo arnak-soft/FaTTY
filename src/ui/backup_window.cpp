@@ -265,7 +265,7 @@ class BackupJobDialog : public PositionedDialog {
         lim, wxID_ANY,
         job_.max_single_archive_bytes > 0
             ? wxString::Format(L"%.1f", job_.max_single_archive_bytes / (1024.0 * 1024.0 * 1024.0))
-            : L"0");
+            : wxString(L"0"));
     add_num(L"Мин. свободное место dest, ГБ", min_free_gb_);
     add_num(L"Макс. размер одной копии, ГБ (0 = без лимита)", max_one_gb_);
     auto refresh_preview = [this](wxCommandEvent&) { update_preview(); };
