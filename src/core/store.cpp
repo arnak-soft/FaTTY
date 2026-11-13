@@ -129,6 +129,61 @@ void suggest_server_ui_colours(const std::vector<Server>& existing, std::string&
   out_light = pair.light;
 }
 
+namespace {
+
+bool hosting_name_eq(std::string_view a, std::string_view b) {
+  return to_lower(trim(std::string(a))) == to_lower(trim(std::string(b)));
+}
+
+bool hosting_list_contains(const std::vector<std::string>& list, std::string_view name) {
+  for (const auto& item : list) {
+    if (hosting_name_eq(item, name)) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+const std::vector<std::string>& builtin_hosting_providers() {
+  static const std::vector<std::string> kBuiltins = {
+      "Timeweb Cloud", "Selectel", "REG.RU",     "Beget",       "FirstVDS",   "AdminVPS",
+      "FastVPS",       "Aeza",     "VDSina",     "RuVDS",       "IQHost",     "Fornex",
+      "DigitalOcean",  "Hetzner",  "Contabo",    "OVHcloud",    "Vultr",      "Linode",
+      "AWS",           "Google Cloud", "Azure",  "Oracle Cloud", "Cloudflare", "Hostinger",
+  };
+  return kBuiltins;
+}
+
+std::vector<std::string> hosting_provider_choices(const std::vector<std::string>& custom,
+                                                  const std::vector<Server>& servers,
+                                                  const std::string& current) {
+  std::vector<std::string> out = builtin_hosting_providers();
+  auto add = [&](const std::string& raw) {
+    const auto name = trim(raw);
+    if (name.empty() || hosting_list_contains(out, name)) return;
+    out.push_back(name);
+  };
+  for (const auto& c : custom) add(c);
+  for (const auto& s : servers) add(s.provider);
+  add(current);
+  return out;
+}
+
+void remember_hosting_provider(AppSettings& settings, const std::string& provider) {
+  const auto name = trim(provider);
+  if (name.empty()) return;
+  if (hosting_list_contains(builtin_hosting_providers(), name)) return;
+  if (hosting_list_contains(settings.hosting_providers, name)) return;
+  settings.hosting_providers.push_back(name);
+}
+
+std::string today_date_string() {
+  const auto stamp = format_unix_filename_stamp();
+  // YYYYMMDD-HHMMSS → YYYY-MM-DD
+  if (stamp.size() < 8) return {};
+  return stamp.substr(0, 4) + "-" + stamp.substr(4, 2) + "-" + stamp.substr(6, 2);
+}
+
 Command Command::make_new(const std::string& server_id) {
   Command c;
   c.id = new_uuid();
@@ -626,6 +681,9 @@ Config load_config_from(const std::filesystem::path& path) {
     }
     s.ui_font = trim(raw.value("ui_font", ""));
     s.ui_font_pt = clamp_int(raw.value("ui_font_pt", 0), 0, 48);
+    s.notes = raw.value("notes", "");
+    s.created_at = trim(raw.value("created_at", ""));
+    s.provider = trim(raw.value("provider", ""));
     const std::string legacy = raw.value("password_encrypted", "");
     if (!vault_ok && !legacy.empty()) {
       try {
@@ -841,6 +899,15 @@ Config load_config_from(const std::filesystem::path& path) {
     st.workspace_mode = "commands";
   }
   st.backup_show_all_servers = settings_raw.value("backup_show_all_servers", false);
+  if (settings_raw.contains("hosting_providers") && settings_raw["hosting_providers"].is_array()) {
+    for (const auto& item : settings_raw["hosting_providers"]) {
+      if (!item.is_string()) continue;
+      const auto name = trim(item.get<std::string>());
+      if (name.empty() || hosting_list_contains(st.hosting_providers, name)) continue;
+      if (hosting_list_contains(builtin_hosting_providers(), name)) continue;
+      st.hosting_providers.push_back(name);
+    }
+  }
   json last_group_raw = settings_raw.value("last_group_by_server", json::object());
   if (!last_group_raw.is_object()) last_group_raw = json::object();
   if (last_group_raw.empty() && settings_raw.contains("last_folder_by_server")) {
@@ -931,6 +998,9 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
         {"ui_colour_light", s.ui_colour_light},
         {"ui_font", s.ui_font},
         {"ui_font_pt", s.ui_font_pt},
+        {"notes", s.notes},
+        {"created_at", s.created_at},
+        {"provider", s.provider},
     };
     payload["servers"].push_back(item);
     s.password_blob = item["password_vault"].get<std::string>();
@@ -1054,6 +1124,7 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"last_group_by_server", config.settings.last_group_by_server},
       {"workspace_mode", config.settings.workspace_mode},
       {"backup_show_all_servers", config.settings.backup_show_all_servers},
+      {"hosting_providers", config.settings.hosting_providers},
       {"health_auto", config.settings.health_auto},
       {"health_interval_sec", config.settings.health_interval_sec},
       {"health_timeout_sec", config.settings.health_timeout_sec},

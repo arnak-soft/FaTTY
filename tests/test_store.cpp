@@ -3,6 +3,7 @@
 #include "core/store.hpp"
 #include "core/util.hpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <vector>
@@ -105,6 +106,24 @@ void test_store() {
     a.ui_colour_light = "#0f766e";
     suggest_server_ui_colours({a}, dark2, light2);
     expect(dark2 != "#2DD4BF", "normalized hex still counts as taken");
+  }
+  {
+    expect(!builtin_hosting_providers().empty(), "builtin providers");
+    expect(today_date_string().size() == 10, "today date length");
+    Server a = Server::make_new();
+    a.provider = "MyCloud";
+    auto choices = hosting_provider_choices({"CustomHost"}, {a}, "CurrentHost");
+    expect(std::find(choices.begin(), choices.end(), "Hetzner") != choices.end(), "builtin in choices");
+    expect(std::find(choices.begin(), choices.end(), "CustomHost") != choices.end(), "custom in choices");
+    expect(std::find(choices.begin(), choices.end(), "MyCloud") != choices.end(), "server provider in choices");
+    expect(std::find(choices.begin(), choices.end(), "CurrentHost") != choices.end(), "current in choices");
+    AppSettings st;
+    remember_hosting_provider(st, "Hetzner");
+    expect(st.hosting_providers.empty(), "builtin not stored");
+    remember_hosting_provider(st, "MyCloud");
+    expect(st.hosting_providers.size() == 1, "custom stored");
+    remember_hosting_provider(st, "mycloud");
+    expect(st.hosting_providers.size() == 1, "case-insensitive dedupe");
   }
 
   auto clone = s.duplicate(copy_name(s.name, {"alpha"}));

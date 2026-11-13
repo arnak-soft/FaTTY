@@ -31,6 +31,12 @@ struct Server {
   std::string ui_font;
   /// Кегль списков; 0 — как в теме.
   int ui_font_pt = 0;
+  /// Заметка / описание VPS (для себя).
+  std::string notes;
+  /// Дата создания: `YYYY-MM-DD` или пусто.
+  std::string created_at;
+  /// Хостинг-провайдер (свободный текст из списка или свой).
+  std::string provider;
 
   static Server make_new();
   Server duplicate(const std::string& new_name) const;
@@ -49,6 +55,15 @@ const ServerUiColourPair* server_ui_colour_palette(std::size_t& count);
 /// Подбирает пару цветов (тёмная / светлая тема), ещё не занятую существующими VPS.
 void suggest_server_ui_colours(const std::vector<Server>& existing, std::string& out_dark,
                                std::string& out_light);
+
+/// Встроенные хостинг-провайдеры для списка в карточке VPS.
+const std::vector<std::string>& builtin_hosting_providers();
+/// Пресеты + сохранённые + с существующих VPS (+ current, если ещё нет в списке).
+std::vector<std::string> hosting_provider_choices(const std::vector<std::string>& custom,
+                                                  const std::vector<Server>& servers,
+                                                  const std::string& current = {});
+/// Сегодняшняя дата `YYYY-MM-DD` (локальное время).
+std::string today_date_string();
 
 struct Command {
   std::string id;
@@ -194,6 +209,8 @@ struct AppSettings {
   std::string workspace_mode = "commands";
   /// В окне резервных копий показывать задания всех VPS, а не только выбранного.
   bool backup_show_all_servers = false;
+  /// Ранее введённые хостинг-провайдеры (дополняют встроенный список).
+  std::vector<std::string> hosting_providers;
   bool health_auto = false;
   int health_interval_sec = 86400;
   int health_timeout_sec = 20;
@@ -221,6 +238,9 @@ struct AppSettings {
   bool health_show_docker = false;
   bool health_show_docker_disks = false;
 };
+
+/// Добавить провайдера в настройки, если он свой (не из встроенных).
+void remember_hosting_provider(AppSettings& settings, const std::string& provider);
 
 struct Config {
   std::vector<Server> servers;

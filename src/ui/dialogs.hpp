@@ -15,7 +15,8 @@ namespace fatty {
 
 class ServerDialog : public PositionedDialog {
  public:
-  ServerDialog(wxWindow* parent, const Server& server, const wxString& title, bool is_new);
+  ServerDialog(wxWindow* parent, const Server& server, const wxString& title, bool is_new,
+               std::vector<std::string> provider_choices = {});
   Server result;
   bool accepted = false;
 
@@ -25,14 +26,19 @@ class ServerDialog : public PositionedDialog {
   void clear_errors();
   void refresh_colour_swatches();
   void open_colour_picker();
+  void pick_provider_from_list();
   Server server_;
   bool is_new_;
+  std::vector<std::string> provider_choices_;
   wxTextCtrl* name_{};
   wxTextCtrl* host_{};
   wxTextCtrl* port_{};
   wxTextCtrl* user_{};
   wxTextCtrl* password_{};
   wxTextCtrl* key_{};
+  wxTextCtrl* provider_{};
+  wxTextCtrl* created_at_{};
+  wxTextCtrl* notes_{};
   ThemedCheckBox* show_pw_{};
   ThemedCheckBox* clear_pw_{};
   ThemedChoice* shell_{};

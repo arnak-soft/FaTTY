@@ -10,6 +10,7 @@
 #include <wx/dcclient.h>
 #include <wx/filedlg.h>
 #include <wx/listctrl.h>
+#include <wx/menu.h>
 #include <wx/msgdlg.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
@@ -219,13 +220,17 @@ bool pick_server_ui_colour(wxWindow* parent, std::string& dark, std::string& lig
   return true;
 }
 
-ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxString& title, bool is_new)
-    : PositionedDialog(parent, title, wxSize(540, 720)), server_(server), is_new_(is_new) {
+ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxString& title, bool is_new,
+                           std::vector<std::string> provider_choices)
+    : PositionedDialog(parent, title, wxSize(560, 820)),
+      server_(server),
+      is_new_(is_new),
+      provider_choices_(std::move(provider_choices)) {
   stored_password_ = is_new ? "" : server.password;
   ui_colour_dark_ = server.ui_colour_dark;
   ui_colour_light_ = server.ui_colour_light;
   auto* body = new wxPanel(this);
-  auto* grid = new wxFlexGridSizer(12, 2, 8, 8);
+  auto* grid = new wxFlexGridSizer(16, 2, 8, 8);
   grid->AddGrowableCol(1);
   name_ = labeled_entry(body, grid, L"Имя", wxString::FromUTF8(server.name));
   host_ = labeled_entry(body, grid, L"Хост / IP", wxString::FromUTF8(server.host));
@@ -273,6 +278,31 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   health_ = new ThemedCheckBox(body, wxID_ANY, L"Учитывать в окне «Состояние VPS»");
   health_->SetValue(server.health_enabled);
   grid->Add(health_, 1, wxEXPAND);
+
+  grid->Add(new wxStaticText(body, wxID_ANY, L"Провайдер"), 0, wxALIGN_CENTER_VERTICAL);
+  auto* provider_row = new wxBoxSizer(wxHORIZONTAL);
+  provider_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(server.provider));
+  style_text(provider_);
+  provider_->SetHint(L"Например, Hetzner");
+  auto* provider_list = make_button(body, L"Список…", BtnIcon::List);
+  provider_row->Add(provider_, 1, wxEXPAND | wxRIGHT, 8);
+  provider_row->Add(provider_list, 0);
+  grid->Add(provider_row, 1, wxEXPAND);
+  provider_list->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { pick_provider_from_list(); });
+
+  {
+    std::string created = server.created_at;
+    if (is_new && created.empty()) created = today_date_string();
+    created_at_ = labeled_entry(body, grid, L"Создана", wxString::FromUTF8(created));
+    created_at_->SetHint(L"YYYY-MM-DD");
+  }
+
+  grid->Add(new wxStaticText(body, wxID_ANY, L"Заметка"), 0, wxALIGN_TOP);
+  notes_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(server.notes), wxDefaultPosition,
+                          FromDIP(wxSize(-1, 72)), wxTE_MULTILINE);
+  style_text(notes_);
+  notes_->SetHint(L"Для себя: зачем этот VPS, проект, доступы…");
+  grid->Add(notes_, 1, wxEXPAND);
 
   grid->Add(new wxStaticText(body, wxID_ANY, L"Цвет"), 0, wxALIGN_CENTER_VERTICAL);
   auto* colour_row = new wxBoxSizer(wxHORIZONTAL);
@@ -430,6 +460,27 @@ void ServerDialog::open_colour_picker() {
   refresh_colour_swatches();
 }
 
+void ServerDialog::pick_provider_from_list() {
+  wxMenu menu;
+  const int clear_id = 1;
+  menu.Append(clear_id, L"(пусто)");
+  if (!provider_choices_.empty()) menu.AppendSeparator();
+  for (std::size_t i = 0; i < provider_choices_.size(); ++i) {
+    menu.Append(static_cast<int>(i + 2), wxString::FromUTF8(provider_choices_[i]));
+  }
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent& e) {
+    const int id = e.GetId();
+    if (id == 1) {
+      provider_->Clear();
+      return;
+    }
+    const auto idx = static_cast<std::size_t>(id - 2);
+    if (idx >= provider_choices_.size()) return;
+    provider_->SetValue(wxString::FromUTF8(provider_choices_[idx]));
+  });
+  show_themed_menu(this, &menu);
+}
+
 void ServerDialog::mark_error(wxTextCtrl* field, const wxString& message) {
   error_->SetLabel(message);
   if (field) {
@@ -497,6 +548,30 @@ void ServerDialog::on_ok(wxCommandEvent&) {
   result.health_ignore.net = ignore_net_->GetValue();
   result.ui_colour_dark = ui_colour_dark_;
   result.ui_colour_light = ui_colour_light_;
+  result.provider = trim(std::string(provider_->GetValue().utf8_string()));
+  result.created_at = trim(std::string(created_at_->GetValue().utf8_string()));
+  result.notes = std::string(notes_->GetValue().utf8_string());
+  while (!result.notes.empty() && (result.notes.back() == '\n' || result.notes.back() == '\r')) {
+    result.notes.pop_back();
+  }
+  if (!result.created_at.empty()) {
+    // YYYY-MM-DD или YYYYMMDD
+    std::string d = result.created_at;
+    if (d.size() == 8 && d.find('-') == std::string::npos) {
+      d = d.substr(0, 4) + "-" + d.substr(4, 2) + "-" + d.substr(6, 2);
+    }
+    int y = 0;
+    int m = 0;
+    int day = 0;
+    if (d.size() == 10 && d[4] == '-' && d[7] == '-' && parse_int(d.substr(0, 4), y) &&
+        parse_int(d.substr(5, 2), m) && parse_int(d.substr(8, 2), day) && y >= 1990 && y <= 2100 && m >= 1 &&
+        m <= 12 && day >= 1 && day <= 31) {
+      result.created_at = d;
+    } else {
+      mark_error(created_at_, L"Дата создания — YYYY-MM-DD или пусто.");
+      return;
+    }
+  }
   {
     const int sel = font_face_->GetSelection();
     if (sel <= 0) {

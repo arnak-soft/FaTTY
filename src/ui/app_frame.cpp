@@ -689,10 +689,13 @@ void AppFrame::build_ui() {
   servers_->Bind(wxEVT_LIST_ITEM_ACTIVATED, [this](wxListEvent&) {
     auto* s = selected_server();
     if (!s) return;
-    ServerDialog dlg(this, *s, wxString::FromUTF8("VPS: " + s->name), false);
+    auto providers =
+        hosting_provider_choices(config_.settings.hosting_providers, config_.servers, s->provider);
+    ServerDialog dlg(this, *s, wxString::FromUTF8("VPS: " + s->name), false, std::move(providers));
     dlg.setup_layout(&config_.settings, "server", false, [this] { persist(); });
     if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
       *s = dlg.result;
+      remember_hosting_provider(config_.settings, s->provider);
       persist();
       if (health_) health_->reevaluate_cached();
       refresh_servers(s->id);
@@ -725,9 +728,11 @@ void AppFrame::build_ui() {
   sadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     auto draft = Server::make_new();
     suggest_server_ui_colours(config_.servers, draft.ui_colour_dark, draft.ui_colour_light);
-    ServerDialog dlg(this, draft, L"Новый VPS", true);
+    auto providers = hosting_provider_choices(config_.settings.hosting_providers, config_.servers);
+    ServerDialog dlg(this, draft, L"Новый VPS", true, std::move(providers));
     dlg.setup_layout(&config_.settings, "server", false, [this] { persist(); });
     if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
+      remember_hosting_provider(config_.settings, dlg.result.provider);
       config_.servers.push_back(dlg.result);
       persist();
       refresh_servers(dlg.result.id);
@@ -1479,7 +1484,8 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
   for (std::size_t i = 0; i < config_.servers.size(); ++i) {
     const auto& s = config_.servers[i];
     if (!q.empty()) {
-      auto hay = to_lower(s.name + " " + s.username + " " + s.host);
+      auto hay = to_lower(s.name + " " + s.username + " " + s.host + " " + s.provider + " " + s.notes + " " +
+                          s.created_at);
       if (hay.find(q) == std::string::npos) continue;
     }
     // Данные строки — индекс в config_.servers; selected_server() читает именно его,
@@ -1488,6 +1494,7 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
     fill_row(servers_, row, server_column_ids(),
              {{"name", wxString::FromUTF8(s.name)},
               {"host", wxString::FromUTF8(s.username + "@" + s.host + ":" + std::to_string(s.port))},
+              {"provider", wxString::FromUTF8(s.provider.empty() ? "—" : s.provider)},
               {"health", L""}});
     servers_->SetItemPtrData(row, static_cast<wxUIntPtr>(i));
     wxColour row_colour = Theme::text();
@@ -1709,11 +1716,28 @@ void AppFrame::update_server_heading() {
   auto* s = selected_server();
   if (!s) {
     server_heading_->SetLabel(L"Нет VPS");
-    if (server_meta_) server_meta_->SetLabel(L"");
+    if (server_meta_) {
+      server_meta_->SetLabel(L"");
+      server_meta_->UnsetToolTip();
+    }
+    server_heading_->UnsetToolTip();
   } else {
     server_heading_->SetLabel(wxString::FromUTF8(s->name.empty() ? s->host : s->name));
     if (server_meta_) {
-      server_meta_->SetLabel(wxString::FromUTF8(s->username + "@" + s->host + ":" + std::to_string(s->port)));
+      std::string meta = s->username + "@" + s->host + ":" + std::to_string(s->port);
+      if (!s->provider.empty()) meta += " · " + s->provider;
+      if (!s->created_at.empty()) meta += " · с " + s->created_at;
+      server_meta_->SetLabel(wxString::FromUTF8(meta));
+      if (!s->notes.empty()) {
+        server_meta_->SetToolTip(wxString::FromUTF8(s->notes));
+      } else {
+        server_meta_->UnsetToolTip();
+      }
+    }
+    if (!s->notes.empty()) {
+      server_heading_->SetToolTip(wxString::FromUTF8(s->notes));
+    } else {
+      server_heading_->UnsetToolTip();
     }
   }
   apply_server_appearance();
@@ -1782,7 +1806,7 @@ std::vector<std::string> AppFrame::command_column_ids() const {
 }
 
 std::vector<std::string> AppFrame::server_column_ids() const {
-  std::vector<std::string> available{"name", "health", "host"};
+  std::vector<std::string> available{"name", "health", "host", "provider"};
   auto it = config_.settings.column_order.find("servers");
   if (it == config_.settings.column_order.end()) return available;
   return prefer_order(available, it->second);
@@ -1797,11 +1821,13 @@ void AppFrame::setup_server_columns() {
   const auto ids = server_column_ids();
   for (const auto& id : ids) {
     if (id == "host") {
-      servers_->AppendColumn(L"Адрес", wxLIST_FORMAT_LEFT, FromDIP(200));
+      servers_->AppendColumn(L"Адрес", wxLIST_FORMAT_LEFT, FromDIP(180));
     } else if (id == "health") {
       servers_->AppendColumn(L"Состояние", wxLIST_FORMAT_LEFT, FromDIP(78));
+    } else if (id == "provider") {
+      servers_->AppendColumn(L"Провайдер", wxLIST_FORMAT_LEFT, FromDIP(110));
     } else {
-      servers_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(140));
+      servers_->AppendColumn(L"Имя", wxLIST_FORMAT_LEFT, FromDIP(130));
     }
   }
   auto it = config_.settings.column_widths.find("servers");
@@ -2742,10 +2768,13 @@ void AppFrame::show_servers_context_menu(long row) {
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) return;
-    ServerDialog dlg(this, *s, wxString::FromUTF8("VPS: " + s->name), false);
+    auto providers =
+        hosting_provider_choices(config_.settings.hosting_providers, config_.servers, s->provider);
+    ServerDialog dlg(this, *s, wxString::FromUTF8("VPS: " + s->name), false, std::move(providers));
     dlg.setup_layout(&config_.settings, "server", false, [this] { persist(); });
     if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
       *s = dlg.result;
+      remember_hosting_provider(config_.settings, s->provider);
       persist();
       if (health_) health_->reevaluate_cached();
       refresh_servers(s->id);

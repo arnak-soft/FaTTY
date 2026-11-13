@@ -90,6 +90,7 @@ json portable_settings(const AppSettings& settings) {
       {"health_show_load", settings.health_show_load},
       {"health_show_docker", settings.health_show_docker},
       {"health_show_docker_disks", settings.health_show_docker_disks},
+      {"hosting_providers", settings.hosting_providers},
   };
 }
 
@@ -150,6 +151,12 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   settings.health_show_load = raw.value("health_show_load", settings.health_show_load);
   settings.health_show_docker = raw.value("health_show_docker", settings.health_show_docker);
   settings.health_show_docker_disks = raw.value("health_show_docker_disks", settings.health_show_docker_disks);
+  if (raw.contains("hosting_providers") && raw["hosting_providers"].is_array()) {
+    for (const auto& item : raw["hosting_providers"]) {
+      if (!item.is_string()) continue;
+      remember_hosting_provider(settings, item.get<std::string>());
+    }
+  }
 }
 
 std::pair<std::string, std::string> server_key(const std::string& name, const std::string& host) {
@@ -180,6 +187,9 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
         {"ui_colour_light", server.ui_colour_light},
         {"ui_font", server.ui_font},
         {"ui_font_pt", server.ui_font_pt},
+        {"notes", server.notes},
+        {"created_at", server.created_at},
+        {"provider", server.provider},
     };
     if (include_secrets) {
       item["password"] = server.password;
@@ -326,6 +336,9 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       }
       s.ui_font = trim(raw.value("ui_font", ""));
       s.ui_font_pt = clamp_int(raw.value("ui_font_pt", 0), 0, 48);
+      s.notes = raw.value("notes", "");
+      s.created_at = trim(raw.value("created_at", ""));
+      s.provider = trim(raw.value("provider", ""));
       imported_servers.push_back(std::move(s));
     }
   }
