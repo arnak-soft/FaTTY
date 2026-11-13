@@ -534,7 +534,9 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
                      false)) {
       return;
     }
-    wxFileDialog dlg(this, L"Экспорт FaTTY", L"", L"fatty-backup.json", L"JSON|*.json", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+    const auto export_name =
+        wxString::FromUTF8("fatty-backup-" + format_unix_filename_stamp() + ".json");
+    wxFileDialog dlg(this, L"Экспорт FaTTY", L"", export_name, L"JSON|*.json", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
     if (dlg.ShowModal() != wxID_OK) return;
     try {
       write_export(std::filesystem::path(dlg.GetPath().utf8_string()), config_, export_secrets_->GetValue(),

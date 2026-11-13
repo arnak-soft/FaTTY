@@ -11,6 +11,12 @@ namespace fatty::test {
 void test_backup_journal() {
   expect(format_unix_local(0).empty(), "zero unix empty");
   expect(format_unix_local(1731490000.0).size() == 19, "format_unix length");
+  {
+    const auto stamp = format_unix_filename_stamp(1731490000.0);
+    expect(stamp.size() == 15, "filename stamp length");
+    expect(stamp.find('-') == 8, "filename stamp separator");
+    expect(format_unix_filename_stamp().size() == 15, "filename stamp now");
+  }
 
   const auto dir = std::filesystem::temp_directory_path() / ("fatty-bj-" + new_uuid());
   std::filesystem::create_directories(dir);

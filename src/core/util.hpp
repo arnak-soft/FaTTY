@@ -34,6 +34,8 @@ void log_error(std::string_view message);
 
 /// Локальное `YYYY-MM-DD HH:MM:SS`; пустая строка, если unix ≤ 0.
 std::string format_unix_local(double unix_ts);
+/// Метка для имён файлов: `YYYYMMDD-HHMMSS`. `unix_ts ≤ 0` — сейчас.
+std::string format_unix_filename_stamp(double unix_ts = 0);
 
 std::filesystem::path expand_user(const std::filesystem::path& path);
 std::string posix_join(const std::string& cwd, const std::string& name);
