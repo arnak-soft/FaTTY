@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <wx/checkbox.h>
-#include <wx/colordlg.h>
 #include <wx/dcclient.h>
 #include <wx/filedlg.h>
 #include <wx/listctrl.h>
@@ -37,7 +36,188 @@ wxTextCtrl* labeled_entry(wxWindow* parent, wxFlexGridSizer* grid, const wxStrin
   return e;
 }
 
+wxPanel* make_colour_swatch(wxWindow* parent, int width_dip = 28, int height_dip = 22) {
+  auto* panel = new wxPanel(parent, wxID_ANY, wxDefaultPosition, parent->FromDIP(wxSize(width_dip, height_dip)));
+  panel->SetBackgroundStyle(wxBG_STYLE_PAINT);
+  panel->Bind(wxEVT_PAINT, [panel, parent](wxPaintEvent&) {
+    wxPaintDC dc(panel);
+    dc.SetPen(wxPen(Theme::border()));
+    dc.SetBrush(wxBrush(panel->GetBackgroundColour()));
+    const wxSize sz = panel->GetClientSize();
+    dc.DrawRoundedRectangle(0, 0, sz.x, sz.y, parent->FromDIP(3));
+  });
+  return panel;
+}
+
+void paint_colour_swatch(wxPanel* panel, const std::string& hex) {
+  if (!panel) return;
+  wxColour c;
+  panel->SetBackgroundColour(parse_hex_colour(hex, c) ? c : Theme::btn());
+  panel->Refresh();
+}
+
+class ColourPickDialog : public wxDialog {
+ public:
+  ColourPickDialog(wxWindow* parent, const std::string& dark, const std::string& light)
+      : wxDialog(parent, wxID_ANY, L"Цвет VPS", wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE),
+        dark_(dark),
+        light_(light) {
+    bind_escape_close(this);
+    auto* body = new wxPanel(this);
+    auto* intro = new wxStaticText(body, wxID_ANY, L"Выберите оттенок — для тёмной и светлой темы подставится пара.");
+    intro->SetName(L"muted");
+    intro->SetForegroundColour(Theme::muted());
+    intro->Wrap(FromDIP(420));
+
+    auto* grid = new wxFlexGridSizer(0, 7, FromDIP(8), FromDIP(8));
+    std::size_t n = 0;
+    const auto* palette = server_ui_colour_palette(n);
+    selected_ = -1;
+    for (std::size_t i = 0; i < n; ++i) {
+      const auto& pair = palette[i];
+      if (colours_match(dark_, pair.dark) && colours_match(light_, pair.light)) {
+        selected_ = static_cast<int>(i);
+      }
+      auto* cell = new wxPanel(body, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(44, 44)));
+      cell->SetBackgroundStyle(wxBG_STYLE_PAINT);
+      cell->SetCursor(wxCursor(wxCURSOR_HAND));
+      cell->SetToolTip(wxString::FromUTF8(pair.name));
+      const int idx = static_cast<int>(i);
+      cell->Bind(wxEVT_PAINT, [this, cell, idx, pair](wxPaintEvent&) {
+        wxPaintDC dc(cell);
+        const wxSize sz = cell->GetClientSize();
+        const int radius = FromDIP(6);
+        wxColour dark_c;
+        wxColour light_c;
+        parse_hex_colour(pair.dark, dark_c);
+        parse_hex_colour(pair.light, light_c);
+        if (!dark_c.IsOk()) dark_c = Theme::btn();
+        if (!light_c.IsOk()) light_c = Theme::btn();
+        // Левая половина — тёмная тема, правая — светлая.
+        dc.SetPen(*wxTRANSPARENT_PEN);
+        dc.SetBrush(wxBrush(dark_c));
+        dc.DrawRectangle(0, 0, sz.x / 2 + 1, sz.y);
+        dc.SetBrush(wxBrush(light_c));
+        dc.DrawRectangle(sz.x / 2, 0, sz.x - sz.x / 2, sz.y);
+        dc.SetBrush(*wxTRANSPARENT_BRUSH);
+        dc.SetPen(wxPen(selected_ == idx ? Theme::accent() : Theme::border(), selected_ == idx ? FromDIP(2) : 1));
+        dc.DrawRoundedRectangle(0, 0, sz.x, sz.y, radius);
+      });
+      cell->Bind(wxEVT_LEFT_DOWN, [this, idx, pair](wxMouseEvent&) {
+        selected_ = idx;
+        dark_ = pair.dark;
+        light_ = pair.light;
+        hex_->ChangeValue(wxString::FromUTF8(theme_is_dark() ? dark_ : light_));
+        for (auto* c : cells_) c->Refresh();
+      });
+      cell->Bind(wxEVT_LEFT_DCLICK, [this, idx, pair](wxMouseEvent&) {
+        selected_ = idx;
+        dark_ = pair.dark;
+        light_ = pair.light;
+        EndModal(wxID_OK);
+      });
+      cells_.push_back(cell);
+      grid->Add(cell, 0);
+    }
+
+    auto* hex_row = new wxBoxSizer(wxHORIZONTAL);
+    hex_row->Add(new wxStaticText(body, wxID_ANY, L"Свой (#RRGGBB)"), 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
+    hex_ = new wxTextCtrl(body, wxID_ANY, wxString::FromUTF8(theme_is_dark() ? dark_ : light_));
+    style_text(hex_);
+    hex_row->Add(hex_, 1, wxEXPAND);
+    auto* hex_hint = new wxStaticText(body, wxID_ANY, L"Один цвет для обеих тем, если нет пары из палитры.");
+    hex_hint->SetName(L"muted");
+    hex_hint->SetForegroundColour(Theme::muted());
+    hex_hint->Wrap(FromDIP(420));
+
+    auto* btns = new wxBoxSizer(wxHORIZONTAL);
+    btns->AddStretchSpacer();
+    auto* ok = accent_button(body, L"Выбрать", BtnIcon::Check);
+    auto* cancel = make_button(body, L"Отмена", BtnIcon::Cancel, wxID_CANCEL);
+    ok->SetDefault();
+    btns->Add(ok, 0, wxRIGHT, 8);
+    btns->Add(cancel);
+
+    auto* root = new wxBoxSizer(wxVERTICAL);
+    root->Add(intro, 0, wxEXPAND | wxALL, 16);
+    root->Add(grid, 0, wxLEFT | wxRIGHT | wxBOTTOM, 16);
+    root->Add(hex_row, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 16);
+    root->Add(hex_hint, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 16);
+    root->Add(btns, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 16);
+    body->SetSizer(root);
+    auto* outer = new wxBoxSizer(wxVERTICAL);
+    outer->Add(body, 1, wxEXPAND);
+    SetSizer(outer);
+    apply_dark(this);
+    outer->SetSizeHints(this);
+    if (parent) CentreOnParent();
+
+    ok->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+      if (!apply_hex_if_custom()) return;
+      EndModal(wxID_OK);
+    });
+  }
+
+  std::string dark() const { return dark_; }
+  std::string light() const { return light_; }
+
+ private:
+  static bool colours_match(std::string_view a, std::string_view b) {
+    wxColour ca;
+    wxColour cb;
+    if (!parse_hex_colour(a, ca) || !parse_hex_colour(b, cb)) return false;
+    return ca.Red() == cb.Red() && ca.Green() == cb.Green() && ca.Blue() == cb.Blue();
+  }
+
+  bool apply_hex_if_custom() {
+    const auto typed = trim(std::string(hex_->GetValue().utf8_string()));
+    if (typed.empty()) {
+      if (dark_.empty() && light_.empty()) {
+        wxMessageBox(L"Выберите цвет из палитры или введите #RRGGBB.", L"Цвет VPS", wxOK | wxICON_INFORMATION,
+                     this);
+        return false;
+      }
+      return true;
+    }
+    wxColour c;
+    if (!parse_hex_colour(typed, c)) {
+      wxMessageBox(L"Некорректный цвет. Пример: #2DD4BF", L"Цвет VPS", wxOK | wxICON_WARNING, this);
+      return false;
+    }
+    const auto hex = colour_to_hex(c);
+    std::size_t n = 0;
+    const auto* palette = server_ui_colour_palette(n);
+    for (std::size_t i = 0; i < n; ++i) {
+      const auto& pair = palette[i];
+      if (colours_match(hex, pair.dark) || colours_match(hex, pair.light)) {
+        dark_ = pair.dark;
+        light_ = pair.light;
+        selected_ = static_cast<int>(i);
+        return true;
+      }
+    }
+    dark_ = hex;
+    light_ = hex;
+    selected_ = -1;
+    return true;
+  }
+
+  std::string dark_;
+  std::string light_;
+  int selected_ = -1;
+  wxTextCtrl* hex_{};
+  std::vector<wxPanel*> cells_;
+};
+
 }  // namespace
+
+bool pick_server_ui_colour(wxWindow* parent, std::string& dark, std::string& light) {
+  ColourPickDialog dlg(parent, dark, light);
+  if (dlg.ShowModal() != wxID_OK) return false;
+  dark = dlg.dark();
+  light = dlg.light();
+  return true;
+}
 
 ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxString& title, bool is_new)
     : PositionedDialog(parent, title, wxSize(540, 720)), server_(server), is_new_(is_new) {
@@ -94,72 +274,26 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   health_->SetValue(server.health_enabled);
   grid->Add(health_, 1, wxEXPAND);
 
-  auto make_swatch = [this, body](wxPanel*& panel) {
-    panel = new wxPanel(body, wxID_ANY, wxDefaultPosition, FromDIP(wxSize(28, 22)));
-    panel->SetBackgroundStyle(wxBG_STYLE_PAINT);
-    panel->Bind(wxEVT_PAINT, [panel, this](wxPaintEvent&) {
-      wxPaintDC dc(panel);
-      dc.SetPen(wxPen(Theme::border()));
-      dc.SetBrush(wxBrush(panel->GetBackgroundColour()));
-      const wxSize sz = panel->GetClientSize();
-      dc.DrawRoundedRectangle(0, 0, sz.x, sz.y, FromDIP(3));
-    });
-  };
-  auto refresh_swatch = [](wxPanel* panel, const std::string& hex) {
-    wxColour c;
-    panel->SetBackgroundColour(parse_hex_colour(hex, c) ? c : Theme::btn());
-    panel->Refresh();
-  };
-
-  grid->Add(new wxStaticText(body, wxID_ANY, L"Цвет (тёмная тема)"), 0, wxALIGN_CENTER_VERTICAL);
-  auto* colour_dark_row = new wxBoxSizer(wxHORIZONTAL);
-  make_swatch(colour_swatch_dark_);
-  auto* pick_dark = make_button(body, L"Выбрать…", BtnIcon::None);
-  auto* clear_dark = make_button(body, L"Сбросить", BtnIcon::Cancel);
-  colour_dark_row->Add(colour_swatch_dark_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
-  colour_dark_row->Add(pick_dark, 0, wxRIGHT, 8);
-  colour_dark_row->Add(clear_dark, 0);
-  grid->Add(colour_dark_row, 1, wxEXPAND);
-  pick_dark->Bind(wxEVT_BUTTON, [this, refresh_swatch](wxCommandEvent&) {
-    wxColour cur = Theme::accent();
-    parse_hex_colour(ui_colour_dark_, cur);
-    wxColourData data;
-    data.SetColour(cur);
-    wxColourDialog dlg(this, &data);
-    if (dlg.ShowModal() != wxID_OK) return;
-    ui_colour_dark_ = colour_to_hex(dlg.GetColourData().GetColour());
-    refresh_swatch(colour_swatch_dark_, ui_colour_dark_);
-  });
-  clear_dark->Bind(wxEVT_BUTTON, [this, refresh_swatch](wxCommandEvent&) {
+  grid->Add(new wxStaticText(body, wxID_ANY, L"Цвет"), 0, wxALIGN_CENTER_VERTICAL);
+  auto* colour_row = new wxBoxSizer(wxHORIZONTAL);
+  colour_swatch_dark_ = make_colour_swatch(body, 28, 22);
+  colour_swatch_light_ = make_colour_swatch(body, 28, 22);
+  colour_swatch_dark_->SetToolTip(L"Тёмная тема");
+  colour_swatch_light_->SetToolTip(L"Светлая тема");
+  auto* pick_colour = make_button(body, L"Палитра…", BtnIcon::None);
+  auto* clear_colour = make_button(body, L"Сбросить", BtnIcon::Cancel);
+  colour_row->Add(colour_swatch_dark_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 4);
+  colour_row->Add(colour_swatch_light_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
+  colour_row->Add(pick_colour, 0, wxRIGHT, 8);
+  colour_row->Add(clear_colour, 0);
+  grid->Add(colour_row, 1, wxEXPAND);
+  pick_colour->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { open_colour_picker(); });
+  clear_colour->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     ui_colour_dark_.clear();
-    refresh_swatch(colour_swatch_dark_, ui_colour_dark_);
-  });
-
-  grid->Add(new wxStaticText(body, wxID_ANY, L"Цвет (светлая тема)"), 0, wxALIGN_CENTER_VERTICAL);
-  auto* colour_light_row = new wxBoxSizer(wxHORIZONTAL);
-  make_swatch(colour_swatch_light_);
-  auto* pick_light = make_button(body, L"Выбрать…", BtnIcon::None);
-  auto* clear_light = make_button(body, L"Сбросить", BtnIcon::Cancel);
-  colour_light_row->Add(colour_swatch_light_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 8);
-  colour_light_row->Add(pick_light, 0, wxRIGHT, 8);
-  colour_light_row->Add(clear_light, 0);
-  grid->Add(colour_light_row, 1, wxEXPAND);
-  pick_light->Bind(wxEVT_BUTTON, [this, refresh_swatch](wxCommandEvent&) {
-    wxColour cur = Theme::accent();
-    parse_hex_colour(ui_colour_light_, cur);
-    wxColourData data;
-    data.SetColour(cur);
-    wxColourDialog dlg(this, &data);
-    if (dlg.ShowModal() != wxID_OK) return;
-    ui_colour_light_ = colour_to_hex(dlg.GetColourData().GetColour());
-    refresh_swatch(colour_swatch_light_, ui_colour_light_);
-  });
-  clear_light->Bind(wxEVT_BUTTON, [this, refresh_swatch](wxCommandEvent&) {
     ui_colour_light_.clear();
-    refresh_swatch(colour_swatch_light_, ui_colour_light_);
+    refresh_colour_swatches();
   });
-  refresh_swatch(colour_swatch_dark_, ui_colour_dark_);
-  refresh_swatch(colour_swatch_light_, ui_colour_light_);
+  refresh_colour_swatches();
 
   grid->Add(new wxStaticText(body, wxID_ANY, L"Шрифт списков"), 0, wxALIGN_CENTER_VERTICAL);
   auto* font_row = new wxBoxSizer(wxHORIZONTAL);
@@ -284,6 +418,16 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   for (wxTextCtrl* f : {name_, host_, user_, port_}) {
     f->Bind(wxEVT_TEXT, [this](wxCommandEvent& e) { clear_errors(); e.Skip(); });
   }
+}
+
+void ServerDialog::refresh_colour_swatches() {
+  paint_colour_swatch(colour_swatch_dark_, ui_colour_dark_);
+  paint_colour_swatch(colour_swatch_light_, ui_colour_light_);
+}
+
+void ServerDialog::open_colour_picker() {
+  if (!pick_server_ui_colour(this, ui_colour_dark_, ui_colour_light_)) return;
+  refresh_colour_swatches();
 }
 
 void ServerDialog::mark_error(wxTextCtrl* field, const wxString& message) {

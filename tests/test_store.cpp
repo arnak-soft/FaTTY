@@ -85,6 +85,10 @@ void test_store() {
   expect(cfg.bundles_for(s.id).empty(), "server bundles dropped");
 
   {
+    std::size_t n = 0;
+    const auto* palette = server_ui_colour_palette(n);
+    expect(n >= 10 && n <= 15, "palette size 10-15");
+    expect(palette && palette[0].name && palette[0].name[0], "palette has names");
     std::string dark;
     std::string light;
     suggest_server_ui_colours({}, dark, light);

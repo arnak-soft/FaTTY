@@ -85,36 +85,46 @@ bool colour_taken(const std::vector<Server>& existing, std::string_view hex) {
   return false;
 }
 
-struct UiColourPair {
-  const char* dark;
-  const char* light;
-};
+}  // namespace
 
-// Насыщенные для тёмной темы, более глубокие — для светлой; разные оттенки.
-constexpr UiColourPair kServerUiPalette[] = {
-    {"#2DD4BF", "#0F766E"},  // teal
-    {"#60A5FA", "#1D4ED8"},  // blue
-    {"#A78BFA", "#6D28D9"},  // violet
-    {"#FB7185", "#BE123C"},  // rose
-    {"#FBBF24", "#B45309"},  // amber
-    {"#A3E635", "#4D7C0F"},  // lime
-    {"#22D3EE", "#0E7490"},  // cyan
-    {"#FB923C", "#C2410C"},  // orange
-    {"#F472B6", "#BE185D"},  // pink
-    {"#818CF8", "#4338CA"},  // indigo
+namespace {
+
+constexpr ServerUiColourPair kServerUiPalette[] = {
+    {"#2DD4BF", "#0F766E", "Бирюзовый"},
+    {"#38BDF8", "#0369A1", "Небесный"},
+    {"#60A5FA", "#1D4ED8", "Синий"},
+    {"#818CF8", "#4338CA", "Индиго"},
+    {"#A78BFA", "#6D28D9", "Фиолетовый"},
+    {"#E879F9", "#A21CAF", "Фуксия"},
+    {"#F472B6", "#BE185D", "Розовый"},
+    {"#FB7185", "#BE123C", "Алый"},
+    {"#FB923C", "#C2410C", "Оранжевый"},
+    {"#FBBF24", "#B45309", "Янтарный"},
+    {"#A3E635", "#4D7C0F", "Лайм"},
+    {"#34D399", "#047857", "Изумруд"},
+    {"#22D3EE", "#0E7490", "Циан"},
+    {"#94A3B8", "#475569", "Стальной"},
 };
 
 }  // namespace
 
+const ServerUiColourPair* server_ui_colour_palette(std::size_t& count) {
+  count = std::size(kServerUiPalette);
+  return kServerUiPalette;
+}
+
 void suggest_server_ui_colours(const std::vector<Server>& existing, std::string& out_dark,
                                std::string& out_light) {
-  for (const auto& pair : kServerUiPalette) {
+  std::size_t n = 0;
+  const auto* palette = server_ui_colour_palette(n);
+  for (std::size_t i = 0; i < n; ++i) {
+    const auto& pair = palette[i];
     if (colour_taken(existing, pair.dark) || colour_taken(existing, pair.light)) continue;
     out_dark = pair.dark;
     out_light = pair.light;
     return;
   }
-  const auto& pair = kServerUiPalette[existing.size() % std::size(kServerUiPalette)];
+  const auto& pair = palette[existing.size() % n];
   out_dark = pair.dark;
   out_light = pair.light;
 }

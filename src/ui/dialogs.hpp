@@ -23,6 +23,8 @@ class ServerDialog : public PositionedDialog {
   void on_ok(wxCommandEvent&);
   void mark_error(wxTextCtrl* field, const wxString& message);
   void clear_errors();
+  void refresh_colour_swatches();
+  void open_colour_picker();
   Server server_;
   bool is_new_;
   wxTextCtrl* name_{};
@@ -51,6 +53,9 @@ class ServerDialog : public PositionedDialog {
   std::string ui_colour_dark_;
   std::string ui_colour_light_;
 };
+
+/// Палитра из готовых пар (тёмная / светлая) + свой hex. Пустые строки — отмена.
+bool pick_server_ui_colour(wxWindow* parent, std::string& dark, std::string& light);
 
 class PresetDialog : public PositionedDialog {
  public:

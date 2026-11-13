@@ -36,6 +36,16 @@ struct Server {
   Server duplicate(const std::string& new_name) const;
 };
 
+/// Готовая пара акцента: насыщенный для тёмной темы, более глубокий — для светлой.
+struct ServerUiColourPair {
+  const char* dark = "";
+  const char* light = "";
+  const char* name = "";  // русское имя для палитры
+};
+
+/// 14 заметно разных оттенков для карточки VPS.
+const ServerUiColourPair* server_ui_colour_palette(std::size_t& count);
+
 /// Подбирает пару цветов (тёмная / светлая тема), ещё не занятую существующими VPS.
 void suggest_server_ui_colours(const std::vector<Server>& existing, std::string& out_dark,
                                std::string& out_light);
