@@ -55,6 +55,70 @@ Server Server::duplicate(const std::string& new_name) const {
   return s;
 }
 
+namespace {
+
+std::string normalize_ui_colour(std::string_view hex) {
+  std::string s = trim(hex);
+  if (s.empty()) return {};
+  if (s.front() == '#') s.erase(s.begin());
+  for (char& c : s) {
+    if (c >= 'a' && c <= 'f') c = static_cast<char>(c - 'a' + 'A');
+  }
+  if (s.size() == 3) {
+    s = {s[0], s[0], s[1], s[1], s[2], s[2]};
+  }
+  if (s.size() != 6) return {};
+  for (char c : s) {
+    const bool ok = (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
+    if (!ok) return {};
+  }
+  return "#" + s;
+}
+
+bool colour_taken(const std::vector<Server>& existing, std::string_view hex) {
+  const auto want = normalize_ui_colour(hex);
+  if (want.empty()) return false;
+  for (const auto& s : existing) {
+    if (normalize_ui_colour(s.ui_colour_dark) == want) return true;
+    if (normalize_ui_colour(s.ui_colour_light) == want) return true;
+  }
+  return false;
+}
+
+struct UiColourPair {
+  const char* dark;
+  const char* light;
+};
+
+// Насыщенные для тёмной темы, более глубокие — для светлой; разные оттенки.
+constexpr UiColourPair kServerUiPalette[] = {
+    {"#2DD4BF", "#0F766E"},  // teal
+    {"#60A5FA", "#1D4ED8"},  // blue
+    {"#A78BFA", "#6D28D9"},  // violet
+    {"#FB7185", "#BE123C"},  // rose
+    {"#FBBF24", "#B45309"},  // amber
+    {"#A3E635", "#4D7C0F"},  // lime
+    {"#22D3EE", "#0E7490"},  // cyan
+    {"#FB923C", "#C2410C"},  // orange
+    {"#F472B6", "#BE185D"},  // pink
+    {"#818CF8", "#4338CA"},  // indigo
+};
+
+}  // namespace
+
+void suggest_server_ui_colours(const std::vector<Server>& existing, std::string& out_dark,
+                               std::string& out_light) {
+  for (const auto& pair : kServerUiPalette) {
+    if (colour_taken(existing, pair.dark) || colour_taken(existing, pair.light)) continue;
+    out_dark = pair.dark;
+    out_light = pair.light;
+    return;
+  }
+  const auto& pair = kServerUiPalette[existing.size() % std::size(kServerUiPalette)];
+  out_dark = pair.dark;
+  out_light = pair.light;
+}
+
 Command Command::make_new(const std::string& server_id) {
   Command c;
   c.id = new_uuid();

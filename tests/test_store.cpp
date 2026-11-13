@@ -84,6 +84,25 @@ void test_store() {
   cfg.drop_server_bundles(s.id);
   expect(cfg.bundles_for(s.id).empty(), "server bundles dropped");
 
+  {
+    std::string dark;
+    std::string light;
+    suggest_server_ui_colours({}, dark, light);
+    expect(!dark.empty() && !light.empty(), "suggest colours for first vps");
+    expect(dark != light, "dark and light differ");
+    Server a = Server::make_new();
+    a.ui_colour_dark = dark;
+    a.ui_colour_light = light;
+    std::string dark2;
+    std::string light2;
+    suggest_server_ui_colours({a}, dark2, light2);
+    expect(dark2 != dark && light2 != light, "next vps gets unused pair");
+    a.ui_colour_dark = "2dd4bf";
+    a.ui_colour_light = "#0f766e";
+    suggest_server_ui_colours({a}, dark2, light2);
+    expect(dark2 != "#2DD4BF", "normalized hex still counts as taken");
+  }
+
   auto clone = s.duplicate(copy_name(s.name, {"alpha"}));
   expect(clone.name == "alpha (копия)", "copy name");
   expect(clone.id != s.id, "new id");

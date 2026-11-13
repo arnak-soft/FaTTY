@@ -720,7 +720,9 @@ void AppFrame::build_ui() {
   });
 
   sadd->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
-    ServerDialog dlg(this, Server::make_new(), L"Новый VPS", true);
+    auto draft = Server::make_new();
+    suggest_server_ui_colours(config_.servers, draft.ui_colour_dark, draft.ui_colour_light);
+    ServerDialog dlg(this, draft, L"Новый VPS", true);
     dlg.setup_layout(&config_.settings, "server", false, [this] { persist(); });
     if (dlg.ShowModal() == wxID_OK && dlg.accepted) {
       config_.servers.push_back(dlg.result);

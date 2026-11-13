@@ -1216,7 +1216,7 @@ UpdateAvailableDialog::UpdateAvailableDialog(wxWindow* parent, const std::string
       wxString::Format(L"Доступна версия %s (у вас %s).\nСкачать установщик?", latest_s, current_s));
   msg->Wrap(FromDIP(400));
   skip_ = new ThemedCheckBox(body, wxID_ANY, L"Больше не напоминать об этой версии");
-  skip_->SetValue(true);
+  skip_->SetValue(false);
 
   auto* btns = new wxBoxSizer(wxHORIZONTAL);
   btns->AddStretchSpacer();

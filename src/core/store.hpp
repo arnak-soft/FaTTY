@@ -36,6 +36,10 @@ struct Server {
   Server duplicate(const std::string& new_name) const;
 };
 
+/// Подбирает пару цветов (тёмная / светлая тема), ещё не занятую существующими VPS.
+void suggest_server_ui_colours(const std::vector<Server>& existing, std::string& out_dark,
+                               std::string& out_light);
+
 struct Command {
   std::string id;
   std::string name;
