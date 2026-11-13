@@ -136,7 +136,8 @@ AppFrame::AppFrame(Config config, SessionVault vault)
               wxDefaultPosition, wxDefaultSize),
       config_(std::move(config)),
       vault_(std::move(vault)),
-      journal_(std::make_shared<Journal>(journal_path(), config_.settings.journal_max_entries)) {
+      journal_(std::make_shared<Journal>(journal_path(), config_.settings.journal_max_entries)),
+      backup_journal_(std::make_shared<BackupJournal>(backup_journal_path())) {
   set_icon(this);
   SetMinSize(FromDIP(wxSize(860, 560)));
   SetSize(FromDIP(wxSize(1100, 720)));
@@ -961,6 +962,7 @@ void AppFrame::init_backup_monitor() {
   d.config = [this]() -> Config& { return config_; };
   d.busy_server_id = [this] { return busy_server_id_; };
   d.alive = alive_;
+  d.journal = backup_journal_;
   d.persist = [this] { persist(); };
   d.on_change = [this, alive = alive_] {
     if (!alive->load()) return;
@@ -991,7 +993,7 @@ void AppFrame::ensure_mode_panels() {
   }
   if (!backup_panel_ && backups_) {
     auto* s = selected_server();
-    backup_panel_ = new BackupWindow(mode_stack_, &config_, backups_.get(), &config_.settings,
+    backup_panel_ = new BackupWindow(mode_stack_, &config_, backups_.get(), backup_journal_, &config_.settings,
                                      [this] { persist(); }, s ? s->id : std::string{});
     if (auto* sz = mode_stack_->GetSizer()) sz->Add(backup_panel_, 1, wxEXPAND);
     backup_panel_->Hide();

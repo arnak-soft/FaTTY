@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/backup_journal.hpp"
 #include "core/journal.hpp"
 #include "core/store.hpp"
 #include "core/vault.hpp"
@@ -132,6 +133,7 @@ class AppFrame : public wxFrame {
   Config config_;
   SessionVault vault_;
   std::shared_ptr<Journal> journal_;
+  std::shared_ptr<BackupJournal> backup_journal_;
   std::shared_ptr<SSHSession> session_;
   std::unique_ptr<RunController> runs_;
   std::unique_ptr<BundleController> bundle_run_;

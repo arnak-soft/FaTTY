@@ -185,6 +185,20 @@ std::string read_text_file(const std::filesystem::path& path) {
   return ss.str();
 }
 
+std::string format_unix_local(double unix_ts) {
+  if (unix_ts <= 0) return {};
+  const auto sec = static_cast<std::time_t>(unix_ts);
+  std::tm tm{};
+#ifdef _WIN32
+  if (localtime_s(&tm, &sec) != 0) return {};
+#else
+  if (!localtime_r(&sec, &tm)) return {};
+#endif
+  char buf[32];
+  if (std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm) == 0) return {};
+  return buf;
+}
+
 void log_error(std::string_view message) {
   try {
     std::filesystem::create_directories(app_dir());

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/backup_journal.hpp"
 #include "core/store.hpp"
 #include "core/vps_backup_engine.hpp"
 
@@ -20,6 +21,7 @@ class BackupMonitor : public wxEvtHandler {
     std::function<Config&()> config;
     std::function<std::string()> busy_server_id;
     std::shared_ptr<std::atomic<bool>> alive;
+    std::shared_ptr<BackupJournal> journal;
     std::function<void()> on_change;
     std::function<void()> persist;
     std::function<void(const std::string& job_id, const std::string& line)> on_log;

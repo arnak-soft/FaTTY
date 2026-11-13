@@ -1,8 +1,10 @@
 #include "ui/backup_window.hpp"
 
+#include "core/health.hpp"
 #include "core/util.hpp"
 #include "core/vps_backup.hpp"
 #include "core/vps_backup_engine.hpp"
+#include "ui/backup_journal_window.hpp"
 #include "ui/dialogs.hpp"
 #include "ui/theme.hpp"
 
@@ -483,11 +485,13 @@ bool edit_backup_job_dialog(wxWindow* parent, BackupJob& job, Config& config, Ap
   return true;
 }
 
-BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* monitor, AppSettings* settings,
+BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* monitor,
+                           std::shared_ptr<BackupJournal> journal, AppSettings* settings,
                            std::function<void()> persist, std::string preferred_server_id)
     : wxPanel(parent),
       config_(config),
       monitor_(monitor),
+      journal_(std::move(journal)),
       settings_(settings),
       persist_(std::move(persist)),
       preferred_server_id_(std::move(preferred_server_id)) {
@@ -505,11 +509,12 @@ BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* moni
 
   list_ = new wxListCtrl(this, wxID_ANY, wxDefaultPosition, wxDefaultSize,
                          wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxBORDER_NONE);
-  list_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(160));
-  list_->AppendColumn(L"VPS", wxLIST_FORMAT_LEFT, FromDIP(120));
-  list_->AppendColumn(L"Тип", wxLIST_FORMAT_LEFT, FromDIP(100));
-  list_->AppendColumn(L"Куда", wxLIST_FORMAT_LEFT, FromDIP(120));
-  list_->AppendColumn(L"Статус", wxLIST_FORMAT_LEFT, FromDIP(90));
+  list_->AppendColumn(L"Название", wxLIST_FORMAT_LEFT, FromDIP(150));
+  list_->AppendColumn(L"VPS", wxLIST_FORMAT_LEFT, FromDIP(100));
+  list_->AppendColumn(L"Тип", wxLIST_FORMAT_LEFT, FromDIP(90));
+  list_->AppendColumn(L"Куда", wxLIST_FORMAT_LEFT, FromDIP(110));
+  list_->AppendColumn(L"Статус", wxLIST_FORMAT_LEFT, FromDIP(70));
+  list_->AppendColumn(L"Последний раз", wxLIST_FORMAT_LEFT, FromDIP(140));
   list_->AppendColumn(L"Авто", wxLIST_FORMAT_LEFT, FromDIP(50));
   root->Add(list_, 1, wxEXPAND | wxLEFT | wxRIGHT, 8);
 
@@ -521,18 +526,23 @@ BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* moni
   run_btn_ = make_button(this, L"Запустить", BtnIcon::Play);
   cron_btn_ = make_button(this, L"Поставить cron", BtnIcon::Save);
   uncron_btn_ = make_button(this, L"Снять cron", BtnIcon::Trash);
+  auto* journal_btn = make_button(this, L"Весь журнал…", BtnIcon::List);
   buttons->Add(add, 0, wxRIGHT, 6);
   buttons->Add(edit, 0, wxRIGHT, 6);
   buttons->Add(dup, 0, wxRIGHT, 6);
   buttons->Add(del, 0, wxRIGHT, 6);
   buttons->Add(run_btn_, 0, wxRIGHT, 6);
   buttons->Add(cron_btn_, 0, wxRIGHT, 6);
-  buttons->Add(uncron_btn_, 0);
+  buttons->Add(uncron_btn_, 0, wxRIGHT, 6);
+  buttons->Add(journal_btn, 0);
   root->Add(buttons, 0, wxALL, 8);
 
+  auto* log_header = new wxBoxSizer(wxHORIZONTAL);
+  log_header->Add(new wxStaticText(this, wxID_ANY, L"Текущий запуск"), 0, wxALIGN_CENTER_VERTICAL);
+  log_header->AddStretchSpacer();
+  root->Add(log_header, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
   log_ = new wxTextCtrl(this, wxID_ANY, L"", wxDefaultPosition, FromDIP(wxSize(-1, 140)),
                         wxTE_MULTILINE | wxTE_READONLY | wxTE_RICH2);
-  root->Add(new wxStaticText(this, wxID_ANY, L"Журнал запуска"), 0, wxLEFT | wxRIGHT, 8);
   root->Add(log_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
 
   SetSizer(root);
@@ -545,6 +555,7 @@ BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* moni
   run_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { run_selected(); });
   cron_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { install_cron_selected(); });
   uncron_btn_->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { uninstall_cron_selected(); });
+  journal_btn->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { open_journal(); });
   show_all_cb_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
     if (settings_) {
       settings_->backup_show_all_servers = show_all_cb_->GetValue();
@@ -556,7 +567,13 @@ BackupWindow::BackupWindow(wxWindow* parent, Config* config, BackupMonitor* moni
   rebuild_list();
 }
 
-BackupWindow::~BackupWindow() { *alive_ = false; }
+BackupWindow::~BackupWindow() {
+  *alive_ = false;
+  if (journal_window_) {
+    journal_window_->Destroy();
+    journal_window_ = nullptr;
+  }
+}
 
 void BackupWindow::reload() { rebuild_list(); }
 
@@ -597,7 +614,9 @@ void BackupWindow::rebuild_list() {
     wxString st = wxString::FromUTF8(j.last_status.empty() ? "—" : j.last_status);
     if (!j.last_error.empty()) st += L" / " + wxString::FromUTF8(clip(j.last_error, 40));
     list_->SetItem(row, 4, st);
-    list_->SetItem(row, 5, j.enabled ? L"да" : L"нет");
+    const auto when = format_unix_local(j.last_run_unix);
+    list_->SetItem(row, 5, wxString::FromUTF8(when.empty() ? "—" : when));
+    list_->SetItem(row, 6, j.enabled ? L"да" : L"нет");
     row_job_ids_.push_back(j.id);
     ++row;
   }
@@ -666,8 +685,27 @@ void BackupWindow::run_selected() {
   if (!ask_confirm(this, L"Запуск", L"Запустить резервное копирование «" + wxString::FromUTF8(job->name) + L"» сейчас?",
                    L"Запустить", true, BtnIcon::Play))
     return;
-  log_->AppendText(L"\n— Запуск " + wxString::FromUTF8(job->name) + L" —\n");
+  const auto when = format_unix_local(unix_now());
+  log_->AppendText(L"\n— Запуск " + wxString::FromUTF8(job->name));
+  if (!when.empty()) log_->AppendText(L" · " + wxString::FromUTF8(when));
+  log_->AppendText(L" —\n");
   monitor_->run_now(job->id);
+}
+
+void BackupWindow::open_journal() {
+  if (!journal_) {
+    wxMessageBox(L"Журнал резервов недоступен.", L"Резервные копии");
+    return;
+  }
+  if (!journal_window_) {
+    journal_window_ = new BackupJournalWindow(wxGetTopLevelParent(this), journal_, settings_, persist_);
+    journal_window_->Bind(wxEVT_CLOSE_WINDOW, [this](wxCloseEvent& ev) {
+      journal_window_ = nullptr;
+      ev.Skip();
+    });
+  }
+  journal_window_->Show();
+  journal_window_->Raise();
 }
 
 void BackupWindow::install_cron_selected() {

@@ -9,6 +9,7 @@ const std::filesystem::path& app_dir();
 const std::filesystem::path& config_path();
 const std::filesystem::path& known_hosts_path();
 const std::filesystem::path& journal_path();
+const std::filesystem::path& backup_journal_path();
 const std::filesystem::path& lockout_path();
 const std::filesystem::path& health_cache_path();
 const std::filesystem::path& error_log_path();

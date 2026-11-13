@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/backup_journal.hpp"
 #include "core/store.hpp"
 #include "ui/backup_monitor.hpp"
 #include "ui/chrome.hpp"
@@ -17,10 +18,13 @@
 
 namespace fatty {
 
+class BackupJournalWindow;
+
 /// Панель заданий резервного копирования VPS (встраивается в главное окно).
 class BackupWindow : public wxPanel {
  public:
-  BackupWindow(wxWindow* parent, Config* config, BackupMonitor* monitor, AppSettings* settings = nullptr,
+  BackupWindow(wxWindow* parent, Config* config, BackupMonitor* monitor,
+               std::shared_ptr<BackupJournal> journal, AppSettings* settings = nullptr,
                std::function<void()> persist = {}, std::string preferred_server_id = {});
   ~BackupWindow() override;
   void reload();
@@ -37,11 +41,13 @@ class BackupWindow : public wxPanel {
   void run_selected();
   void install_cron_selected();
   void uninstall_cron_selected();
+  void open_journal();
   BackupJob* selected_job();
   std::string default_source_server_id() const;
 
   Config* config_ = nullptr;
   BackupMonitor* monitor_ = nullptr;
+  std::shared_ptr<BackupJournal> journal_;
   AppSettings* settings_ = nullptr;
   std::function<void()> persist_;
   std::string preferred_server_id_;
@@ -54,6 +60,7 @@ class BackupWindow : public wxPanel {
   RoundButton* run_btn_{};
   RoundButton* cron_btn_{};
   RoundButton* uncron_btn_{};
+  BackupJournalWindow* journal_window_ = nullptr;
 };
 
 bool edit_backup_job_dialog(wxWindow* parent, BackupJob& job, Config& config, AppSettings* settings,

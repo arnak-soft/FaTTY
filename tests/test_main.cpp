@@ -10,6 +10,7 @@ void test_quote();
 void test_journal();
 void test_backup();
 void test_vps_backup();
+void test_backup_journal();
 void test_placeholders();
 void test_updates();
 void test_config_roundtrip();
@@ -29,6 +30,7 @@ int main() {
     test_journal();
     test_backup();
     test_vps_backup();
+    test_backup_journal();
     test_placeholders();
     test_updates();
     test_config_roundtrip();

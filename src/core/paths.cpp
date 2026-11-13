@@ -64,6 +64,11 @@ const std::filesystem::path& journal_path() {
   return path;
 }
 
+const std::filesystem::path& backup_journal_path() {
+  static const auto path = app_dir() / "backup_journal.jsonl";
+  return path;
+}
+
 const std::filesystem::path& lockout_path() {
   static const auto path = app_dir() / "auth-lockout.json";
   return path;

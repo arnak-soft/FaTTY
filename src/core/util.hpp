@@ -32,6 +32,9 @@ void atomic_write_text(const std::filesystem::path& path, std::string_view text)
 std::string read_text_file(const std::filesystem::path& path);
 void log_error(std::string_view message);
 
+/// Локальное `YYYY-MM-DD HH:MM:SS`; пустая строка, если unix ≤ 0.
+std::string format_unix_local(double unix_ts);
+
 std::filesystem::path expand_user(const std::filesystem::path& path);
 std::string posix_join(const std::string& cwd, const std::string& name);
 std::string posix_parent(const std::string& path);

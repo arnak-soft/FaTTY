@@ -46,6 +46,7 @@ set(FATTY_CORE_SOURCES
   src/core/store.cpp
   src/core/lockout.cpp
   src/core/journal.cpp
+  src/core/backup_journal.cpp
   src/core/config_io.cpp
   src/core/backup.cpp
   src/core/vps_backup.cpp
@@ -78,6 +79,7 @@ set(FATTY_UI_SOURCES
   src/ui/settings_dialog.cpp
   src/ui/files_window.cpp
   src/ui/journal_window.cpp
+  src/ui/backup_journal_window.cpp
   src/ui/bundle_steps_window.cpp
   src/ui/help_window.cpp
   src/ui/health_monitor.cpp
@@ -184,6 +186,7 @@ add_executable(fatty_tests
   tests/test_journal.cpp
   tests/test_backup.cpp
   tests/test_vps_backup.cpp
+  tests/test_backup_journal.cpp
   tests/test_placeholders.cpp
   tests/test_updates.cpp
   tests/test_config_roundtrip.cpp
