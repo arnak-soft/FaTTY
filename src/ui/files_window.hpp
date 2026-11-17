@@ -31,8 +31,12 @@ class FilesWindow : public wxPanel {
   void refresh();
   void go_up();
   void download_selected();
+  void open_selected_for_edit();
+  void save_edited_file(const std::string& name, std::string bytes, long long expected_mtime, bool force);
   void upload();
+  void show_list_context_menu(long row);
   void set_busy(bool busy);
+  RemoteEntry* selected_file_entry();
   Server server_;
   std::string start_path_;
   std::shared_ptr<SFTPSession> session_ = std::make_shared<SFTPSession>();

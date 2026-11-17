@@ -5,8 +5,6 @@
 Скачать: [релизы на GitHub](https://github.com/arnak-soft/FaTTY/releases).
 
 - **Setup.exe** — установка в Program Files, ярлык в меню Пуск, удаление через «Приложения».
-- **OneFile.exe** — один файл, без установки.
-- **Portable** — папка. Запускайте `FaTTY.exe` внутри.
 
 ## Как начать
 
@@ -44,4 +42,4 @@
 
 ## Сборка из исходников
 
-На Windows: `build.bat` (Visual Studio 2022 с C++ или MinGW-w64 в PATH). Готовые файлы появляются в `dist\`. Номер версии берётся из git-тега.
+На Windows: `build.bat` (Visual Studio 2022 с C++ или MinGW-w64 в PATH). В `dist\` — **Setup.exe**. Номер версии берётся из git-тега. OneFile и Portable собираются только по запросу: `build.bat extras`.

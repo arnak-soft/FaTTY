@@ -159,8 +159,22 @@ void test_journal() {
     expect(mem["x"].latest.status == "ok", "newest-first is latest");
   }
 
+  {
+    JournalEntry fresh;
+    fresh.finished_at = now_iso();
+    fresh.status = "ok";
+    const double age = journal_age_sec(fresh);
+    expect(age >= 0.0 && age < 5.0, "fresh journal age near zero");
+    JournalEntry old;
+    old.finished_at = "2000-01-01T00:00:00";
+    expect(journal_age_sec(old) > 3600.0, "old journal age large");
+    JournalEntry bad;
+    expect(journal_age_sec(bad) < 0.0, "missing stamp age unknown");
+  }
+
   std::error_code ec;
   std::filesystem::remove_all(dir, ec);
 }
 
 }  // namespace fatty::test
+

@@ -63,6 +63,9 @@ json portable_settings(const AppSettings& settings) {
       {"theme", settings.theme},
       {"terminal_font_pt", settings.terminal_font_pt},
       {"show_command_folder_column", settings.show_command_folder_column},
+      {"result_fade_sec", settings.result_fade_sec},
+      {"result_fade_pct", settings.result_fade_pct},
+      {"notify_when_unfocused", settings.notify_when_unfocused},
       {"backup_enabled", settings.backup_enabled},
       {"health_auto", settings.health_auto},
       {"health_interval_sec", settings.health_interval_sec},
@@ -122,6 +125,9 @@ void apply_portable_settings(AppSettings& settings, const json& raw) {
   settings.terminal_font_pt = clamp_int(raw.value("terminal_font_pt", settings.terminal_font_pt), 8, 24);
   settings.show_command_folder_column =
       raw.value("show_command_folder_column", settings.show_command_folder_column);
+  settings.result_fade_sec = clamp_int(raw.value("result_fade_sec", settings.result_fade_sec), 10, 24 * 3600);
+  settings.result_fade_pct = clamp_int(raw.value("result_fade_pct", settings.result_fade_pct), 0, 100);
+  settings.notify_when_unfocused = raw.value("notify_when_unfocused", settings.notify_when_unfocused);
   settings.backup_enabled = raw.value("backup_enabled", settings.backup_enabled);
   settings.health_auto = raw.value("health_auto", settings.health_auto);
   settings.health_interval_sec =

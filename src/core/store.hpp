@@ -204,6 +204,12 @@ struct AppSettings {
   std::string theme = "dark";
   int terminal_font_pt = 12;
   bool show_command_folder_column = true;
+  /// За сколько секунд цвет итога (OK/ошибка) тускнеет от яркого к блеклому.
+  int result_fade_sec = 180;
+  /// Насколько тусклые старые итоги: 0 — как свежие, 100 — почти как приглушённый текст.
+  int result_fade_pct = 55;
+  /// Тихий toast, если команда завершилась, пока FaTTY не на переднем плане.
+  bool notify_when_unfocused = true;
   bool backup_enabled = true;
   double last_backup = 0.0;
   std::map<std::string, std::string> last_group_by_server;

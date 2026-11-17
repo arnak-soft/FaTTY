@@ -56,6 +56,24 @@ class SFTPSession {
   void download(const std::string& remote_name, const std::filesystem::path& local, long long size,
                 ProgressCb on_progress);
 
+  struct FileStat {
+    long long size = 0;
+    long long mtime = 0;
+    bool is_dir = false;
+  };
+  struct FileBytes {
+    std::string data;
+    long long size = 0;
+    long long mtime = 0;
+  };
+
+  FileStat stat_name(const std::string& remote_name);
+  /// Читает файл целиком в память (для встроенного редактора).
+  FileBytes read_file(const std::string& remote_name, long long known_size = -1, ProgressCb on_progress = {});
+  /// Пишет байты как есть (TRUNC). Если expected_mtime >= 0 и mtime на сервере другой — SFTPError.
+  void write_file(const std::string& remote_name, std::string_view data, long long expected_mtime = -1,
+                  ProgressCb on_progress = {});
+
   std::string remote_cwd;
 
  private:

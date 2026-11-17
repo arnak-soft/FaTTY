@@ -913,6 +913,9 @@ Config load_config_from(const std::filesystem::path& path) {
   }
   st.terminal_font_pt = json_int(settings_raw, "terminal_font_pt", 12, 8, 24);
   st.show_command_folder_column = settings_raw.value("show_command_folder_column", true);
+  st.result_fade_sec = clamp_int(settings_raw.value("result_fade_sec", 180), 10, 24 * 3600);
+  st.result_fade_pct = clamp_int(settings_raw.value("result_fade_pct", 55), 0, 100);
+  st.notify_when_unfocused = settings_raw.value("notify_when_unfocused", true);
   st.backup_enabled = settings_raw.value("backup_enabled", true);
   try {
     st.last_backup = std::max(0.0, settings_raw.value("last_backup", 0.0));
@@ -1146,6 +1149,9 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
       {"theme", config.settings.theme},
       {"terminal_font_pt", config.settings.terminal_font_pt},
       {"show_command_folder_column", config.settings.show_command_folder_column},
+      {"result_fade_sec", config.settings.result_fade_sec},
+      {"result_fade_pct", config.settings.result_fade_pct},
+      {"notify_when_unfocused", config.settings.notify_when_unfocused},
       {"backup_enabled", config.settings.backup_enabled},
       {"last_backup", config.settings.last_backup},
       {"last_group_by_server", config.settings.last_group_by_server},

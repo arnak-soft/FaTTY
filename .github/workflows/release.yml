@@ -90,24 +90,12 @@ jobs:
             throw "Tag build produced a dirty version ($ver). Working tree must be clean."
           }
           $need = @(
-            "dist\FaTTY $ver Setup.exe",
-            "dist\FaTTY $ver OneFile.exe",
-            "dist\FaTTY $ver Portable\FaTTY.exe"
+            "dist\FaTTY $ver Setup.exe"
           )
           foreach ($p in $need) {
             if (-not (Test-Path -LiteralPath $p)) { throw "Missing artifact: $p" }
             Write-Host "OK $p"
           }
-
-      - name: Zip Portable
-        shell: pwsh
-        run: |
-          $ver = (Get-Content build/generated/_version.txt -Raw).Trim()
-          $portable = "dist\FaTTY $ver Portable"
-          $zip = "dist\FaTTY $ver Portable.zip"
-          if (Test-Path -LiteralPath $zip) { Remove-Item -LiteralPath $zip -Force }
-          Compress-Archive -Path "$portable\*" -DestinationPath $zip -Force
-          Write-Host "Wrote $zip"
 
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
@@ -116,5 +104,3 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             dist/FaTTY * Setup.exe
-            dist/FaTTY * OneFile.exe
-            dist/FaTTY * Portable.zip

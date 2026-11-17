@@ -170,7 +170,7 @@ void RunController::start_ssh_run(Server server, std::string command, int timeou
       e.output = truncated ? ("…\n" + captured) : captured;
       journal->append(e);
     }
-    post([this, alive, host, srv, title, code, status, error, new_cwd, on_done] {
+    post([this, alive, host, srv, title, code, status, error, new_cwd, on_done, kind] {
       if (!alive || !alive->load()) return;
       if (host.remote_cwd && !new_cwd.empty()) (*host.remote_cwd)[srv.id] = new_cwd;
       if (host.update_cwd_label) host.update_cwd_label();
@@ -179,6 +179,7 @@ void RunController::start_ssh_run(Server server, std::string command, int timeou
         on_done(code, status);
         return;
       }
+      if (host.on_command_finished) host.on_command_finished(title, srv.name, status, kind);
       if (!run_queue_.empty()) {
         if (host.set_status && host.busy_label) {
           host.set_status(

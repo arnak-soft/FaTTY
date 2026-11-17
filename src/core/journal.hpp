@@ -59,6 +59,8 @@ std::string format_duration(double seconds);
 std::string status_from_exit(int code);
 std::string status_label(const std::string& status);
 std::string kind_label(const std::string& kind);
+/// Секунды с finished_at (или started_at). −1, если время неизвестно.
+double journal_age_sec(const JournalEntry& entry);
 std::map<std::string, CommandRunStats> command_run_stats(const std::vector<JournalEntry>& entries);
 std::map<std::string, CommandRunStats> bundle_run_stats(const std::vector<JournalEntry>& entries);
 JournalStatsSnapshot split_run_stats(const std::vector<JournalEntry>& entries);

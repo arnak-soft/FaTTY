@@ -1,8 +1,10 @@
 #include "net/sftp_session.hpp"
 
+#include "core/remote_text.hpp"
 #include "core/util.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <ctime>
 #include <fstream>
@@ -229,6 +231,128 @@ void SFTPSession::download(const std::string& remote_name, const std::filesystem
                            ProgressCb on_progress) {
   std::filesystem::create_directories(local.parent_path());
   transfer(local.string(), posix_join(remote_cwd, remote_name), true, std::max(0LL, size), std::move(on_progress));
+}
+
+SFTPSession::FileStat SFTPSession::stat_name(const std::string& remote_name) {
+  std::lock_guard lock(mutex_);
+  auto* sftp = static_cast<LIBSSH2_SFTP*>(sftp_);
+  if (!sftp) throw SFTPError("SFTP-сессия закрыта");
+  LIBSSH2_SFTP_ATTRIBUTES attrs{};
+  const auto path = posix_join(remote_cwd, remote_name);
+  if (libssh2_sftp_stat(sftp, path.c_str(), &attrs) != 0) {
+    throw SFTPError("Не удалось получить сведения о «" + remote_name + "»");
+  }
+  FileStat st;
+  st.size = (attrs.flags & LIBSSH2_SFTP_ATTR_SIZE) ? static_cast<long long>(attrs.filesize) : 0;
+  st.mtime = (attrs.flags & LIBSSH2_SFTP_ATTR_ACMODTIME) ? static_cast<long long>(attrs.mtime) : 0;
+  st.is_dir = (attrs.flags & LIBSSH2_SFTP_ATTR_PERMISSIONS) && LIBSSH2_SFTP_S_ISDIR(attrs.permissions);
+  return st;
+}
+
+SFTPSession::FileBytes SFTPSession::read_file(const std::string& remote_name, long long known_size,
+                                              ProgressCb on_progress) {
+  cancel_ = false;
+  std::lock_guard lock(mutex_);
+  auto* sftp = static_cast<LIBSSH2_SFTP*>(sftp_);
+  if (!sftp) throw SFTPError("SFTP-сессия закрыта");
+  const auto path = posix_join(remote_cwd, remote_name);
+  LIBSSH2_SFTP_ATTRIBUTES attrs{};
+  if (libssh2_sftp_stat(sftp, path.c_str(), &attrs) != 0) {
+    throw SFTPError("Не удалось открыть «" + remote_name + "»");
+  }
+  FileBytes out;
+  out.size = (attrs.flags & LIBSSH2_SFTP_ATTR_SIZE) ? static_cast<long long>(attrs.filesize) : 0;
+  out.mtime = (attrs.flags & LIBSSH2_SFTP_ATTR_ACMODTIME) ? static_cast<long long>(attrs.mtime) : 0;
+  if ((attrs.flags & LIBSSH2_SFTP_ATTR_PERMISSIONS) && LIBSSH2_SFTP_S_ISDIR(attrs.permissions)) {
+    throw SFTPError("Это папка, а не файл");
+  }
+  const long long total = known_size >= 0 ? known_size : out.size;
+  if (total > static_cast<long long>(kRemoteTextMaxBytes) || out.size > static_cast<long long>(kRemoteTextMaxBytes)) {
+    throw SFTPError("Файл слишком большой для встроенного редактора");
+  }
+  auto* handle = libssh2_sftp_open(sftp, path.c_str(), LIBSSH2_FXF_READ, 0);
+  if (!handle) throw SFTPError("Не удалось открыть «" + remote_name + "»");
+  try {
+    if (out.size > 0) out.data.reserve(static_cast<std::size_t>(out.size));
+    char buf[32768];
+    long long sent = 0;
+    auto last = std::chrono::steady_clock::now();
+    while (true) {
+      if (cancel_) throw TransferCancelled();
+      const auto n = libssh2_sftp_read(handle, buf, sizeof(buf));
+      if (n == 0) break;
+      if (n < 0) throw SFTPError("Не удалось прочитать «" + remote_name + "»");
+      if (out.data.size() + static_cast<std::size_t>(n) > kRemoteTextMaxBytes) {
+        throw SFTPError("Файл слишком большой для встроенного редактора");
+      }
+      out.data.append(buf, static_cast<std::size_t>(n));
+      sent += n;
+      const auto now = std::chrono::steady_clock::now();
+      if (on_progress && (now - last >= std::chrono::milliseconds(50) || (total > 0 && sent >= total))) {
+        last = now;
+        on_progress(sent, total > 0 ? total : sent);
+      }
+    }
+    out.size = static_cast<long long>(out.data.size());
+  } catch (...) {
+    libssh2_sftp_close(handle);
+    throw;
+  }
+  libssh2_sftp_close(handle);
+  return out;
+}
+
+void SFTPSession::write_file(const std::string& remote_name, std::string_view data, long long expected_mtime,
+                             ProgressCb on_progress) {
+  cancel_ = false;
+  std::lock_guard lock(mutex_);
+  auto* sftp = static_cast<LIBSSH2_SFTP*>(sftp_);
+  if (!sftp) throw SFTPError("SFTP-сессия закрыта");
+  const auto path = posix_join(remote_cwd, remote_name);
+  if (expected_mtime >= 0) {
+    LIBSSH2_SFTP_ATTRIBUTES attrs{};
+    if (libssh2_sftp_stat(sftp, path.c_str(), &attrs) == 0) {
+      const long long mtime =
+          (attrs.flags & LIBSSH2_SFTP_ATTR_ACMODTIME) ? static_cast<long long>(attrs.mtime) : 0;
+      if (mtime != expected_mtime) {
+        throw SFTPError("Файл на сервере изменился с момента открытия");
+      }
+    }
+  }
+  auto* handle =
+      libssh2_sftp_open(sftp, path.c_str(), LIBSSH2_FXF_WRITE | LIBSSH2_FXF_CREAT | LIBSSH2_FXF_TRUNC, 0644);
+  if (!handle) throw SFTPError("Не удалось сохранить «" + remote_name + "»");
+  try {
+    const long long total = static_cast<long long>(data.size());
+    long long sent = 0;
+    auto last = std::chrono::steady_clock::now();
+    std::size_t off = 0;
+    while (off < data.size()) {
+      if (cancel_) throw TransferCancelled();
+      const auto chunk = std::min<std::size_t>(32768, data.size() - off);
+      std::size_t wrote = 0;
+      while (wrote < chunk) {
+        const auto w = libssh2_sftp_write(handle, data.data() + off + wrote, chunk - wrote);
+        if (w < 0) throw SFTPError("Не удалось сохранить «" + remote_name + "»");
+        wrote += static_cast<std::size_t>(w);
+        sent += w;
+      }
+      off += chunk;
+      const auto now = std::chrono::steady_clock::now();
+      if (on_progress && (now - last >= std::chrono::milliseconds(50) || sent >= total)) {
+        last = now;
+        on_progress(sent, total > 0 ? total : sent);
+      }
+    }
+  } catch (const TransferCancelled&) {
+    libssh2_sftp_close(handle);
+    libssh2_sftp_unlink(sftp, path.c_str());
+    throw;
+  } catch (...) {
+    libssh2_sftp_close(handle);
+    throw;
+  }
+  libssh2_sftp_close(handle);
 }
 
 void SFTPSession::transfer(const std::string& local, const std::string& remote, bool download, long long size,

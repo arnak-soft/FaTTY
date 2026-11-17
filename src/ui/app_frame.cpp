@@ -28,6 +28,7 @@
 #include "ui/settings_dialog.hpp"
 #include "ui/striped_list.hpp"
 #include "ui/theme.hpp"
+#include "ui/toast.hpp"
 #include "ui/widgets.hpp"
 #include "ui/workspace_mode.hpp"
 
@@ -201,6 +202,7 @@ AppFrame::AppFrame(Config config, SessionVault vault)
     // Закрытие подтверждено: гасим живой-токен, чтобы фоновые задачи не трогали окно.
     alive_->store(false);
     busy_timer_.Stop();
+    result_fade_timer_.Stop();
     // Даём потоку команды доработать (он уже получил cancel): цикл опрашивает
     // флаг каждые 40 мс, поэтому ожидание короткое. Потолок — чтобы зависшая
     // сеть не заблокировала выход насовсем.
@@ -670,7 +672,12 @@ void AppFrame::build_ui() {
   status_bar->SetSizer(sbs);
   status_bar->SetMinSize(wxSize(-1, FromDIP(26)));
   busy_timer_.SetOwner(this);
-  Bind(wxEVT_TIMER, [this](wxTimerEvent&) { update_busy_indicator(); });
+  result_fade_timer_.SetOwner(this);
+  Bind(wxEVT_TIMER, [this](wxTimerEvent& e) {
+    if (&e.GetTimer() == &busy_timer_) update_busy_indicator();
+    else if (&e.GetTimer() == &result_fade_timer_) refresh_result_colours();
+  });
+  result_fade_timer_.Start(15000);
 
   auto* root = new wxBoxSizer(wxVERTICAL);
   root->Add(vsplit_, 1, wxEXPAND | wxALL, pad);
@@ -1296,6 +1303,7 @@ void AppFrame::open_settings() {
                        journal_->max_entries = config_.settings.journal_max_entries;
                        apply_ui_theme();
                        rebuild_extra_tools();
+                       refresh_result_colours();
                        persist();
                        if (health_) {
                          health_->reevaluate_cached();
@@ -1579,6 +1587,43 @@ void AppFrame::restore_columns() {
   refresh_servers(config_.settings.last_server_id);
 }
 
+void AppFrame::maybe_notify_run_finished(const std::string& title, const std::string& detail,
+                                         const std::string& status) {
+  if (!config_.settings.notify_when_unfocused) return;
+  if (app_is_foreground()) return;
+  show_completion_toast(this, title, detail, status);
+}
+
+void AppFrame::refresh_result_colours() {
+  if (commands_) {
+    for (long row = 0; row < commands_->GetItemCount(); ++row) {
+      if (row >= static_cast<long>(visible_command_ids_.size())) break;
+      const auto& id = visible_command_ids_[static_cast<std::size_t>(row)];
+      wxColour colour = Theme::text();
+      auto it = command_stats_.find(id);
+      if (it != command_stats_.end()) {
+        colour = Theme::run_status_aged(it->second.latest.status, journal_age_sec(it->second.latest),
+                                        config_.settings.result_fade_sec, config_.settings.result_fade_pct);
+      }
+      commands_->set_row_text(row, colour);
+    }
+  }
+  if (bundles_) {
+    auto* s = selected_server();
+    if (!s) return;
+    auto list = config_.bundles_for(s->id);
+    for (long row = 0; row < bundles_->GetItemCount() && row < static_cast<long>(list.size()); ++row) {
+      wxColour colour = Theme::text();
+      auto it = bundle_stats_.find(list[static_cast<std::size_t>(row)].id);
+      if (it != bundle_stats_.end()) {
+        colour = Theme::run_status_aged(it->second.latest.status, journal_age_sec(it->second.latest),
+                                        config_.settings.result_fade_sec, config_.settings.result_fade_pct);
+      }
+      bundles_->set_row_text(row, colour);
+    }
+  }
+}
+
 void AppFrame::apply_ui_theme() {
   set_theme(config_.settings.theme);
   set_mono_point_size(config_.settings.terminal_font_pt);
@@ -1711,7 +1756,8 @@ void AppFrame::refresh_commands() {
     if (it != command_stats_.end()) {
       last = wxString::FromUTF8(it->second.latest.last_run_label());
       result = wxString::FromUTF8(status_label(it->second.latest.status));
-      colour = Theme::run_status(it->second.latest.status);
+      colour = Theme::run_status_aged(it->second.latest.status, journal_age_sec(it->second.latest),
+                                      config_.settings.result_fade_sec, config_.settings.result_fade_pct);
       if (it->second.run_count > 0) {
         avg = wxString::FromUTF8(format_duration(it->second.average_sec));
       }
@@ -2110,7 +2156,8 @@ void AppFrame::refresh_bundles() {
     auto it = bundle_stats_.find(b.id);
     if (it != bundle_stats_.end()) {
       last = wxString::FromUTF8(it->second.latest.last_run_label());
-      colour = Theme::run_status(it->second.latest.status);
+      colour = Theme::run_status_aged(it->second.latest.status, journal_age_sec(it->second.latest),
+                                      config_.settings.result_fade_sec, config_.settings.result_fade_pct);
     }
     long row = bundles_->InsertItem(static_cast<long>(i), wxString::FromUTF8(b.name));
     bundles_->SetItem(row, 1, wxString::FromUTF8(std::to_string(n)));
@@ -2349,6 +2396,7 @@ void AppFrame::set_busy(bool busy) {
     busy_server_id_.clear();
     busy_timer_.Stop();
     busy_gauge_->Hide();
+    refresh_result_colours();
     if (auto* sizer = busy_gauge_->GetContainingSizer()) sizer->Layout();
     if (health_) health_->wake();
     if (settle) {
@@ -2407,6 +2455,12 @@ void AppFrame::init_run_controllers() {
   rh.set_busy = [this](bool v) { set_busy(v); };
   rh.update_cwd_label = [this] { update_cwd_label(); };
   rh.set_status = [this](const std::string& text) { status_->SetLabel(wxString::FromUTF8(text)); };
+  rh.on_command_finished = [this](const std::string& title, const std::string& server_name,
+                                  const std::string& status, const std::string& kind) {
+    if (kind == "health" || kind == "backup") return;
+    const std::string label = title.empty() ? "Команда" : title;
+    maybe_notify_run_finished(label, status_label(status) + " · " + server_name, status);
+  };
   runs_ = std::make_unique<RunController>(std::move(rh));
 
   BundleController::Host bh;
@@ -2427,6 +2481,12 @@ void AppFrame::init_run_controllers() {
     if (it != bundle_steps_windows_.end() && it->second) {
       it->second->notify_bundle_finished(bundle_id, name, reason);
     }
+    std::string status = "ok";
+    if (reason == "ошибка") status = "failed";
+    else if (reason == "прервано") status = "cancelled";
+    else if (reason != "готово") status = "error";
+    const std::string label = name.empty() ? "Связка" : ("Связка «" + name + "»");
+    maybe_notify_run_finished(label, reason, status);
   };
   bh.journal = journal_;
   bundle_run_ = std::make_unique<BundleController>(std::move(bh));

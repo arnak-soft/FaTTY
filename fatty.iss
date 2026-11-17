@@ -1,5 +1,5 @@
-; Inno Setup 6 — установщик FaTTY (обёртка над Portable из build.bat).
-; Версию и имя папки передаёт build.bat через /D...
+; Inno Setup 6 — установщик FaTTY (файлы из dist\_stage, готовит build.bat).
+; Версию и имя staging-папки передаёт build.bat через /D...
 
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0-dev"
@@ -7,8 +7,8 @@
 #ifndef MyVersionInfo
   #define MyVersionInfo "0.0.0.0"
 #endif
-#ifndef PortableDirName
-  #define PortableDirName "FaTTY 0.0.0-dev Portable"
+#ifndef StageDirName
+  #define StageDirName "_stage"
 #endif
 
 #define MyAppName "FaTTY"
@@ -61,7 +61,7 @@ russian.CloseFaTTYFailed=Установка не может продолжать
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "dist\{#PortableDirName}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\{#StageDirName}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

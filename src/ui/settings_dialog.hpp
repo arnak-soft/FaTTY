@@ -38,10 +38,13 @@ class SettingsDialog : public PositionedDialog {
   ThemedCheckBox* shell_follow_cwd_{};
   ThemedCheckBox* advance_command_{};
   ThemedCheckBox* show_folder_col_{};
+  ThemedCheckBox* notify_unfocused_{};
   ThemedCheckBox* backup_{};
   ThemedChoice* theme_{};
   ThemedChoice* terminal_font_{};
   wxTextCtrl* timeout_{};
+  wxTextCtrl* result_fade_sec_{};
+  wxTextCtrl* result_fade_pct_{};
   wxTextCtrl* journal_{};
   wxTextCtrl* putty_{};
   wxTextCtrl* winscp_{};

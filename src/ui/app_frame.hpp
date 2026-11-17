@@ -114,6 +114,8 @@ class AppFrame : public wxFrame {
   void show_whats_new();
   void open_settings();
   void restore_columns();
+  void refresh_result_colours();
+  void maybe_notify_run_finished(const std::string& title, const std::string& detail, const std::string& status);
   void track_window_state();
   std::string quick_history_key();
   void push_quick_history(const std::string& cmd);
@@ -210,6 +212,7 @@ class AppFrame : public wxFrame {
   RoundButton* bundles_stop_btn_{};
   wxGauge* busy_gauge_{};
   wxTimer busy_timer_;
+  wxTimer result_fade_timer_;
   std::vector<wxWindow*> busy_disable_;
   std::vector<wxWindow*> extra_tool_btns_;
   wxWindow* extra_tools_parent_{};

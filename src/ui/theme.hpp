@@ -34,6 +34,8 @@ struct Theme {
   static wxColour sorted_header();
   static wxColour sorted_column(const wxColour& row_bg);
   static wxColour run_status(const std::string& status);
+  /// Яркий итог → блеклый: age_sec/fade_sec и fade_pct (0–100) к muted.
+  static wxColour run_status_aged(const std::string& status, double age_sec, int fade_sec, int fade_pct);
   static wxFont ui();
   static wxFont ui_small();
   static wxFont ui_section();

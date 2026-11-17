@@ -148,6 +148,19 @@ wxColour Theme::run_status(const std::string& status) {
   if (status == "warn") return warn();
   return warn();
 }
+
+wxColour Theme::run_status_aged(const std::string& status, double age_sec, int fade_sec, int fade_pct) {
+  const wxColour bright = run_status(status);
+  fade_sec = std::max(1, fade_sec);
+  fade_pct = std::clamp(fade_pct, 0, 100);
+  if (fade_pct <= 0) return bright;
+  float age_t = 1.f;
+  if (age_sec >= 0.0) {
+    age_t = static_cast<float>(std::clamp(age_sec / static_cast<double>(fade_sec), 0.0, 1.0));
+  }
+  const float blend_t = age_t * (static_cast<float>(fade_pct) / 100.f);
+  return blend(bright, muted(), blend_t);
+}
 wxFont Theme::ui() { return wxFont(10, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
 wxFont Theme::ui_small() { return wxFont(9, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL, false, L"Segoe UI"); }
 wxFont Theme::ui_section() { return wxFont(11, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_SEMIBOLD, false, L"Segoe UI"); }

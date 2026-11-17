@@ -165,6 +165,13 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   advance_command_->SetValue(st.advance_command_after_run);
   show_folder_col_ = new ThemedCheckBox(general, wxID_ANY, L"Показывать столбец «Каталог» в списке команд");
   show_folder_col_->SetValue(st.show_command_folder_column);
+  notify_unfocused_ =
+      new ThemedCheckBox(general, wxID_ANY, L"Тихое уведомление, если команда закончилась вне FaTTY");
+  notify_unfocused_->SetValue(st.notify_when_unfocused);
+  notify_unfocused_->SetToolTip(
+      L"Когда FaTTY не на переднем плане — короткий toast в углу экрана (без системного "
+      L"центра уведомлений Windows) и лёгкая вспышка кнопки на панели задач. Клик по toast "
+      L"возвращает в FaTTY.");
   updates_ = new ThemedCheckBox(general, wxID_ANY, L"Проверять обновления при запуске (не чаще раза в сутки)");
   updates_->SetValue(st.check_updates_on_start);
   auto* theme_row = new wxBoxSizer(wxHORIZONTAL);
@@ -192,12 +199,26 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   trow->Add(new wxStaticText(general, wxID_ANY, L"Таймаут новых команд, с"), 0, wxALIGN_CENTER_VERTICAL);
   timeout_ = new wxTextCtrl(general, wxID_ANY, std::to_wstring(st.default_command_timeout));
   trow->Add(timeout_, 0, wxLEFT, 8);
+  auto* fade_row = new wxBoxSizer(wxHORIZONTAL);
+  fade_row->Add(new wxStaticText(general, wxID_ANY, L"Итог тускнеет за, с"), 0, wxALIGN_CENTER_VERTICAL);
+  result_fade_sec_ = new wxTextCtrl(general, wxID_ANY, std::to_wstring(st.result_fade_sec));
+  result_fade_sec_->SetToolTip(
+      L"Сразу после запуска цвет OK/ошибки яркий; за это время плавно становится блеклым.");
+  fade_row->Add(result_fade_sec_, 0, wxLEFT, 8);
+  fade_row->Add(new wxStaticText(general, wxID_ANY, L"тусклость старых, %"), 0,
+                wxALIGN_CENTER_VERTICAL | wxLEFT, 12);
+  result_fade_pct_ = new wxTextCtrl(general, wxID_ANY, std::to_wstring(st.result_fade_pct));
+  result_fade_pct_->SetToolTip(
+      L"0 — старые итоги остаются яркими; 100 — почти как приглушённый текст. По умолчанию 55.");
+  fade_row->Add(result_fade_pct_, 0, wxLEFT, 8);
   auto* jrow = new wxBoxSizer(wxHORIZONTAL);
   jrow->Add(new wxStaticText(general, wxID_ANY, L"Максимум записей журнала"), 0, wxALIGN_CENTER_VERTICAL);
   journal_ = new wxTextCtrl(general, wxID_ANY, std::to_wstring(st.journal_max_entries));
   jrow->Add(journal_, 0, wxLEFT, 8);
   auto* check_now = make_button(general, L"Проверить сейчас…", BtnIcon::Refresh);
   style_text(timeout_);
+  style_text(result_fade_sec_);
+  style_text(result_fade_pct_);
   style_text(journal_);
   const int pad = 8;
   bool first_section = true;
@@ -214,11 +235,13 @@ SettingsDialog::SettingsDialog(wxWindow* parent, Config& config, SessionVault& v
   add_check(clear_output_);
   add_check(advance_command_);
   add_row(trow);
+  add_row(fade_row);
   add_section(L"Shell");
   add_check(automation_to_shell_);
   add_check(shell_follow_cwd_);
   add_section(L"Окно");
   add_check(show_folder_col_);
+  add_check(notify_unfocused_);
   add_row(theme_row);
   add_row(font_row);
   add_section(L"Журнал");
@@ -578,7 +601,11 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   int journal = config_.settings.journal_max_entries;
   int attempts = config_.settings.master_password_max_attempts;
   int minutes = config_.settings.master_password_lockout_minutes;
+  int fade_sec = config_.settings.result_fade_sec;
+  int fade_pct = config_.settings.result_fade_pct;
   parse_int(std::string(timeout_->GetValue().utf8_string()), timeout);
+  parse_int(std::string(result_fade_sec_->GetValue().utf8_string()), fade_sec);
+  parse_int(std::string(result_fade_pct_->GetValue().utf8_string()), fade_pct);
   parse_int(std::string(journal_->GetValue().utf8_string()), journal);
   parse_int(std::string(lockout_attempts_->GetValue().utf8_string()), attempts);
   parse_int(std::string(lockout_minutes_->GetValue().utf8_string()), minutes);
@@ -590,6 +617,7 @@ void SettingsDialog::on_save(wxCommandEvent&) {
   config_.settings.shell_follow_command_cwd = shell_follow_cwd_->GetValue();
   config_.settings.advance_command_after_run = advance_command_->GetValue();
   config_.settings.show_command_folder_column = show_folder_col_->GetValue();
+  config_.settings.notify_when_unfocused = notify_unfocused_->GetValue();
   config_.settings.backup_enabled = backup_->GetValue();
   const std::string old_theme = config_.settings.theme;
   config_.settings.theme = theme_->GetSelection() == 1 ? "light" : "dark";
@@ -604,6 +632,8 @@ void SettingsDialog::on_save(wxCommandEvent&) {
                  L"Тема", wxOK | wxICON_INFORMATION, this);
   }
   config_.settings.default_command_timeout = clamp_int(timeout, 1, 86400);
+  config_.settings.result_fade_sec = clamp_int(fade_sec, 10, 24 * 3600);
+  config_.settings.result_fade_pct = clamp_int(fade_pct, 0, 100);
   config_.settings.journal_max_entries = clamp_int(journal, 100, 50000);
   config_.settings.putty_path = std::string(putty_->GetValue().utf8_string());
   config_.settings.winscp_path = std::string(winscp_->GetValue().utf8_string());

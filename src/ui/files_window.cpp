@@ -1,13 +1,17 @@
 #include "ui/files_window.hpp"
 
+#include "core/remote_text.hpp"
 #include "core/util.hpp"
+#include "ui/chrome.hpp"
 #include "ui/dialogs.hpp"
+#include "ui/file_editor_dialog.hpp"
 #include "ui/layout.hpp"
 #include "ui/theme.hpp"
 #include "ui/widgets.hpp"
 
 #include <wx/dirdlg.h>
 #include <wx/filedlg.h>
+#include <wx/menu.h>
 #include <wx/msgdlg.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
@@ -103,8 +107,13 @@ FilesWindow::FilesWindow(wxWindow* parent, const Server& server, std::string sta
         wxMessageBox(wxString::FromUTF8(exc.what()), L"Файлы", wxOK | wxICON_ERROR, this);
       }
     } else {
+      // Двойной клик / Enter — только скачать; правка только из ПКМ.
       download_selected();
     }
+  });
+  list_->Bind(wxEVT_LIST_ITEM_RIGHT_CLICK, [this](wxListEvent& e) {
+    if (busy_) return;
+    show_list_context_menu(e.GetIndex());
   });
   mkdir->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
     wxTextEntryDialog dlg(this, L"Имя папки", L"Новая папка");
@@ -202,12 +211,156 @@ void FilesWindow::go_up() {
   }
 }
 
+RemoteEntry* FilesWindow::selected_file_entry() {
+  long i = list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+  if (i <= 0) return nullptr;
+  auto& ent = entries_[static_cast<std::size_t>(i - 1)];
+  if (ent.is_dir) return nullptr;
+  return &ent;
+}
+
+void FilesWindow::show_list_context_menu(long row) {
+  if (row < 0 || row >= list_->GetItemCount()) return;
+  list_->SetItemState(row, wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
+                      wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED);
+  if (row == 0) return;
+  auto& ent = entries_[static_cast<std::size_t>(row - 1)];
+  wxMenu menu;
+  if (!ent.is_dir) {
+    menu.Append(1, L"Открыть…");
+    menu.Append(2, L"Скачать");
+    menu.AppendSeparator();
+  }
+  menu.Append(3, L"Удалить");
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { open_selected_for_edit(); }, 1);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { download_selected(); }, 2);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto* file = selected_file_entry();
+    RemoteEntry* ent_ptr = file;
+    if (!ent_ptr) {
+      long i = list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
+      if (i <= 0) return;
+      ent_ptr = &entries_[static_cast<std::size_t>(i - 1)];
+    }
+    if (!ask_confirm(this, L"Файлы", L"Удалить «" + wxString::FromUTF8(ent_ptr->name) + L"»?", L"Удалить", false,
+                     BtnIcon::Trash))
+      return;
+    try {
+      session_->remove(*ent_ptr);
+      refresh();
+    } catch (const std::exception& exc) {
+      wxMessageBox(wxString::FromUTF8(exc.what()), L"Файлы", wxOK | wxICON_ERROR, this);
+    }
+  }, 3);
+  show_themed_menu(this, &menu);
+}
+
+void FilesWindow::open_selected_for_edit() {
+  if (busy_) return;
+  auto* ent = selected_file_entry();
+  if (!ent) return;
+  if (ent->is_link) {
+    wxMessageBox(L"Ссылки пока не редактируются — скачайте цель или откройте реальный файл.", L"Файлы",
+                 wxOK | wxICON_INFORMATION, this);
+    return;
+  }
+  if (ent->size > static_cast<long long>(kRemoteTextMaxBytes)) {
+    wxMessageBox(wxString::FromUTF8("Файл больше " + std::to_string(kRemoteTextMaxBytes / 1024) +
+                                    " КБ. Встроенный редактор его не открывает — используйте «Скачать»."),
+                 L"Файлы", wxOK | wxICON_INFORMATION, this);
+    return;
+  }
+  set_busy(true);
+  status_->SetLabel(L"Чтение…");
+  auto alive = alive_;
+  auto session = session_;
+  const auto name = ent->name;
+  const auto size = ent->size;
+  const auto mtime = ent->mtime;
+  std::thread([this, alive, session, name, size, mtime] {
+    std::string err;
+    SFTPSession::FileBytes bytes;
+    try {
+      bytes = session->read_file(name, size, [this, alive](long long sent, long long total) {
+        wxTheApp->CallAfter([this, alive, sent, total] {
+          if (!alive->load()) return;
+          gauge_->SetRange(static_cast<int>(total > 0 ? total : 1));
+          gauge_->SetValue(static_cast<int>(sent > total ? total : sent));
+        });
+      });
+    } catch (const std::exception& exc) {
+      err = exc.what();
+    }
+    wxTheApp->CallAfter([this, alive, err, bytes = std::move(bytes), name, mtime]() mutable {
+      if (!alive->load()) return;
+      set_busy(false);
+      if (!err.empty()) {
+        wxMessageBox(wxString::FromUTF8(err), L"Файлы", wxOK | wxICON_ERROR, this);
+        return;
+      }
+      const auto decoded = decode_remote_text(bytes.data);
+      if (!decoded.ok) {
+        wxMessageBox(wxString::FromUTF8(decoded.error), L"Файлы", wxOK | wxICON_WARNING, this);
+        return;
+      }
+      FileEditorDialog dlg(this, wxString::FromUTF8("Файл: " + name), decoded.view);
+      if (dlg.ShowModal() != wxID_OK || !dlg.saved) return;
+      const long long expected = bytes.mtime > 0 ? bytes.mtime : mtime;
+      save_edited_file(name, std::move(dlg.result_bytes), expected, false);
+    });
+  }).detach();
+}
+
+void FilesWindow::save_edited_file(const std::string& name, std::string payload, long long expected_mtime,
+                                   bool force) {
+  if (busy_) return;
+  set_busy(true);
+  status_->SetLabel(L"Сохранение…");
+  auto alive = alive_;
+  auto session = session_;
+  const long long expect = force ? -1 : expected_mtime;
+  std::thread([this, alive, session, name, payload = std::move(payload), expect, expected_mtime]() mutable {
+    std::string write_err;
+    try {
+      session->write_file(name, payload, expect, [this, alive](long long sent, long long total) {
+        wxTheApp->CallAfter([this, alive, sent, total] {
+          if (!alive->load()) return;
+          gauge_->SetRange(static_cast<int>(total > 0 ? total : 1));
+          gauge_->SetValue(static_cast<int>(sent > total ? total : sent));
+        });
+      });
+    } catch (const std::exception& exc) {
+      write_err = exc.what();
+    }
+    wxTheApp->CallAfter([this, alive, write_err, name, payload = std::move(payload), expected_mtime]() mutable {
+      if (!alive->load()) return;
+      set_busy(false);
+      if (write_err.empty()) {
+        status_->SetLabel(L"Сохранено");
+        try {
+          refresh();
+        } catch (...) {
+        }
+        return;
+      }
+      if (write_err.find("изменился") != std::string::npos) {
+        if (ask_confirm(this, L"Файлы",
+                        L"Файл на сервере изменился с момента открытия.\nПерезаписать своей версией?",
+                        L"Перезаписать", false)) {
+          save_edited_file(name, std::move(payload), expected_mtime, true);
+        }
+        return;
+      }
+      wxMessageBox(wxString::FromUTF8(write_err), L"Файлы", wxOK | wxICON_ERROR, this);
+    });
+  }).detach();
+}
+
 void FilesWindow::download_selected() {
   if (busy_) return;
-  long i = list_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
-  if (i <= 0) return;
-  auto& ent = entries_[static_cast<std::size_t>(i - 1)];
-  if (ent.is_dir) return;
+  auto* ent_ptr = selected_file_entry();
+  if (!ent_ptr) return;
+  auto& ent = *ent_ptr;
   wxFileDialog dlg(this, L"Сохранить как", L"", wxString::FromUTF8(ent.name), L"All|*.*", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
   if (dlg.ShowModal() != wxID_OK) return;
   auto dest = std::filesystem::path(dlg.GetPath().utf8_string());

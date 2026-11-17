@@ -16,6 +16,7 @@ void test_updates();
 void test_config_roundtrip();
 void test_health();
 void test_remote_profile();
+void test_remote_text();
 void test_whats_new();
 void test_checklist();
 void test_smoke();
@@ -36,6 +37,7 @@ int main() {
     test_config_roundtrip();
     test_health();
     test_remote_profile();
+    test_remote_text();
     test_whats_new();
     test_checklist();
     test_smoke();

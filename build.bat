@@ -2,6 +2,14 @@
 setlocal EnableExtensions
 cd /d "%~dp0"
 
+rem По умолчанию: Setup.exe. OneFile + Portable — только по запросу:
+rem   build.bat extras
+rem   set FATTY_BUILD_EXTRAS=1
+set "EXTRAS=0"
+if /I "%~1"=="extras" set "EXTRAS=1"
+if /I "%~1"=="--extras" set "EXTRAS=1"
+if "%FATTY_BUILD_EXTRAS%"=="1" set "EXTRAS=1"
+
 set "VCPKG_ROOT=%~dp0third_party\vcpkg"
 if not defined VCPKG_DEFAULT_BINARY_CACHE set "VCPKG_DEFAULT_BINARY_CACHE=%~dp0.vcpkg-cache"
 if not exist "%VCPKG_DEFAULT_BINARY_CACHE%" mkdir "%VCPKG_DEFAULT_BINARY_CACHE%"
@@ -77,19 +85,30 @@ if "%EXE%"=="" (
 if exist dist (
   del /q "dist\FaTTY*.exe" 2>nul
   for /d %%D in ("dist\FaTTY*Portable") do rd /s /q "%%D"
+  if exist "dist\_stage" rd /s /q "dist\_stage"
 )
 mkdir dist 2>nul
-set "PORTABLE=dist\FaTTY %VER% Portable"
-mkdir "%PORTABLE%" 2>nul
-copy /y "%EXE%" "%PORTABLE%\FaTTY.exe" >nul
-copy /y "build\generated\_version.txt" "%PORTABLE%\_version.txt" >nul
-if exist "assets\app.ico" copy /y "assets\app.ico" "%PORTABLE%\app.ico" >nul
-copy /y "%EXE%" "dist\FaTTY %VER% OneFile.exe" >nul
+set "STAGE=dist\_stage"
+mkdir "%STAGE%" 2>nul
+copy /y "%EXE%" "%STAGE%\FaTTY.exe" >nul
+copy /y "build\generated\_version.txt" "%STAGE%\_version.txt" >nul
+if exist "assets\app.ico" copy /y "assets\app.ico" "%STAGE%\app.ico" >nul
+
+if "%EXTRAS%"=="1" (
+  set "PORTABLE=dist\FaTTY %VER% Portable"
+  mkdir "%PORTABLE%" 2>nul
+  copy /y "%STAGE%\FaTTY.exe" "%PORTABLE%\FaTTY.exe" >nul
+  copy /y "%STAGE%\_version.txt" "%PORTABLE%\_version.txt" >nul
+  if exist "%STAGE%\app.ico" copy /y "%STAGE%\app.ico" "%PORTABLE%\app.ico" >nul
+  copy /y "%EXE%" "dist\FaTTY %VER% OneFile.exe" >nul
+)
 
 echo.
 echo Ready:
-echo   dist\FaTTY %VER% OneFile.exe
-echo   %PORTABLE%\FaTTY.exe
+if "%EXTRAS%"=="1" (
+  echo   dist\FaTTY %VER% OneFile.exe
+  echo   dist\FaTTY %VER% Portable\FaTTY.exe
+)
 
 call :find_iscc
 if "%ISCC%"=="" (
@@ -123,7 +142,7 @@ set "VERINFO=%V1%.%V2%.%V3%.%V4%"
 
 :got_verinfo
 echo Building installer...
-"%ISCC%" "/DMyAppVersion=%VER%" "/DMyVersionInfo=%VERINFO%" "/DPortableDirName=FaTTY %VER% Portable" fatty.iss
+"%ISCC%" "/DMyAppVersion=%VER%" "/DMyVersionInfo=%VERINFO%" "/DStageDirName=_stage" fatty.iss
 if errorlevel 1 exit /b 1
 echo   dist\FaTTY %VER% Setup.exe
 exit /b 0

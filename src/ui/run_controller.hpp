@@ -50,6 +50,10 @@ class RunController {
     std::function<void(bool)> set_busy;
     std::function<void()> update_cwd_label;
     std::function<void(const std::string&)> set_status;
+    /// Команда завершилась (не шаг связки с on_done). title / server / status / kind.
+    std::function<void(const std::string& title, const std::string& server_name, const std::string& status,
+                       const std::string& kind)>
+        on_command_finished;
   };
 
   explicit RunController(Host host);

@@ -55,6 +55,7 @@ set(FATTY_CORE_SOURCES
   src/core/placeholders.cpp
   src/core/health.cpp
   src/core/remote_profile.cpp
+  src/core/remote_text.cpp
   src/app/version.cpp
   src/app/whats_new.cpp
 )
@@ -78,6 +79,7 @@ set(FATTY_UI_SOURCES
   src/ui/dialogs.cpp
   src/ui/settings_dialog.cpp
   src/ui/files_window.cpp
+  src/ui/file_editor_dialog.cpp
   src/ui/journal_window.cpp
   src/ui/backup_journal_window.cpp
   src/ui/bundle_steps_window.cpp
@@ -89,6 +91,7 @@ set(FATTY_UI_SOURCES
   src/ui/command_transfer.cpp
   src/ui/terminal_view.cpp
   src/ui/splash.cpp
+  src/ui/toast.cpp
   src/ui/app_frame.cpp
   src/app/single_instance.cpp
   src/app/main.cpp
@@ -192,6 +195,7 @@ add_executable(fatty_tests
   tests/test_config_roundtrip.cpp
   tests/test_health.cpp
   tests/test_remote_profile.cpp
+  tests/test_remote_text.cpp
   tests/test_whats_new.cpp
   tests/test_checklist.cpp
   tests/test_smoke.cpp

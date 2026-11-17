@@ -269,6 +269,14 @@ std::string JournalEntry::compact_when() const {
   return ss.str();
 }
 
+double journal_age_sec(const JournalEntry& entry) {
+  const std::string& stamp = !entry.finished_at.empty() ? entry.finished_at : entry.started_at;
+  auto tp = parse_iso(stamp);
+  if (!tp) return -1.0;
+  const auto now = std::chrono::system_clock::now();
+  return std::chrono::duration<double>(now - *tp).count();
+}
+
 std::string JournalEntry::last_run_label() const {
   std::string result;
   if (status == "ok") {
