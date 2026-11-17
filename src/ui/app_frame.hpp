@@ -151,6 +151,7 @@ class AppFrame : public wxFrame {
   bool window_maximized_ = false;
   std::string normal_geometry_;
   std::string server_filter_;
+  bool show_archived_servers_ = false;
   std::string busy_label_;
   std::string command_sort_by_;
   bool command_sort_asc_ = true;
@@ -165,6 +166,8 @@ class AppFrame : public wxFrame {
   wxSplitterWindow* vsplit_{};
   wxSplitterWindow* hsplit_{};
   wxTextCtrl* server_search_{};
+  ThemedCheckBox* server_archive_cb_{};
+  wxStaticText* servers_section_{};
   StripedListCtrl* servers_{};
   wxStaticText* server_heading_{};
   wxStaticText* server_meta_{};

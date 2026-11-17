@@ -68,7 +68,7 @@ void HealthMonitor::refresh_all() {
   {
     std::lock_guard lock(mutex_);
     for (const auto& s : servers) {
-      if (s.health_enabled) force_.insert(s.id);
+      if (s.health_enabled && !s.archived) force_.insert(s.id);
     }
   }
   tick();
@@ -146,7 +146,7 @@ void HealthMonitor::tick() {
   {
     std::lock_guard lock(mutex_);
     for (const auto& s : servers) {
-      if (!s.health_enabled) continue;
+      if (!s.health_enabled || s.archived) continue;
       if (s.id == busy) continue;
       if (force_.count(s.id)) {
         force_pick = s.id;
@@ -170,7 +170,7 @@ void HealthMonitor::tick() {
     const int n = static_cast<int>(servers.size());
     for (int i = 0; i < n; ++i) {
       const auto& s = servers[(next_ + static_cast<std::size_t>(i)) % servers.size()];
-      if (!s.health_enabled) continue;
+      if (!s.health_enabled || s.archived) continue;
       if (s.id == busy) continue;
       HealthSnapshot prev;
       {

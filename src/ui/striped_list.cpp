@@ -92,6 +92,16 @@ StripedListCtrl::Header::Header(StripedListCtrl* owner)
   Bind(wxEVT_MOTION, &Header::on_mouse, this);
   Bind(wxEVT_LEAVE_WINDOW, &Header::on_mouse, this);
   Bind(wxEVT_MOUSE_CAPTURE_LOST, &Header::on_capture_lost, this);
+  Bind(wxEVT_MOUSEWHEEL, [this](wxMouseEvent& e) {
+    if (e.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL || e.ShiftDown()) {
+      const int step = FromDIP(40);
+      int delta = e.GetWheelRotation() > 0 ? -step : step;
+      if (e.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL) delta = -delta;
+      owner_->scroll_h_by(delta);
+      return;
+    }
+    e.Skip();
+  });
 }
 
 wxSize StripedListCtrl::Header::DoGetBestSize() const { return {FromDIP(100), owner_->header_height()}; }
@@ -107,7 +117,7 @@ void StripedListCtrl::Header::on_paint(wxPaintEvent&) {
   const int arrow_w = FromDIP(8);
   const int arrow_h = FromDIP(5);
   const int arrow_gap = FromDIP(6);
-  int x = 0;
+  int x = -owner_->h_offset();
   for (std::size_t i = 0; i < owner_->columns_.size(); ++i) {
     const auto& col = owner_->columns_[i];
     const bool sorted = static_cast<int>(i) == owner_->sort_col_;
@@ -140,7 +150,7 @@ void StripedListCtrl::Header::on_paint(wxPaintEvent&) {
     dc.DrawLine(x - 1, FromDIP(4), x - 1, h - FromDIP(4));
   }
   if (moving_ && drop_before_ >= 0) {
-    int mark = 0;
+    int mark = -owner_->h_offset();
     const int n = static_cast<int>(owner_->columns_.size());
     for (int i = 0; i < drop_before_ && i < n; ++i) {
       mark += owner_->columns_[static_cast<std::size_t>(i)].width;
@@ -153,30 +163,33 @@ void StripedListCtrl::Header::on_paint(wxPaintEvent&) {
 }
 
 int StripedListCtrl::Header::hit_split(int x) const {
+  const int abs_x = x + owner_->h_offset();
   int pos = 0;
   const int grip = FromDIP(5);
   for (int i = 0; i < static_cast<int>(owner_->columns_.size()); ++i) {
     pos += owner_->columns_[static_cast<std::size_t>(i)].width;
-    if (std::abs(x - pos) <= grip) return i;
+    if (std::abs(abs_x - pos) <= grip) return i;
   }
   return -1;
 }
 
 int StripedListCtrl::Header::hit_column(int x) const {
+  const int abs_x = x + owner_->h_offset();
   int pos = 0;
   for (int i = 0; i < static_cast<int>(owner_->columns_.size()); ++i) {
     pos += owner_->columns_[static_cast<std::size_t>(i)].width;
-    if (x < pos) return i;
+    if (abs_x < pos) return i;
   }
   return -1;
 }
 
 int StripedListCtrl::Header::drop_before_at(int x) const {
+  const int abs_x = x + owner_->h_offset();
   int pos = 0;
   const int n = static_cast<int>(owner_->columns_.size());
   for (int i = 0; i < n; ++i) {
     const int w = owner_->columns_[static_cast<std::size_t>(i)].width;
-    if (x < pos + w / 2) return i;
+    if (abs_x < pos + w / 2) return i;
     pos += w;
   }
   return n;
@@ -246,6 +259,7 @@ void StripedListCtrl::Header::on_mouse(wxMouseEvent& e) {
     if (drag_col_ >= 0) {
       const int w = std::max(FromDIP(40), drag_start_w_ + (x - drag_start_x_));
       owner_->columns_[static_cast<std::size_t>(drag_col_)].width = w;
+      owner_->update_h_scroll();
       Refresh();
       owner_->refresh_body();
       return;
@@ -285,6 +299,15 @@ StripedListCtrl::Body::Body(StripedListCtrl* owner)
   Bind(wxEVT_LEFT_DCLICK, &Body::on_dclick, this);
   Bind(wxEVT_KEY_DOWN, &Body::on_key, this);
   Bind(wxEVT_SIZE, &Body::on_size, this);
+  Bind(wxEVT_SCROLLWIN_TOP, &Body::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_BOTTOM, &Body::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_LINEUP, &Body::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_LINEDOWN, &Body::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_PAGEUP, &Body::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_PAGEDOWN, &Body::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_THUMBTRACK, &Body::on_scroll, this);
+  Bind(wxEVT_SCROLLWIN_THUMBRELEASE, &Body::on_scroll, this);
+  Bind(wxEVT_MOUSEWHEEL, &Body::on_wheel, this);
 }
 
 wxCoord StripedListCtrl::Body::OnGetRowHeight(size_t) const { return owner_->row_height(); }
@@ -303,10 +326,11 @@ int StripedListCtrl::Body::hit_row(int y) const {
 }
 
 int StripedListCtrl::Body::hit_column(int x) const {
+  const int abs_x = x + owner_->h_offset();
   int acc = 0;
   for (int i = 0; i < static_cast<int>(owner_->columns_.size()); ++i) {
     const int w = owner_->columns_[static_cast<std::size_t>(i)].width;
-    if (x >= acc && x < acc + w) return i;
+    if (abs_x >= acc && abs_x < acc + w) return i;
     acc += w;
   }
   return -1;
@@ -318,6 +342,7 @@ int StripedListCtrl::Body::hit_badge(int row, int col, int x) const {
   if (col >= static_cast<int>(item.badges.size()) || item.badges[static_cast<std::size_t>(col)].empty()) {
     return -1;
   }
+  const int abs_x = x + owner_->h_offset();
   int col_x = 0;
   for (int i = 0; i < col; ++i) col_x += owner_->columns_[static_cast<std::size_t>(i)].width;
   const int pad = FromDIP(6);
@@ -326,7 +351,7 @@ int StripedListCtrl::Body::hit_badge(int row, int col, int x) const {
   int bx = col_x + pad;
   const auto& badges = item.badges[static_cast<std::size_t>(col)];
   for (int i = 0; i < static_cast<int>(badges.size()); ++i) {
-    if (x >= bx && x < bx + size) return i;
+    if (abs_x >= bx && abs_x < bx + size) return i;
     bx += size + gap;
   }
   return -1;
@@ -369,7 +394,7 @@ void StripedListCtrl::Body::on_paint(wxPaintEvent&) {
     dc.SetBrush(wxBrush(bg));
     dc.DrawRectangle(row_rc);
     dc.SetTextForeground(item.text.IsOk() ? item.text : Theme::text());
-    int x = 0;
+    int x = -owner_->h_offset();
     for (int col = 0; col < static_cast<int>(owner_->columns_.size()); ++col) {
       const int w = owner_->columns_[static_cast<std::size_t>(col)].width;
       if (col == owner_->sort_col_) {
@@ -411,12 +436,31 @@ void StripedListCtrl::Body::on_motion(wxMouseEvent& e) {
     return;
   }
   const int bi = hit_badge(row, col, e.GetX());
-  if (bi < 0) {
+  if (bi >= 0) {
+    const auto& badges = owner_->rows_[static_cast<std::size_t>(row)].badges[static_cast<std::size_t>(col)];
+    set_hover_tip(badges[static_cast<std::size_t>(bi)].tip);
+    return;
+  }
+  const auto& item = owner_->rows_[static_cast<std::size_t>(row)];
+  if (col >= static_cast<int>(item.cells.size())) {
     set_hover_tip(L"");
     return;
   }
-  const auto& badges = owner_->rows_[static_cast<std::size_t>(row)].badges[static_cast<std::size_t>(col)];
-  set_hover_tip(badges[static_cast<std::size_t>(bi)].tip);
+  const wxString& text = item.cells[static_cast<std::size_t>(col)];
+  if (text.empty()) {
+    set_hover_tip(L"");
+    return;
+  }
+  wxClientDC dc(this);
+  const wxFont list_font = owner_->GetFont().IsOk() ? owner_->GetFont() : Theme::ui();
+  dc.SetFont(list_font);
+  const int pad = FromDIP(6);
+  const int col_w = owner_->columns_[static_cast<std::size_t>(col)].width;
+  if (dc.GetTextExtent(text).x > std::max(0, col_w - pad * 2)) {
+    set_hover_tip(text);
+  } else {
+    set_hover_tip(L"");
+  }
 }
 
 void StripedListCtrl::Body::on_leave(wxMouseEvent&) { set_hover_tip(L""); }
@@ -461,6 +505,10 @@ void StripedListCtrl::Body::on_key(wxKeyEvent& e) {
     }
     return;
   }
+  if (key == WXK_LEFT || key == WXK_RIGHT) {
+    owner_->scroll_h_by(key == WXK_LEFT ? -FromDIP(40) : FromDIP(40));
+    return;
+  }
   if (key == WXK_RETURN || key == WXK_NUMPAD_ENTER) {
     if (cur >= 0) owner_->emit_activated(cur);
     return;
@@ -469,8 +517,43 @@ void StripedListCtrl::Body::on_key(wxKeyEvent& e) {
 }
 
 void StripedListCtrl::Body::on_size(wxSizeEvent& e) {
+  owner_->update_h_scroll();
   Refresh();
   e.Skip();
+}
+
+void StripedListCtrl::Body::on_scroll(wxScrollWinEvent& e) {
+  if (e.GetOrientation() != wxHORIZONTAL) {
+    e.Skip();
+    return;
+  }
+  int pos = owner_->h_offset();
+  const int client = std::max(1, GetClientSize().x);
+  const int max_pos = std::max(0, owner_->content_width() - client);
+  const int step = FromDIP(40);
+  const int page = std::max(step, client - step);
+  const auto type = e.GetEventType();
+  if (type == wxEVT_SCROLLWIN_LINEUP) pos -= step;
+  else if (type == wxEVT_SCROLLWIN_LINEDOWN) pos += step;
+  else if (type == wxEVT_SCROLLWIN_PAGEUP) pos -= page;
+  else if (type == wxEVT_SCROLLWIN_PAGEDOWN) pos += page;
+  else if (type == wxEVT_SCROLLWIN_TOP) pos = 0;
+  else if (type == wxEVT_SCROLLWIN_BOTTOM) pos = max_pos;
+  else pos = e.GetPosition();
+  owner_->set_h_offset(std::clamp(pos, 0, max_pos));
+}
+
+void StripedListCtrl::Body::on_wheel(wxMouseEvent& e) {
+  const bool horizontal =
+      e.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL || e.ShiftDown();
+  if (!horizontal) {
+    e.Skip();
+    return;
+  }
+  const int step = FromDIP(40);
+  const int delta = e.GetWheelRotation() > 0 ? -step : step;
+  // Invert for native horizontal axis so trackpad direction feels natural.
+  owner_->scroll_h_by(e.GetWheelAxis() == wxMOUSE_WHEEL_HORIZONTAL ? -delta : delta);
 }
 
 StripedListCtrl::StripedListCtrl(wxWindow* parent, wxWindowID id, long style)
@@ -497,6 +580,7 @@ void StripedListCtrl::restyle() {
     body_->SetRowCount(static_cast<size_t>(GetItemCount()));
   }
   Layout();
+  update_h_scroll();
   Refresh();
 }
 
@@ -564,6 +648,7 @@ void StripedListCtrl::DeleteAllItems() {
 void StripedListCtrl::AppendColumn(const wxString& title, int, int width) {
   columns_.push_back({title, width > 0 ? width : FromDIP(80)});
   for (auto& row : rows_) ensure_cells(row);
+  update_h_scroll();
   if (header_) header_->Refresh();
   refresh_body();
 }
@@ -581,6 +666,7 @@ bool StripedListCtrl::DeleteColumn(int col) {
   }
   if (sort_col_ == col) sort_col_ = -1;
   else if (sort_col_ > col) --sort_col_;
+  update_h_scroll();
   if (header_) header_->Refresh();
   refresh_body();
   return true;
@@ -589,6 +675,7 @@ bool StripedListCtrl::DeleteColumn(int col) {
 void StripedListCtrl::SetColumnWidth(int col, int width) {
   if (col < 0 || col >= GetColumnCount() || width <= 0) return;
   columns_[static_cast<std::size_t>(col)].width = width;
+  update_h_scroll();
   if (header_) header_->Refresh();
   refresh_body();
 }
@@ -711,6 +798,7 @@ void StripedListCtrl::MoveColumn(int from, int to_before) {
     }
     ensure_cells(row);
   }
+  update_h_scroll();
   refresh_body();
 }
 
@@ -752,6 +840,38 @@ int StripedListCtrl::row_height() const {
 int StripedListCtrl::header_height() const { return FromDIP(28); }
 int StripedListCtrl::badge_size() const { return FromDIP(10); }
 int StripedListCtrl::badge_gap() const { return FromDIP(4); }
+
+int StripedListCtrl::content_width() const {
+  int w = 0;
+  for (const auto& col : columns_) w += col.width;
+  return w;
+}
+
+void StripedListCtrl::set_h_offset(int offset) {
+  const int client = body_ ? std::max(1, body_->GetClientSize().x) : 1;
+  const int max_pos = std::max(0, content_width() - client);
+  offset = std::clamp(offset, 0, max_pos);
+  if (offset == h_offset_) {
+    if (body_) body_->SetScrollPos(wxHORIZONTAL, h_offset_);
+    return;
+  }
+  h_offset_ = offset;
+  if (body_) body_->SetScrollPos(wxHORIZONTAL, h_offset_);
+  refresh_body();
+}
+
+void StripedListCtrl::update_h_scroll() {
+  if (!body_) return;
+  const int client = std::max(1, body_->GetClientSize().x);
+  const int content = std::max(client, content_width());
+  const int max_pos = std::max(0, content_width() - client);
+  if (h_offset_ > max_pos) h_offset_ = max_pos;
+  body_->SetScrollbar(wxHORIZONTAL, h_offset_, client, content, true);
+}
+
+void StripedListCtrl::scroll_h_by(int delta) {
+  set_h_offset(h_offset_ + delta);
+}
 
 void StripedListCtrl::refresh_body() {
   if (header_) header_->Refresh();

@@ -56,6 +56,7 @@ void test_config_roundtrip() {
   cfg.settings.health_show_docker_disks = true;
   cfg.settings.last_seen_version = "1.2.3";
   cfg.servers[0].health_enabled = false;
+  cfg.servers[0].archived = true;
 
   SessionVault vault;
   vault.create("roundtrip-password");
@@ -64,6 +65,7 @@ void test_config_roundtrip() {
   Config loaded = load_config_from(path);
   expect(loaded.servers.size() == 1, "roundtrip server count");
   expect(loaded.servers[0].remote_shell == "sh", "roundtrip server shell");
+  expect(loaded.servers[0].archived, "roundtrip server archived");
   expect(loaded.groups.size() == 1, "roundtrip group count");
   expect(loaded.groups[0].name == "deploy", "roundtrip group name");
   expect(loaded.commands.size() == 1, "roundtrip command count");

@@ -37,6 +37,8 @@ struct Server {
   std::string created_at;
   /// Хостинг-провайдер (свободный текст из списка или свой).
   std::string provider;
+  /// Скрыт из основного списка; команды и настройки сохраняются.
+  bool archived = false;
 
   static Server make_new();
   Server duplicate(const std::string& new_name) const;
@@ -278,6 +280,8 @@ struct Config {
   const BackupJob* backup_job_by_id(const std::string& id) const;
   std::vector<BackupJob> backup_jobs_for(const std::string& server_id) const;
   void drop_server_backup_jobs(const std::string& server_id);
+  /// Удаляет VPS и связанные команды, группы, связки, задания резерва и хвосты настроек.
+  void erase_server(const std::string& server_id);
 };
 
 std::string normalize_remote_shell(std::string_view shell);

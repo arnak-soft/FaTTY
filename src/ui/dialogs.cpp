@@ -705,6 +705,7 @@ CommandDialog::CommandDialog(wxWindow* parent, const Command& command, const std
   wxArrayString names;
   wxString current;
   for (const auto& s : servers) {
+    if (s.archived && s.id != command.server_id) continue;
     names.Add(wxString::FromUTF8(s.name));
     if (s.id == command.server_id) current = wxString::FromUTF8(s.name);
   }

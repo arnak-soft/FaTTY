@@ -561,7 +561,22 @@ HealthWindow::~HealthWindow() { alive_->store(false); }
 
 void HealthWindow::reload() {
   if (!config_ || !monitor_) return;
-  if (selected_id_.empty() && !config_->servers.empty()) selected_id_ = config_->servers.front().id;
+  if (selected_id_.empty()) {
+    for (const auto& s : config_->servers) {
+      if (!s.archived) {
+        selected_id_ = s.id;
+        break;
+      }
+    }
+  } else if (auto* cur = config_->server_by_id(selected_id_); cur && cur->archived) {
+    selected_id_.clear();
+    for (const auto& s : config_->servers) {
+      if (!s.archived) {
+        selected_id_ = s.id;
+        break;
+      }
+    }
+  }
   rebuild_cards();
   show_detail();
   wxString auto_text;
@@ -597,6 +612,7 @@ void HealthWindow::rebuild_cards() {
   list_sz_->Clear(true);
   const auto st = settings_ ? *settings_ : AppSettings{};
   for (const auto& server : config_->servers) {
+    if (server.archived) continue;
     auto* card = new HostCard(list_, this);
     auto snap = view_snap(monitor_->snapshot(server.id), st, server.health_ignore);
     snap.server_id = server.id;

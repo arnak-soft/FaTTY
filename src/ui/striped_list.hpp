@@ -98,6 +98,8 @@ class StripedListCtrl : public wxPanel {
     void on_dclick(wxMouseEvent&);
     void on_key(wxKeyEvent&);
     void on_size(wxSizeEvent&);
+    void on_scroll(wxScrollWinEvent&);
+    void on_wheel(wxMouseEvent&);
     int hit_row(int y) const;
     int hit_column(int x) const;
     int hit_badge(int row, int col, int x) const;
@@ -122,6 +124,11 @@ class StripedListCtrl : public wxPanel {
   void refresh_body();
   int badge_size() const;
   int badge_gap() const;
+  int content_width() const;
+  int h_offset() const { return h_offset_; }
+  void set_h_offset(int offset);
+  void update_h_scroll();
+  void scroll_h_by(int delta);
 
   std::vector<Column> columns_;
   std::vector<Row> rows_;
@@ -129,6 +136,7 @@ class StripedListCtrl : public wxPanel {
   long anchor_ = -1;
   int sort_col_ = -1;
   bool sort_asc_ = true;
+  int h_offset_ = 0;
   wxString empty_hint_;
   Header* header_{};
   Body* body_{};

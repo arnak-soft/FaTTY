@@ -190,6 +190,7 @@ json build_export_payload(const Config& config, bool include_secrets, bool inclu
         {"notes", server.notes},
         {"created_at", server.created_at},
         {"provider", server.provider},
+        {"archived", server.archived},
     };
     if (include_secrets) {
       item["password"] = server.password;
@@ -339,6 +340,7 @@ ImportResult import_into_config(Config& config, const json& data, const std::str
       s.notes = raw.value("notes", "");
       s.created_at = trim(raw.value("created_at", ""));
       s.provider = trim(raw.value("provider", ""));
+      s.archived = raw.value("archived", false);
       imported_servers.push_back(std::move(s));
     }
   }

@@ -86,6 +86,32 @@ void test_store() {
   expect(cfg.bundles_for(s.id).empty(), "server bundles dropped");
 
   {
+    auto archived = Server::make_new();
+    archived.name = "old";
+    archived.host = "10.0.0.9";
+    archived.archived = true;
+    cfg.servers.push_back(archived);
+    auto ac = Command::make_new(archived.id);
+    ac.name = "gone";
+    cfg.commands.push_back(ac);
+    auto ag = CommandGroup::make_new(archived.id, "old-group");
+    cfg.groups.push_back(ag);
+    cfg.settings.last_server_id = archived.id;
+    cfg.settings.last_group_by_server[archived.id] = ag.id;
+    cfg.settings.quick_history[archived.id] = {"uptime"};
+    cfg.settings.quick_history[archived.id + "\x1f" + ag.id] = {"df -h"};
+    cfg.erase_server(archived.id);
+    expect(cfg.server_by_id(archived.id) == nullptr, "erase_server removes server");
+    expect(cfg.commands_for(archived.id).empty(), "erase_server removes commands");
+    expect(cfg.groups_for(archived.id).empty(), "erase_server removes groups");
+    expect(cfg.settings.last_server_id.empty(), "erase_server clears last_server_id");
+    expect(cfg.settings.last_group_by_server.count(archived.id) == 0, "erase_server clears last group");
+    expect(cfg.settings.quick_history.count(archived.id) == 0, "erase_server clears quick history");
+    auto clone = archived.duplicate("old-copy");
+    expect(!clone.archived, "duplicate clears archived");
+  }
+
+  {
     std::size_t n = 0;
     const auto* palette = server_ui_colour_palette(n);
     expect(n >= 10 && n <= 15, "palette size 10-15");

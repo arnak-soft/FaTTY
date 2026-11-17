@@ -410,8 +410,14 @@ void AppFrame::build_ui() {
   extra_tools_parent_ = left;
   extra_tools_sizer_ = new wxWrapSizer(wxHORIZONTAL);
   auto* ls = new wxBoxSizer(wxVERTICAL);
-  ls->Add(section_label(left, L"VPS-серверы"), 0, wxBOTTOM, gap);
-  ls->Add(server_search_, 0, wxEXPAND | wxBOTTOM, gap);
+  servers_section_ = section_label(left, L"VPS-серверы");
+  ls->Add(servers_section_, 0, wxBOTTOM, gap);
+  auto* search_row = new wxBoxSizer(wxHORIZONTAL);
+  search_row->Add(server_search_, 1, wxEXPAND | wxRIGHT, gap);
+  server_archive_cb_ = new ThemedCheckBox(left, wxID_ANY, L"Архив");
+  server_archive_cb_->SetToolTip(L"Показать архивные VPS вместо рабочих");
+  search_row->Add(server_archive_cb_, 0, wxALIGN_CENTER_VERTICAL);
+  ls->Add(search_row, 0, wxEXPAND | wxBOTTOM, gap);
   ls->Add(servers_card, 1, wxEXPAND);
   ls->Add(sbtns, 0, wxTOP, pad);
   ls->Add(extra_tools_sizer_, 0);
@@ -677,6 +683,13 @@ void AppFrame::build_ui() {
 
   server_search_->Bind(wxEVT_TEXT, [this](wxCommandEvent&) {
     server_filter_ = trim(std::string(server_search_->GetValue().utf8_string()));
+    refresh_servers();
+  });
+  server_archive_cb_->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent&) {
+    show_archived_servers_ = server_archive_cb_->GetValue();
+    if (servers_section_) {
+      servers_section_->SetLabel(show_archived_servers_ ? L"Архив VPS" : L"VPS-серверы");
+    }
     refresh_servers();
   });
   servers_->Bind(wxEVT_LIST_ITEM_SELECTED, [this](wxListEvent&) {
@@ -1481,8 +1494,13 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
   const std::string q = to_lower(server_filter_);
   long sel = -1;
   long row = 0;
+  bool any_active = false;
+  bool any_archived = false;
   for (std::size_t i = 0; i < config_.servers.size(); ++i) {
     const auto& s = config_.servers[i];
+    if (s.archived) any_archived = true;
+    else any_active = true;
+    if (s.archived != show_archived_servers_) continue;
     if (!q.empty()) {
       auto hay = to_lower(s.name + " " + s.username + " " + s.host + " " + s.provider + " " + s.notes + " " +
                           s.created_at);
@@ -1498,7 +1516,7 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
               {"health", L""}});
     servers_->SetItemPtrData(row, static_cast<wxUIntPtr>(i));
     wxColour row_colour = Theme::text();
-    if (health_) {
+    if (health_ && !s.archived) {
       auto snap = health_->snapshot(s.id);
       const auto th = health_thresholds_of(config_.settings);
       apply_health_thresholds(snap, th, s.health_ignore);
@@ -1525,6 +1543,7 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
       wxColour accent;
       if (server_ui_colour(s.ui_colour_dark, s.ui_colour_light, accent)) row_colour = accent;
     }
+    if (s.archived) row_colour = Theme::muted();
     style_list_row(servers_, row, row_colour);
     if (s.id == keep) sel = row;
     ++row;
@@ -1533,7 +1552,15 @@ void AppFrame::refresh_servers(const std::string& keep_id) {
   if (config_.servers.empty()) {
     servers_->set_empty_hint(L"Пока нет VPS.\nНажмите «Добавить».");
   } else if (servers_->GetItemCount() == 0) {
-    servers_->set_empty_hint(L"Ничего не найдено.");
+    if (!q.empty()) {
+      servers_->set_empty_hint(L"Ничего не найдено.");
+    } else if (show_archived_servers_) {
+      servers_->set_empty_hint(L"Архив пуст.");
+    } else if (any_archived && !any_active) {
+      servers_->set_empty_hint(L"Все VPS в архиве.\nОтметьте «Архив».");
+    } else {
+      servers_->set_empty_hint(L"Ничего не найдено.");
+    }
   } else {
     servers_->set_empty_hint(L"");
   }
@@ -2481,7 +2508,7 @@ void AppFrame::update_health_button() {
   std::vector<std::string> enabled;
   enabled.reserve(config_.servers.size());
   for (const auto& s : config_.servers) {
-    if (s.health_enabled) enabled.push_back(s.id);
+    if (s.health_enabled && !s.archived) enabled.push_back(s.id);
   }
   const auto alert = health_ ? health_fleet_alert(health_->snapshots(), enabled) : HealthFleetAlert{};
   if (alert.total() > 0) {
@@ -2764,7 +2791,13 @@ void AppFrame::show_servers_context_menu(long row) {
   menu.Append(2009, L"Состояние VPS…");
   menu.Append(2017, L"Резервные копии VPS…");
   menu.AppendSeparator();
-  menu.Append(2008, L"Удалить");
+  if (show_archived_servers_) {
+    menu.Append(2025, L"Восстановить из архива");
+    menu.Append(2008, L"Удалить навсегда");
+  } else {
+    menu.Append(2025, L"В архив");
+    menu.Append(2008, L"Удалить навсегда");
+  }
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) return;
@@ -2885,23 +2918,46 @@ void AppFrame::show_servers_context_menu(long row) {
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) return;
-    if (!ask_confirm(this, L"Удалить VPS", L"Удалить «" + wxString::FromUTF8(s->name) + L"»?", L"Удалить", false,
-                     BtnIcon::Trash))
+    const bool to_archive = !s->archived;
+    if (to_archive) {
+      if (!ask_confirm(this, L"Архив VPS",
+                       L"Переместить «" + wxString::FromUTF8(s->name) +
+                           L"» в архив?\nКоманды и настройки сохранятся.",
+                       L"В архив", false))
+        return;
+      const auto name = s->name;
+      s->archived = true;
+      persist();
+      refresh_servers();
+      status_->SetLabel(wxString::FromUTF8("В архиве → " + name));
+    } else {
+      const auto id = s->id;
+      const auto name = s->name;
+      s->archived = false;
+      persist();
+      if (server_archive_cb_) {
+        server_archive_cb_->SetValue(false);
+        show_archived_servers_ = false;
+        if (servers_section_) servers_section_->SetLabel(L"VPS-серверы");
+      }
+      refresh_servers(id);
+      status_->SetLabel(wxString::FromUTF8("Восстановлен из архива → " + name));
+    }
+  }, 2025);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
+    auto* s = selected_server();
+    if (!s) return;
+    if (!ask_confirm(this, L"Удалить VPS",
+                     L"Удалить «" + wxString::FromUTF8(s->name) +
+                         L"» навсегда?\nКоманды, группы, связки и задания резерва этого VPS тоже удалятся.",
+                     L"Удалить", false, BtnIcon::Trash))
       return;
-    auto id = s->id;
-    config_.servers.erase(std::remove_if(config_.servers.begin(), config_.servers.end(),
-                                         [&](const Server& x) { return x.id == id; }),
-                          config_.servers.end());
-    config_.commands.erase(std::remove_if(config_.commands.begin(), config_.commands.end(),
-                                          [&](const Command& x) { return x.server_id == id; }),
-                           config_.commands.end());
-    config_.groups.erase(std::remove_if(config_.groups.begin(), config_.groups.end(),
-                                        [&](const CommandGroup& x) { return x.server_id == id; }),
-                          config_.groups.end());
-    config_.drop_server_bundles(id);
-    config_.drop_server_backup_jobs(id);
+    const auto id = s->id;
+    const auto name = s->name;
+    config_.erase_server(id);
     persist();
     refresh_servers();
+    status_->SetLabel(wxString::FromUTF8("Удалён → " + name));
   }, 2008);
   show_themed_menu(this, &menu);
 }
@@ -3088,6 +3144,7 @@ void AppFrame::show_bundles_context_menu(long row) {
     wxArrayString labels;
     std::vector<std::string> ids;
     for (const auto& srv : config_.servers) {
+      if (srv.archived) continue;
       if (s && srv.id == s->id) continue;
       labels.Add(wxString::FromUTF8(srv.name.empty() ? srv.host : srv.name));
       ids.push_back(srv.id);

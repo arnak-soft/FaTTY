@@ -57,6 +57,7 @@ class BackupJobDialog : public PositionedDialog {
       wxArrayString names;
       int sel = 0;
       for (const auto& s : config_.servers) {
+        if (s.archived && s.id != job_.source_server_id) continue;
         server_ids_.push_back(s.id);
         names.Add(wxString::FromUTF8(s.name.empty() ? s.host : s.name));
         if (s.id == job_.source_server_id) sel = static_cast<int>(server_ids_.size() - 1);
@@ -146,6 +147,7 @@ class BackupJobDialog : public PositionedDialog {
       wxArrayString names;
       int sel = 0;
       for (const auto& s : config_.servers) {
+        if (s.archived && s.id != job_.dest_server_id) continue;
         dest_server_ids_.push_back(s.id);
         names.Add(wxString::FromUTF8(s.name.empty() ? s.host : s.name));
         if (s.id == job_.dest_server_id) sel = static_cast<int>(dest_server_ids_.size() - 1);
@@ -590,10 +592,15 @@ void BackupWindow::append_log(const std::string& line) {
 
 std::string BackupWindow::default_source_server_id() const {
   if (!config_ || config_->servers.empty()) return {};
-  if (!preferred_server_id_.empty() && config_->server_by_id(preferred_server_id_)) {
-    return preferred_server_id_;
+  if (!preferred_server_id_.empty()) {
+    if (auto* s = config_->server_by_id(preferred_server_id_); s && !s->archived) {
+      return preferred_server_id_;
+    }
   }
-  return config_->servers.front().id;
+  for (const auto& s : config_->servers) {
+    if (!s.archived) return s.id;
+  }
+  return {};
 }
 
 void BackupWindow::rebuild_list() {

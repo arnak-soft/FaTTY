@@ -52,6 +52,7 @@ Server Server::duplicate(const std::string& new_name) const {
   s.id = new_uuid();
   s.name = new_name;
   s.password_blob.clear();
+  s.archived = false;
   return s;
 }
 
@@ -520,6 +521,30 @@ void Config::drop_server_backup_jobs(const std::string& server_id) {
                     backup_jobs.end());
 }
 
+void Config::erase_server(const std::string& server_id) {
+  servers.erase(std::remove_if(servers.begin(), servers.end(),
+                               [&](const Server& s) { return s.id == server_id; }),
+                servers.end());
+  commands.erase(std::remove_if(commands.begin(), commands.end(),
+                                [&](const Command& c) { return c.server_id == server_id; }),
+                 commands.end());
+  groups.erase(std::remove_if(groups.begin(), groups.end(),
+                              [&](const CommandGroup& g) { return g.server_id == server_id; }),
+               groups.end());
+  drop_server_bundles(server_id);
+  drop_server_backup_jobs(server_id);
+  settings.last_group_by_server.erase(server_id);
+  if (settings.last_server_id == server_id) settings.last_server_id.clear();
+  const std::string prefix = server_id + "\x1f";
+  for (auto it = settings.quick_history.begin(); it != settings.quick_history.end();) {
+    if (it->first == server_id || it->first.rfind(prefix, 0) == 0) {
+      it = settings.quick_history.erase(it);
+    } else {
+      ++it;
+    }
+  }
+}
+
 namespace {
 
 int json_int(const json& j, const char* key, int def, int lo, int hi) {
@@ -684,6 +709,7 @@ Config load_config_from(const std::filesystem::path& path) {
     s.notes = raw.value("notes", "");
     s.created_at = trim(raw.value("created_at", ""));
     s.provider = trim(raw.value("provider", ""));
+    s.archived = raw.value("archived", false);
     const std::string legacy = raw.value("password_encrypted", "");
     if (!vault_ok && !legacy.empty()) {
       try {
@@ -1001,6 +1027,7 @@ void save_config_to(Config& config, SessionVault& vault, const std::filesystem::
         {"notes", s.notes},
         {"created_at", s.created_at},
         {"provider", s.provider},
+        {"archived", s.archived},
     };
     payload["servers"].push_back(item);
     s.password_blob = item["password_vault"].get<std::string>();

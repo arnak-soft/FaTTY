@@ -45,6 +45,7 @@ std::optional<TransferTarget> pick_server_and_group(wxWindow* parent, const Conf
   wxArrayString server_labels;
   std::vector<std::string> server_ids;
   for (const auto& s : config.servers) {
+    if (s.archived) continue;
     if (!exclude_server_id.empty() && s.id == exclude_server_id) continue;
     server_labels.Add(wxString::FromUTF8(s.name.empty() ? s.host : s.name));
     server_ids.push_back(s.id);
