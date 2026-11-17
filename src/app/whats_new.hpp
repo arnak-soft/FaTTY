@@ -9,9 +9,9 @@ namespace fatty {
 // с последнего git-тега. Агент обновляет после каждого заметного изменения.
 inline constexpr std::string_view kWhatsNew =
     "• Команда закончилась вне FaTTY — тихий toast в углу (настройки)\n"
-    "• Свежий OK/ошибка в списке ярко, через пару минут тускнеет\n"
     "• Файлы: правый клик → «Открыть…» — правка текста на VPS\n"
-    "• VPS можно отправить в архив вместо удаления";
+    "• VPS можно отправить в архив вместо удаления\n"
+    "• Разовая команда очищается после выполнения";
 
 std::string release_version_id(std::string_view version);
 bool should_show_whats_new(std::string_view last_seen, std::string_view current,

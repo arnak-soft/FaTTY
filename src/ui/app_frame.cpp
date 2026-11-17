@@ -848,6 +848,7 @@ void AppFrame::build_ui() {
       return;
     push_quick_history(cmd);
     run_command(*s, cmd, config_.settings.default_command_timeout, true, "разовая команда", "", "quick");
+    quick_->ChangeValue(wxEmptyString);
   });
   quick_->Bind(wxEVT_TEXT_ENTER, [this, qrun](wxCommandEvent&) {
     wxCommandEvent ev(wxEVT_BUTTON);
