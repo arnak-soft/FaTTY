@@ -33,7 +33,7 @@ struct Server {
   int ui_font_pt = 0;
   /// Заметка / описание VPS (для себя).
   std::string notes;
-  /// Дата создания: `YYYY-MM-DD` или пусто.
+  /// Дата создания записи о VPS: `YYYY-MM-DD` или пусто. У новых — день `make_new`/`duplicate`.
   std::string created_at;
   /// Хостинг-провайдер (свободный текст из списка или свой).
   std::string provider;
@@ -273,6 +273,8 @@ struct Config {
   void set_commands_for(const std::string& server_id, const std::vector<Command>& ordered);
   void set_commands_for(const std::string& server_id, const std::string& group_id, const std::vector<Command>& ordered);
   bool move_command(const std::string& command_id, int delta);
+  /// Сдвиг VPS среди серверов с тем же флагом `archived` (порядок в списке).
+  bool move_server(const std::string& server_id, int delta);
   void sort_commands_for(const std::string& server_id, const std::string& by, bool ascending = true);
   void sort_commands_for(const std::string& server_id, const std::string& group_id, const std::string& by,
                          bool ascending = true);

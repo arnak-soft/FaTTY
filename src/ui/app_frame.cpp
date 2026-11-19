@@ -267,10 +267,14 @@ AppFrame::AppFrame(Config config, SessionVault vault)
         (e.GetKeyCode() == WXK_UP || e.GetKeyCode() == WXK_NUMPAD_UP || e.GetKeyCode() == WXK_DOWN ||
          e.GetKeyCode() == WXK_NUMPAD_DOWN)) {
       if (auto* focus = wxWindow::FindFocus()) {
+        const int delta =
+            (e.GetKeyCode() == WXK_UP || e.GetKeyCode() == WXK_NUMPAD_UP) ? -1 : 1;
         if (commands_ && (focus == commands_ || commands_->IsDescendant(focus))) {
-          const int delta =
-              (e.GetKeyCode() == WXK_UP || e.GetKeyCode() == WXK_NUMPAD_UP) ? -1 : 1;
           move_selected_command(delta);
+          return;
+        }
+        if (servers_ && (focus == servers_ || servers_->IsDescendant(focus))) {
+          move_selected_server(delta);
           return;
         }
       }
@@ -2648,6 +2652,15 @@ void AppFrame::move_selected_command(int delta) {
   refresh_commands();
 }
 
+void AppFrame::move_selected_server(int delta) {
+  auto* s = selected_server();
+  if (!s) return;
+  const auto id = s->id;
+  if (!config_.move_server(id, delta)) return;
+  persist();
+  refresh_servers(id);
+}
+
 void AppFrame::advance_command_selection() {
   if (visible_command_ids_.size() < 2 || !commands_) return;
   long cur = commands_->GetNextItem(-1, wxLIST_NEXT_ALL, wxLIST_STATE_SELECTED);
@@ -2852,6 +2865,9 @@ void AppFrame::show_servers_context_menu(long row) {
   menu.Append(2009, L"Состояние VPS…");
   menu.Append(2017, L"Резервные копии VPS…");
   menu.AppendSeparator();
+  menu.Append(2026, L"Вверх");
+  menu.Append(2027, L"Вниз");
+  menu.AppendSeparator();
   if (show_archived_servers_) {
     menu.Append(2025, L"Восстановить из архива");
     menu.Append(2008, L"Удалить навсегда");
@@ -2859,6 +2875,8 @@ void AppFrame::show_servers_context_menu(long row) {
     menu.Append(2025, L"В архив");
     menu.Append(2008, L"Удалить навсегда");
   }
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { move_selected_server(-1); }, 2026);
+  menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) { move_selected_server(1); }, 2027);
   menu.Bind(wxEVT_MENU, [this](wxCommandEvent&) {
     auto* s = selected_server();
     if (!s) return;

@@ -6,7 +6,10 @@
 #include "ui/widgets.hpp"
 
 #include <algorithm>
+#include <string_view>
 #include <wx/checkbox.h>
+#include <wx/datectrl.h>
+#include <wx/datetime.h>
 #include <wx/dcclient.h>
 #include <wx/filedlg.h>
 #include <wx/listctrl.h>
@@ -35,6 +38,30 @@ wxTextCtrl* labeled_entry(wxWindow* parent, wxFlexGridSizer* grid, const wxStrin
   style_text(e);
   grid->Add(e, 1, wxEXPAND);
   return e;
+}
+
+/// `YYYY-MM-DD` / `YYYYMMDD` → дата; иначе invalid (пусто в календаре).
+wxDateTime parse_created_at_date(std::string_view raw) {
+  std::string d = trim(raw);
+  if (d.size() == 8 && d.find('-') == std::string::npos) {
+    d = d.substr(0, 4) + "-" + d.substr(4, 2) + "-" + d.substr(6, 2);
+  }
+  int y = 0;
+  int m = 0;
+  int day = 0;
+  if (d.size() != 10 || d[4] != '-' || d[7] != '-' || !parse_int(d.substr(0, 4), y) ||
+      !parse_int(d.substr(5, 2), m) || !parse_int(d.substr(8, 2), day) || y < 1990 || y > 2100 || m < 1 ||
+      m > 12 || day < 1 || day > 31) {
+    return {};
+  }
+  wxDateTime dt(day, static_cast<wxDateTime::Month>(m - 1), y);
+  return dt.IsValid() ? dt : wxDateTime{};
+}
+
+std::string format_created_at_date(const wxDateTime& dt) {
+  if (!dt.IsValid()) return {};
+  return wxString::Format(L"%04d-%02d-%02d", dt.GetYear(), static_cast<int>(dt.GetMonth()) + 1, dt.GetDay())
+      .utf8_string();
 }
 
 wxPanel* make_colour_swatch(wxWindow* parent, int width_dip = 28, int height_dip = 22) {
@@ -291,10 +318,19 @@ ServerDialog::ServerDialog(wxWindow* parent, const Server& server, const wxStrin
   provider_list->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) { pick_provider_from_list(); });
 
   {
-    std::string created = server.created_at;
-    if (is_new && created.empty()) created = today_date_string();
-    created_at_ = labeled_entry(body, grid, L"Создана", wxString::FromUTF8(created));
-    created_at_->SetHint(L"YYYY-MM-DD");
+    grid->Add(new wxStaticText(body, wxID_ANY, L"Создана"), 0, wxALIGN_CENTER_VERTICAL);
+    wxDateTime initial = parse_created_at_date(server.created_at);
+    if (!initial.IsValid()) {
+      // Новая запись — сегодня; старые без даты оставляем пустыми (можно выбрать в календаре).
+      if (is_new) initial = parse_created_at_date(today_date_string());
+    }
+    created_at_ =
+        new wxDatePickerCtrl(body, wxID_ANY, initial.IsValid() ? initial : wxDefaultDateTime,
+                             wxDefaultPosition, wxDefaultSize,
+                             wxDP_DROPDOWN | wxDP_SHOWCENTURY | wxDP_ALLOWNONE);
+    if (!initial.IsValid()) created_at_->SetValue(wxDefaultDateTime);
+    created_at_->SetToolTip(L"Дата создания записи о VPS");
+    grid->Add(created_at_, 0, wxEXPAND);
   }
 
   grid->Add(new wxStaticText(body, wxID_ANY, L"Заметка"), 0, wxALIGN_TOP);
@@ -549,28 +585,10 @@ void ServerDialog::on_ok(wxCommandEvent&) {
   result.ui_colour_dark = ui_colour_dark_;
   result.ui_colour_light = ui_colour_light_;
   result.provider = trim(std::string(provider_->GetValue().utf8_string()));
-  result.created_at = trim(std::string(created_at_->GetValue().utf8_string()));
+  result.created_at = format_created_at_date(created_at_->GetValue());
   result.notes = std::string(notes_->GetValue().utf8_string());
   while (!result.notes.empty() && (result.notes.back() == '\n' || result.notes.back() == '\r')) {
     result.notes.pop_back();
-  }
-  if (!result.created_at.empty()) {
-    // YYYY-MM-DD или YYYYMMDD
-    std::string d = result.created_at;
-    if (d.size() == 8 && d.find('-') == std::string::npos) {
-      d = d.substr(0, 4) + "-" + d.substr(4, 2) + "-" + d.substr(6, 2);
-    }
-    int y = 0;
-    int m = 0;
-    int day = 0;
-    if (d.size() == 10 && d[4] == '-' && d[7] == '-' && parse_int(d.substr(0, 4), y) &&
-        parse_int(d.substr(5, 2), m) && parse_int(d.substr(8, 2), day) && y >= 1990 && y <= 2100 && m >= 1 &&
-        m <= 12 && day >= 1 && day <= 31) {
-      result.created_at = d;
-    } else {
-      mark_error(created_at_, L"Дата создания — YYYY-MM-DD или пусто.");
-      return;
-    }
   }
   {
     const int sel = font_face_->GetSelection();

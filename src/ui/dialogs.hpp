@@ -7,6 +7,7 @@
 #include "ui/chrome.hpp"
 #include "ui/striped_list.hpp"
 
+#include <wx/datectrl.h>
 #include <wx/dialog.h>
 #include <wx/stattext.h>
 #include <wx/textctrl.h>
@@ -37,7 +38,7 @@ class ServerDialog : public PositionedDialog {
   wxTextCtrl* password_{};
   wxTextCtrl* key_{};
   wxTextCtrl* provider_{};
-  wxTextCtrl* created_at_{};
+  wxDatePickerCtrl* created_at_{};
   wxTextCtrl* notes_{};
   ThemedCheckBox* show_pw_{};
   ThemedCheckBox* clear_pw_{};

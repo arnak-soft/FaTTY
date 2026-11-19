@@ -39,6 +39,26 @@ void test_store() {
   expect(cfg.commands_for(s.id).size() == 2, "commands_for");
   expect(cfg.move_command(c1.id, 1), "move down");
   expect(cfg.commands[1].id == c1.id, "moved");
+  {
+    auto s2 = Server::make_new();
+    s2.name = "beta";
+    s2.host = "10.0.0.2";
+    cfg.servers.push_back(s2);
+    expect(cfg.move_server(s.id, 1), "move vps down");
+    expect(cfg.servers[0].id == s2.id && cfg.servers[1].id == s.id, "vps order swapped");
+    expect(cfg.move_server(s.id, 1) == false, "vps already at bottom");
+    expect(cfg.move_server(s.id, -1), "move vps up");
+    expect(cfg.servers[0].id == s.id, "vps back on top");
+    auto archived = Server::make_new();
+    archived.name = "old";
+    archived.archived = true;
+    cfg.servers.insert(cfg.servers.begin() + 1, archived);
+    // [s, archived, s2] — среди неархивных s и s2 соседи
+    expect(cfg.move_server(s.id, 1), "move past archived peer");
+    expect(cfg.servers[0].id == s2.id && cfg.servers[2].id == s.id, "active order without touching archive");
+    expect(cfg.servers[1].archived, "archived stays in place");
+    cfg.servers = {s};  // дальше тесты ждут один активный VPS
+  }
   cfg.sort_commands_for(s.id, "name");
   expect(cfg.commands_for(s.id)[0].name == "a", "sort by name");
   cfg.sort_commands_for(s.id, "name", false);
@@ -137,6 +157,7 @@ void test_store() {
     expect(!builtin_hosting_providers().empty(), "builtin providers");
     expect(today_date_string().size() == 10, "today date length");
     Server a = Server::make_new();
+    expect(a.created_at == today_date_string(), "new vps gets created_at today");
     a.provider = "MyCloud";
     auto choices = hosting_provider_choices({"CustomHost"}, {a}, "CurrentHost");
     expect(std::find(choices.begin(), choices.end(), "Hetzner") != choices.end(), "builtin in choices");

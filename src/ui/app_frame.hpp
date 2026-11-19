@@ -93,6 +93,7 @@ class AppFrame : public wxFrame {
                    std::string working_dir = {}, bool cd_before_run = false, std::string remote_shell = {});
   void request_saved_runs();
   void move_selected_command(int delta);
+  void move_selected_server(int delta);
   void advance_command_selection();
   void start_bundle(const std::string& bundle_id_override = {});
   void open_bundle_steps();

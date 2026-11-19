@@ -44,6 +44,7 @@ json health_ignore_json(const HealthAlertIgnore& ig) {
 Server Server::make_new() {
   Server s;
   s.id = new_uuid();
+  s.created_at = today_date_string();
   return s;
 }
 
@@ -53,6 +54,7 @@ Server Server::duplicate(const std::string& new_name) const {
   s.name = new_name;
   s.password_blob.clear();
   s.archived = false;
+  s.created_at = today_date_string();
   return s;
 }
 
@@ -403,6 +405,31 @@ bool Config::move_command(const std::string& command_id, int delta) {
   }
   std::swap(group[static_cast<std::size_t>(idx)], group[static_cast<std::size_t>(new_idx)]);
   set_commands_for(cmd->server_id, cmd->group_id, group);
+  return true;
+}
+
+bool Config::move_server(const std::string& server_id, int delta) {
+  if (delta == 0 || servers.empty()) return false;
+  int idx = -1;
+  for (int i = 0; i < static_cast<int>(servers.size()); ++i) {
+    if (servers[static_cast<std::size_t>(i)].id == server_id) {
+      idx = i;
+      break;
+    }
+  }
+  if (idx < 0) return false;
+  const bool archived = servers[static_cast<std::size_t>(idx)].archived;
+  std::vector<int> peers;
+  int peer_pos = -1;
+  for (int i = 0; i < static_cast<int>(servers.size()); ++i) {
+    if (servers[static_cast<std::size_t>(i)].archived != archived) continue;
+    if (i == idx) peer_pos = static_cast<int>(peers.size());
+    peers.push_back(i);
+  }
+  const int new_pos = peer_pos + delta;
+  if (peer_pos < 0 || new_pos < 0 || new_pos >= static_cast<int>(peers.size())) return false;
+  std::swap(servers[static_cast<std::size_t>(peers[static_cast<std::size_t>(peer_pos)])],
+            servers[static_cast<std::size_t>(peers[static_cast<std::size_t>(new_pos)])]);
   return true;
 }
 
