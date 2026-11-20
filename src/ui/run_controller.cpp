@@ -12,6 +12,12 @@ namespace fatty {
 
 RunController::RunController(Host host) : host_(std::move(host)) {}
 
+bool RunController::is_occupied() const {
+  if (host_.busy && *host_.busy) return true;
+  if (host_.bundle_active && host_.bundle_active()) return true;
+  return false;
+}
+
 std::string RunController::queue_suffix() const {
   if (run_queue_.empty()) return {};
   return "  •  очередь: " + std::to_string(run_queue_.size());
@@ -19,6 +25,17 @@ std::string RunController::queue_suffix() const {
 
 void RunController::clear_run_queue() {
   run_queue_.clear();
+}
+
+void RunController::enqueue_job(QueuedJob job, const std::string& label) {
+  run_queue_.push_back(std::move(job));
+  const wxColour meta = Theme::meta();
+  if (host_.append_output) {
+    host_.append_output("В очередь: " + label + " (" + std::to_string(run_queue_.size()) + ")\n", &meta);
+  }
+  if (host_.set_status && host_.busy_label) {
+    host_.set_status(*host_.busy_label + queue_suffix());
+  }
 }
 
 void RunController::pump_run_queue() {
@@ -29,9 +46,38 @@ void RunController::pump_run_queue() {
   }
   auto job = std::move(run_queue_.front());
   run_queue_.pop_front();
+  if (job.type == QueuedJob::Type::Bundle) {
+    if (host_.start_bundle) {
+      host_.start_bundle(job.server, job.bundle_id, job.bundle_name, std::move(job.bundle_cmds), job.interval_sec);
+    } else if (host_.set_busy && run_queue_.empty()) {
+      host_.set_busy(false);
+    } else {
+      pump_run_queue();
+    }
+    return;
+  }
   start_ssh_run(std::move(job.server), std::move(job.command), job.timeout, job.login_shell, std::move(job.title),
                 std::move(job.command_id), std::move(job.kind), {}, std::move(job.working_dir), job.cd_before_run,
                 std::move(job.remote_shell));
+}
+
+void RunController::run_bundle(const Server& server, const std::string& bundle_id, const std::string& bundle_name,
+                               std::vector<Command> cmds, int interval_sec) {
+  if (cmds.empty()) return;
+  if (is_occupied()) {
+    QueuedJob job;
+    job.type = QueuedJob::Type::Bundle;
+    job.server = server;
+    job.bundle_id = bundle_id;
+    job.bundle_name = bundle_name;
+    job.bundle_cmds = std::move(cmds);
+    job.interval_sec = interval_sec;
+    enqueue_job(std::move(job), "связка «" + bundle_name + "»  •  " + server.name);
+    return;
+  }
+  if (host_.start_bundle) {
+    host_.start_bundle(server, bundle_id, bundle_name, std::move(cmds), interval_sec);
+  }
 }
 
 void RunController::run_command(const Server& server, const std::string& command, int timeout, bool login_shell,
@@ -39,18 +85,20 @@ void RunController::run_command(const Server& server, const std::string& command
                                 std::function<void(int code, std::string status)> on_done, std::string working_dir,
                                 bool cd_before_run, std::string_view remote_shell) {
   const bool chained = static_cast<bool>(on_done);
-  if (host_.busy && *host_.busy && !chained) {
-    run_queue_.push_back({server, command, timeout, login_shell, title, command_id, kind, std::move(working_dir),
-                          cd_before_run, std::string(remote_shell)});
-    const wxColour meta = Theme::meta();
-    if (host_.append_output) {
-      host_.append_output("В очередь: " + title + "  •  " + server.name + " (" + std::to_string(run_queue_.size()) +
-                              ")\n",
-                          &meta);
-    }
-    if (host_.set_status && host_.busy_label) {
-      host_.set_status(*host_.busy_label + queue_suffix());
-    }
+  if (is_occupied() && !chained) {
+    QueuedJob job;
+    job.type = QueuedJob::Type::Command;
+    job.server = server;
+    job.command = command;
+    job.timeout = timeout;
+    job.login_shell = login_shell;
+    job.title = title;
+    job.command_id = command_id;
+    job.kind = kind;
+    job.working_dir = std::move(working_dir);
+    job.cd_before_run = cd_before_run;
+    job.remote_shell = std::string(remote_shell);
+    enqueue_job(std::move(job), title + "  •  " + server.name);
     return;
   }
   start_ssh_run(server, command, timeout, login_shell, title, command_id, kind, std::move(on_done),

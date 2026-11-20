@@ -79,7 +79,9 @@ void BundleController::run_step() {
     *host_.busy_label = "Связка «" + name_ + "» (" + std::to_string(index_ + 1) + "/" +
                         std::to_string(cmds_.size()) + "): " + c.name;
   }
-  if (host_.set_status && host_.busy_label) host_.set_status(*host_.busy_label);
+  if (host_.set_status && host_.busy_label) {
+    host_.set_status(*host_.busy_label + (host_.runs ? host_.runs->queue_suffix() : std::string{}));
+  }
   if (!host_.run_step) return;
   host_.run_step(server_, c, [this](int code, std::string status) {
     if (!active_) return;

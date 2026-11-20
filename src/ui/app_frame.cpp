@@ -428,8 +428,8 @@ void AppFrame::build_ui() {
   ls->Add(sbtns, 0, wxTOP, pad);
   ls->Add(extra_tools_sizer_, 0);
   left->SetSizer(ls);
-  // Внешние программы гасятся на время SSH; список команд остаётся доступен —
-  // запуск ставит в очередь. Правка VPS — двойной клик и контекстное меню.
+  // Внешние программы гасятся на время SSH; списки команд/связок доступны —
+  // новый запуск встаёт в общую очередь. Правка VPS — двойной клик и меню.
   busy_disable_ = {tools};
   rebuild_extra_tools();
 
@@ -2466,6 +2466,10 @@ void AppFrame::init_run_controllers() {
     const std::string label = title.empty() ? "Команда" : title;
     maybe_notify_run_finished(label, status_label(status) + " · " + server_name, status);
   };
+  rh.start_bundle = [this](const Server& server, const std::string& bundle_id, const std::string& bundle_name,
+                           std::vector<Command> cmds, int interval_sec) {
+    if (bundle_run_) bundle_run_->start(server, bundle_id, bundle_name, std::move(cmds), interval_sec);
+  };
   runs_ = std::make_unique<RunController>(std::move(rh));
 
   BundleController::Host bh;
@@ -2766,14 +2770,8 @@ void AppFrame::start_bundle(const std::string& bundle_id_override) {
   auto msg = wxString::Format(L"Запустить связку «%s»?\n%d команд, пауза %d с.", wxString::FromUTF8(b->name),
                               static_cast<int>(cmds.size()), pause);
   if (!ask_confirm(this, L"Связка", msg, L"Запустить", true, BtnIcon::Play)) return;
-  if (busy_) {
-    for (const auto& c : cmds) {
-      run_command(*s, c.command, c.timeout_sec, c.login_shell, c.name, c.id, "command", {},
-                  command_run_working_dir(config_, c), c.cd_before_run, effective_remote_shell(*s, c));
-    }
-    return;
-  }
-  if (bundle_run_) bundle_run_->start(*s, b->id, b->name, std::move(cmds), pause);
+  if (!runs_) return;
+  runs_->run_bundle(*s, b->id, b->name, std::move(cmds), pause);
 }
 
 void AppFrame::add_group() {
